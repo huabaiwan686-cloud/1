@@ -140,8 +140,16 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     return ok(msg="已发布")
 
 
+VALID_BATCH_OPS = {
+    "publish", "unpublish", "delete", "strip_number_title", "find_duplicates",
+    "clear_channels", "text_replace", "remove_suffix", "add_suffix", "replace_fee_line",
+}
+
+
 def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session) -> dict:
     """10 项批量操作（原站 VIP 下拉）。"""
+    if op not in VALID_BATCH_OPS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知操作: {op}")
     count = 0
     extra: dict = {}
     for n in notes:
@@ -179,8 +187,6 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session) -> di
                 n.fee_text = params.get("fee_text", "")
         elif op == "find_duplicates":
             continue  # 单独处理
-        else:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知操作: {op}")
         count += 1
     if op == "find_duplicates":
         seen: dict[str, list[int]] = {}
