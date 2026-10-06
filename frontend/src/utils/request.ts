@@ -1,0 +1,35 @@
+import axios from 'axios';
+
+const request = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  timeout: 30000,
+});
+
+// token 注入
+request.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// 统一响应：{code, msg, data}；code !== 0 抛错；401 跳登录
+request.interceptors.response.use(
+  (resp) => {
+    const { code, msg, data } = resp.data ?? {};
+    if (code !== 0) {
+      const err: any = new Error(msg || '请求失败');
+      err.code = code;
+      throw err;
+    }
+    return data;
+  },
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      location.href = '/login';
+    }
+    throw error;
+  },
+);
+
+export default request;
