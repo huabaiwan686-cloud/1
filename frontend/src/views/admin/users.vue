@@ -54,6 +54,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { userApi, inviteApi } from '@/api';
+import { formatDateTime } from '@/utils/date';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 70, className: 'hide-mobile' },
@@ -61,7 +62,7 @@ const columns = [
   { title: '密码', key: 'password', width: 120 },
   { title: '昵称', dataIndex: 'displayName' },
   { title: '角色', key: 'role', width: 100 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 180, className: 'hide-mobile' },
+  { title: '创建时间', dataIndex: 'createdAt', width: 180, className: 'hide-mobile', customRender: ({ text }: any) => formatDateTime(text) },
   { title: '操作', key: 'action', width: 320 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
