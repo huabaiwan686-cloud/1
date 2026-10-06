@@ -672,3 +672,10 @@ a {
 @media (max-width: 768px) {
   .hide-mobile { display: none; }
 }
+
+/* 强制 Header 白色（覆盖 antd 默认深色） */
+.ant-layout-header.pro-header,
+.pro-header {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
