@@ -44,12 +44,12 @@ import { message } from 'ant-design-vue';
 import { metaApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '名称', dataIndex: 'name', width: 180 },
   { title: '来源', key: 'source', width: 110 },
   { title: '状态', key: 'status', width: 90 },
   { title: '使用次数', dataIndex: 'usageCount', width: 100 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 170 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 170, className: 'hide-mobile' },
   { title: '操作', key: 'action', width: 80 },
 ];
 const list = ref<any[]>([]);

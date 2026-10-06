@@ -34,14 +34,14 @@ import { metaApi } from '@/api';
 import { formatDateTime } from '@/utils/date';
 
 const columns = [
-  { title: '内容编号', dataIndex: 'id', width: 90 },
+  { title: '内容编号', dataIndex: 'id', width: 90, className: 'hide-mobile' },
   { title: '操作', dataIndex: 'action', width: 140 },
   { title: '频道类型', key: 'chtype', width: 100, customRender: () => '—' },
-  { title: '频道ID', key: 'chid', width: 100, customRender: () => '—' },
+  { title: '频道ID', key: 'chid', width: 100, customRender: () => '—', className: 'hide-mobile' },
   { title: '来源', dataIndex: 'executor', width: 120 },
   { title: '状态', key: 'status', width: 90 },
   { title: '详细信息', dataIndex: 'detail' },
-  { title: '时间', dataIndex: 'createdAt', width: 180, customRender: ({ text }: any) => formatDateTime(text) },
+  { title: '时间', dataIndex: 'createdAt', width: 180, customRender: ({ text }: any) => formatDateTime(text), className: 'hide-mobile' },
 ];
 const list = ref<any[]>([]); const total = ref(0);
 const page = ref(1); const pageSize = ref(20);

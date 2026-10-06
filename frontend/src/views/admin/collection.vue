@@ -161,7 +161,7 @@ async function saveGlobal() {
 }
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '名称', dataIndex: 'name' },
   { title: '策略', key: 'flags' },
   { title: '操作', key: 'action', width: 140 },
@@ -249,7 +249,7 @@ async function remove(id: number) {
 
 // 采集频道
 const chColumns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '名称', dataIndex: 'name' },
   { title: '来源', dataIndex: 'sourceTarget' },
   { title: '协议号', dataIndex: 'accountId', width: 100 },

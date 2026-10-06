@@ -48,10 +48,10 @@ import { message } from 'ant-design-vue';
 import { channelApi, botApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 70 },
+  { title: 'ID', dataIndex: 'id', width: 70, className: 'hide-mobile' },
   { title: '频道', dataIndex: 'name' },
   { title: '用户名', dataIndex: 'username' },
-  { title: '目标ChatID', dataIndex: 'tgChannelId', width: 180 },
+  { title: '目标ChatID', dataIndex: 'tgChannelId', width: 180, className: 'hide-mobile' },
   { title: '方向', key: 'direction', width: 90 },
   { title: '状态', key: 'status', width: 90 },
   { title: '操作', key: 'action', width: 200 },

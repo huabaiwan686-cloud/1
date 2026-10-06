@@ -43,7 +43,7 @@ import { message } from 'ant-design-vue';
 import { botApi, tgApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '名称', dataIndex: 'name', width: 150 },
   { title: '用户名', dataIndex: 'username', width: 180 },
   { title: '运行模式', key: 'mode', width: 110 },

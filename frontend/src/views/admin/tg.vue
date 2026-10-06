@@ -89,9 +89,9 @@ import { formatDateTime } from '@/utils/date';
 const columns = [
   { title: '协议号', dataIndex: 'phone' },
   { title: '状态', key: 'status', width: 100 },
-  { title: '文件大小', key: 'fsize', width: 110 },
-  { title: '最后检测', key: 'lastcheck', width: 180, customRender: ({ text }: any) => formatDateTime(text) },
-  { title: '上传时间', dataIndex: 'createdAt', width: 180, customRender: ({ text }: any) => formatDateTime(text) },
+  { title: '文件大小', key: 'fsize', width: 110, className: 'hide-mobile' },
+  { title: '最后检测', key: 'lastcheck', width: 180, customRender: ({ text }: any) => formatDateTime(text), className: 'hide-mobile' },
+  { title: '上传时间', dataIndex: 'createdAt', width: 180, customRender: ({ text }: any) => formatDateTime(text), className: 'hide-mobile' },
   { title: '操作', key: 'action', width: 220 },
 ];
 const list = ref<any[]>([]); const loading = ref(false); const batchLoading = ref(false);

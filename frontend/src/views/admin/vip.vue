@@ -81,7 +81,7 @@ const orderCols = [
   { title: '支付方式', dataIndex: 'payMethod' },
   { title: '金额', dataIndex: 'amountUsdt' },
   { title: '状态', dataIndex: 'status' },
-  { title: '时间', dataIndex: 'createdAt' },
+  { title: '时间', dataIndex: 'createdAt', className: 'hide-mobile' },
 ];
 
 async function load() {

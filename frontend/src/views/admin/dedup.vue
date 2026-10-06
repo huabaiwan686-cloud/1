@@ -89,13 +89,13 @@ const selectedKeys = ref<number[]>([]);
 const stats = ref({ groups: 0, notes: 0, pending: 0 });
 
 const columns = [
-  { title: '组ID', dataIndex: 'id', width: 70 },
+  { title: '组ID', dataIndex: 'id', width: 70, className: 'hide-mobile' },
   { title: '预览', key: 'preview', width: 200 },
   { title: '维度', dataIndex: 'dimension', width: 80 },
   { title: '相似度', dataIndex: 'similarity', width: 90 },
   { title: '涉及笔记', dataIndex: 'noteCount', width: 100 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '发现时间', dataIndex: 'createdAt', width: 170 },
+  { title: '发现时间', dataIndex: 'createdAt', width: 170, className: 'hide-mobile' },
   { title: '操作', key: 'action', width: 140 },
 ];
 

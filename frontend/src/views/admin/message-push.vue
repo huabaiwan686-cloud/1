@@ -76,14 +76,14 @@ import { message } from 'ant-design-vue';
 import { messageApi, tgApi, mediaApi } from '@/api';
 
 const tplCols = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '代码', dataIndex: 'code', width: 130 },
   { title: '名称', dataIndex: 'name' },
   { title: '媒体', dataIndex: 'mediaCount', width: 80 },
   { title: '操作', key: 'action', width: 140 },
 ];
 const planCols = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '模板', key: 'tpl', width: 160 },
   { title: '间隔', dataIndex: 'intervalDays', width: 80 },
   { title: '操作', key: 'action', width: 80 },

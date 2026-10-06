@@ -47,11 +47,11 @@ import { message, Table } from 'ant-design-vue';
 import { socialApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '用户', dataIndex: 'username' },
   { title: '昵称', dataIndex: 'nickname', width: 140 },
   { title: '关系', dataIndex: 'direction', width: 110 },
-  { title: '时间', dataIndex: 'createdAt', width: 170 },
+  { title: '时间', dataIndex: 'createdAt', width: 170, className: 'hide-mobile' },
 ];
 
 const FriendTable = {

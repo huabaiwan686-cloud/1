@@ -235,7 +235,7 @@ onMounted(() => { load(); loadChannels(); });
 .note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .note-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px; background: #fff; transition: all 0.2s; }
 .note-card:hover { border-color: #d9d9d9; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.note-card.selected { border-color: #1890ff; background: #f6fbff; }
+.note-card.selected { border-color: #1677ff; background: #e6f4ff; }
 .note-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .note-id { color: #999; font-size: 12px; }
 .note-title { font-weight: 500; font-size: 14px; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

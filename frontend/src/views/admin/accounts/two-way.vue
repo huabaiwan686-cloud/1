@@ -46,7 +46,7 @@ import { socialApi, botApi, tgApi } from '@/api';
 
 // meiren 双向机器人列：ID/Bot ID/客服 Chat ID/开关/操作
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: 'Bot ID', key: 'botId', width: 200 },
   { title: '客服 Chat ID', dataIndex: 'serviceChatId', width: 170 },
   { title: '开关', key: 'enabled', width: 80 },

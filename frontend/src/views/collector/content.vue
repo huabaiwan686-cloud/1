@@ -56,7 +56,7 @@ import { collectorApi, noteApi } from '@/api';
 
 // meiren 资料库 13 列
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '标题', dataIndex: 'title', width: 180 },
   { title: '首图', key: 'cover', width: 80 },
   { title: '媒体数', dataIndex: 'mediaCount', width: 70 },

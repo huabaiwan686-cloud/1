@@ -46,7 +46,7 @@ import { message } from 'ant-design-vue';
 import { forwardApi, tgApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 70 },
+  { title: 'ID', dataIndex: 'id', width: 70, className: 'hide-mobile' },
   { title: '协议号', dataIndex: 'accountId', width: 140,
     customRender: ({ text }: any) => accountName(text) },
   { title: '源群', dataIndex: 'sourceChat' },

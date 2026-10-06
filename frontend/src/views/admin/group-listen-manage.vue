@@ -66,7 +66,7 @@ import { listenApi, botApi, tgApi } from '@/api';
 
 // meiren 群监听列：名称/Bot ID/目标 Chat ID/关键词/开关/操作
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
+  { title: 'ID', dataIndex: 'id', width: 60, className: 'hide-mobile' },
   { title: '名称', dataIndex: 'name', width: 160 },
   { title: 'Bot ID', key: 'botId', width: 180 },
   { title: '目标 Chat ID', dataIndex: 'targetChatId', width: 170 },
@@ -75,7 +75,7 @@ const columns = [
   { title: '操作', key: 'action', width: 130 },
 ];
 const hitColumns = [
-  { title: '时间', dataIndex: 'createdAt', width: 170 },
+  { title: '时间', dataIndex: 'createdAt', width: 170, className: 'hide-mobile' },
   { title: '触发用户', dataIndex: 'tgUsername', width: 130 },
   { title: '触发群', dataIndex: 'chatTitle', width: 160 },
   { title: '关键词', dataIndex: 'keyword', width: 100 },
