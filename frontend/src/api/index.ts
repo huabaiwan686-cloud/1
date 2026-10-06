@@ -158,6 +158,18 @@ export const mediaApi = {
   deleteMaterial: (id: number) => request.delete(`/api/media/materials/${id}`),
   mattingGlobal: () => request.get('/api/media/matting-global'),
   setMattingGlobal: (data: any) => request.post('/api/media/matting-global', data),
+  watermarkSetting: () => request.get('/api/media/watermark-setting'),
+  setWatermarkSetting: (data: any) => request.post('/api/media/watermark-setting', data),
+  watermarkPreview: (file: File, params: any) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('type', params.type || 'text');
+    fd.append('content', params.content || '');
+    fd.append('position', params.position || 'bottom-right');
+    fd.append('opacity', String(params.opacity ?? 70));
+    fd.append('qr_size', String(params.qr_size ?? 100));
+    return request.post('/api/media/watermark-preview', fd);
+  },
   process: (file: File, mode: string, background_id?: number) => {
     const fd = new FormData();
     fd.append('file', file);

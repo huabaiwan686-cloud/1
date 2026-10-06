@@ -12,6 +12,49 @@
         <span style="color: #999; margin-left: 12px">每次上架/循环推送时实时处理，按次扣额度（重复图不重复扣）</span>
       </div>
     </a-card>
+    <a-card title="个人水印设置" style="margin-bottom: 16px">
+      <div style="color: #666; margin-bottom: 12px">开启后，你发布的每张图片都会自动叠加水印（视频不加）。这是你个人的设置，只影响你自己发布的内容。</div>
+      <a-space direction="vertical" style="width: 100%" :size="12">
+        <a-space>
+          <a-switch v-model:checked="wm.enabled" />
+          <span>启用水印</span>
+        </a-space>
+        <a-space>
+          <span style="width: 70px">水印类型</span>
+          <a-radio-group v-model:value="wm.type">
+            <a-radio value="text">文字水印</a-radio>
+            <a-radio value="qr">二维码水印</a-radio>
+          </a-radio-group>
+        </a-space>
+        <a-space style="width: 100%">
+          <span style="width: 70px">{{ wm.type === 'qr' ? '二维码内容' : '水印文字' }}</span>
+          <a-input v-model:value="wm.content" :placeholder="wm.type === 'qr' ? '二维码数据（链接或文本）' : '例如：@我的频道'" style="width: 320px" />
+        </a-space>
+        <a-space>
+          <span style="width: 70px">水印位置</span>
+          <a-select v-model:value="wm.position" style="width: 160px">
+            <a-select-option value="top-left">左上</a-select-option>
+            <a-select-option value="top-right">右上</a-select-option>
+            <a-select-option value="bottom-left">左下</a-select-option>
+            <a-select-option value="bottom-right">右下</a-select-option>
+            <a-select-option value="center">居中</a-select-option>
+          </a-select>
+          <span v-if="wm.type === 'text'" style="margin-left: 16px">不透明度</span>
+          <a-slider v-if="wm.type === 'text'" v-model:value="wm.opacity" :min="10" :max="100" style="width: 160px" />
+          <span v-if="wm.type === 'text'">{{ wm.opacity }}%</span>
+          <span v-if="wm.type === 'qr'" style="margin-left: 16px">二维码尺寸</span>
+          <a-input-number v-if="wm.type === 'qr'" v-model:value="wm.qr_size" :min="48" :max="300" style="width: 100px" />
+        </a-space>
+        <a-space>
+          <a-button type="primary" @click="saveWm">保存水印设置</a-button>
+          <a-button @click="previewWm">预览效果</a-button>
+        </a-space>
+        <div v-if="wmPreview">
+          <div style="color: #999; margin-bottom: 6px">预览效果：</div>
+          <img :src="wmPreview" style="max-width: 400px; border: 1px solid #eee; border-radius: 4px" />
+        </div>
+      </a-space>
+    </a-card>
     <a-space style="margin-bottom: 16px">
       <a-button type="primary" @click="openEditor()">添加频道</a-button>
       <a-radio-group v-model:value="filter" @change="load">
@@ -120,6 +163,45 @@ const editing = reactive<any>({});
 const gm = reactive<any>({ enabled: false, background_id: null });
 const materials = ref<any[]>([]);
 const botTokens = ref<any[]>([]);
+// 个人水印设置（P1-13/P1-14）
+const wm = reactive<any>({ type: 'text', content: '', position: 'bottom-right', opacity: 70, qr_size: 100, enabled: false });
+const wmPreview = ref('');
+
+async function loadWm() {
+  try {
+    const s: any = await mediaApi.watermarkSetting();
+    Object.assign(wm, s);
+  } catch (e: any) { /* 忽略 */ }
+}
+async function saveWm() {
+  if (wm.enabled && !wm.content.trim()) {
+    message.warning('启用水印前请填写水印内容');
+    return;
+  }
+  try {
+    await mediaApi.setWatermarkSetting(wm);
+    message.success('水印设置已保存');
+  } catch (e: any) { message.error(e.message); }
+}
+async function previewWm() {
+  if (!wm.content.trim()) { message.warning('请先填写水印内容'); return; }
+  // 用一张空白测试图做预览
+  const canvas = document.createElement('canvas');
+  canvas.width = 600; canvas.height = 400;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createLinearGradient(0, 0, 600, 400);
+  grad.addColorStop(0, '#a8d8ea'); grad.addColorStop(1, '#f6d5f7');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 600, 400);
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    try {
+      const r: any = await mediaApi.watermarkPreview(new File([blob], 'preview.png', { type: 'image/png' }), {
+        type: wm.type, content: wm.content, position: wm.position, opacity: wm.opacity, qr_size: wm.qr_size,
+      });
+      wmPreview.value = r.preview;
+    } catch (e: any) { message.error(e.message); }
+  }, 'image/png');
+}
 
 function botName(id: number) {
   const b = botTokens.value.find((x: any) => x.id === id);
@@ -199,5 +281,5 @@ async function saveRule() {
   catch (e: any) { message.error(e.message); }
 }
 async function removeRule(id: number) { await channelApi.deletePublishRule(id); message.success('已删除'); loadRules(); }
-onMounted(() => { load(); loadRules(); });
+onMounted(() => { load(); loadRules(); loadWm(); });
 </script>
