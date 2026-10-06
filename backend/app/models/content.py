@@ -47,6 +47,7 @@ class Note(Base):
     number_code: Mapped[str] = mapped_column(String(64), default="")  # 编号/标识
     fee_text: Mapped[str] = mapped_column(String(255), default="")  # 介绍费文案
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 定时上架
+    scheduled_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # 定时已由 worker 发送（幂等）
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     collect_rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("collect_rules.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

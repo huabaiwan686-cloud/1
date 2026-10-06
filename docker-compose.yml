@@ -32,6 +32,25 @@ services:
     expose:
       - "8000"
 
+  worker:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
+      TG_API_ID: ${TG_API_ID:-}
+      TG_API_HASH: ${TG_API_HASH:-}
+      USDT_TRC20_ADDRESS: ${USDT_TRC20_ADDRESS:-}
+      TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
+    volumes:
+      - uploads:/srv/uploads
+      - ./models:/srv/models:ro
+    restart: unless-stopped
+
   web:
     build: ./frontend
     depends_on:
