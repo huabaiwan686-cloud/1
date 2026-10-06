@@ -1,15 +1,19 @@
 """图片处理接口：/api/media/*（素材库 / 处理任务）。
 
 模式对齐原站：
-- replace_bg：人像背景替换（扣额度；额度不足/云异常 → 自动降级 light_perturb）
+- replace_bg：人像背景替换（扣额度；额度不足/抠图异常 → 自动降级 light_perturb）
+- blur_bg：人像背景虚化（扣额度；同上降级规则）
 - light_perturb：轻量随机扰动（不扣额度）
 - original：原图
+表格/自评表类截图本地识别后直接走轻量扰动，不扣额度。
 """
 import hashlib
+import io
 import os
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from PIL import Image as PILImage
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, ok
@@ -17,9 +21,12 @@ from app.api.v1.vip import consume_quota
 from app.core.database import get_db
 from app.models.media import BackgroundMaterial, ImageJob
 from app.models.user import User
-from app.services.image_pipeline import light_perturb, replace_background
+from app.services.image_pipeline import blur_background, light_perturb, replace_background
+from app.services.matting import is_table_image
 
 router = APIRouter(prefix="/media", tags=["media"])
+
+MATTING_MODES = {"replace_bg", "blur_bg"}
 
 UPLOAD_DIR = os.environ.get(
     "UPLOAD_DIR",
@@ -84,8 +91,9 @@ def delete_material(material_id: int, user: User = Depends(get_current_user), db
 @router.post("/process")
 async def process_image(
     file: UploadFile = File(...),
-    mode: str = Form("light_perturb"),  # replace_bg/light_perturb/original
+    mode: str = Form("light_perturb"),  # replace_bg/blur_bg/light_perturb/original
     background_id: int | None = Form(None),
+    blur_radius: float = Form(12),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -98,27 +106,39 @@ async def process_image(
     try:
         if mode == "original":
             out = data
-        elif mode == "replace_bg":
-            bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
-            if not bg or not os.path.exists(bg.url):
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
-            with open(bg.url, "rb") as f:
-                bg_data = f.read()
-            try:
-                out = replace_background(data, bg_data)
-                # 首次成功抠图才扣额度；缓存命中不重复扣
-                dup = db.query(ImageJob).filter(
-                    ImageJob.mode == "replace_bg",
-                    ImageJob.status == "success",
-                    ImageJob.detail.contains(src_hash),
-                ).first()
-                if not dup:
-                    ok_q, _ = consume_quota(db, 1)
-                    quota_consumed = ok_q
-            except NotImplementedError:
-                # 抠图服务未配置 / 云异常 → 自动降级轻量扰动（不扣额度）
+        elif mode in MATTING_MODES:
+            probe = PILImage.open(io.BytesIO(data)).convert("RGB")
+            if is_table_image(probe):
+                # 表格/自评表：本地识别，直接轻量扰动，不扣额度
                 out = light_perturb(data)
-                fallback = True
+                job.detail = f"table_skipped:{src_hash}"
+            else:
+                bg_data = None
+                if mode == "replace_bg":
+                    bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
+                    if not bg or not os.path.exists(bg.url):
+                        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
+                    with open(bg.url, "rb") as f:
+                        bg_data = f.read()
+                try:
+                    if mode == "blur_bg":
+                        out = blur_background(data, {"blur_radius": blur_radius})
+                    else:
+                        out = replace_background(data, bg_data)
+                    # 首次成功抠图才扣额度；缓存命中不重复扣
+                    dup = db.query(ImageJob).filter(
+                        ImageJob.mode.in_(list(MATTING_MODES)),
+                        ImageJob.status == "success",
+                        ImageJob.quota_consumed.is_(True),
+                        ImageJob.detail.contains(src_hash),
+                    ).first()
+                    if not dup:
+                        ok_q, _ = consume_quota(db, 1)
+                        quota_consumed = ok_q
+                except NotImplementedError:
+                    # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
+                    out = light_perturb(data)
+                    fallback = True
         else:  # light_perturb
             out = light_perturb(data)
 
@@ -134,14 +154,14 @@ async def process_image(
     job.quota_consumed = quota_consumed
     job.fallback = fallback
     job.background_id = background_id
-    if not job.detail or job.status == "success":
-        job.detail = src_hash if job.status == "success" else job.detail
+    if job.status == "success" and not job.detail:
+        job.detail = src_hash
     db.add(job)
     db.commit()
     return ok({
         "jobId": job.id, "mode": mode, "status": job.status,
         "resultUrl": job.result_url, "quotaConsumed": quota_consumed,
-        "fallback": fallback,
+        "fallback": fallback, "tableSkipped": job.detail.startswith("table_skipped") if job.detail else False,
     }, msg="处理完成" if job.status == "success" else "处理失败")
 
 

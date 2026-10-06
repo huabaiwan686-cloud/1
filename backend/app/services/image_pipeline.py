@@ -1,31 +1,19 @@
-"""图片处理管线：轻量随机扰动（本地全实现）/ 人像背景替换（抠图可插拔）。
+"""图片处理管线：轻量随机扰动（本地全实现）/ 人像背景替换 / 人像背景虚化。
 
 对齐原站行为：
-- replace_bg：云端抠图（扣额度，缓存命中不重复扣）；额度不足/云异常 → 自动降级 light_perturb
+- replace_bg / blur_bg：抠图（扣额度，缓存命中不重复扣；表格类截图本地识别跳过）；
+  额度不足/抠图异常 → 自动降级 light_perturb
 - light_perturb：本地轻量随机扰动，不扣额度
 - original：原图直出
+
+抠图服务：优先自建 RMBG-1.4（见 app/services/matting.py），无模型时抛错由上层降级。
 """
 import io
 import random
-from typing import Protocol
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
-
-class MattingProvider(Protocol):
-    """人像抠图提供者：输入 RGB 图，返回 L 模式人物 mask（255=人物）。"""
-
-    def get_mask(self, img: Image.Image) -> Image.Image: ...
-
-
-class StubMattingProvider:
-    """占位抠图：接入云服务后替换。支持阿里云/腾讯云人体分割 API。"""
-
-    def get_mask(self, img: Image.Image) -> Image.Image:
-        raise NotImplementedError(
-            "未配置抠图服务。请实现 MattingProvider.get_mask，"
-            "对接云人体分割 API（输入 RGB PIL 图，返回 L 模式 mask）后注入。"
-        )
+from app.services.matting import MattingProvider, get_default_provider  # noqa: F401
 
 
 def _open(data: bytes) -> Image.Image:
@@ -102,7 +90,7 @@ def replace_background(
 ) -> bytes:
     """人像背景替换：抠出人物 → 羽化边缘 → 合成到新背景。"""
     o = opts or {}
-    provider = mask_provider or StubMattingProvider()
+    provider = mask_provider or get_default_provider()
     img = _open(data)
     bg = _open(bg_data).resize(img.size, Image.LANCZOS)
 
@@ -127,4 +115,27 @@ def replace_background(
     if alpha > 0:
         composed = Image.blend(composed, img.convert("RGBA"), alpha)
 
+    return _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+
+
+def blur_background(
+    data: bytes,
+    opts: dict | None = None,
+    mask_provider: MattingProvider | None = None,
+) -> bytes:
+    """人像背景虚化（手机人像模式）：人物保持清晰，背景高斯模糊。
+
+    opts: blur_radius（模糊强度，默认 12）、feather（边缘羽化，默认 3）
+    """
+    o = opts or {}
+    provider = mask_provider or get_default_provider()
+    img = _open(data)
+
+    mask = provider.get_mask(img).convert("L").resize(img.size, Image.BILINEAR)
+    feather = int(o.get("feather", 3))
+    if feather > 0:
+        mask = mask.filter(ImageFilter.GaussianBlur(feather))
+
+    blurred = img.filter(ImageFilter.GaussianBlur(float(o.get("blur_radius", 12))))
+    composed = Image.composite(img.convert("RGBA"), blurred.convert("RGBA"), mask)
     return _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))

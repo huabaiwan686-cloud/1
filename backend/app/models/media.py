@@ -26,6 +26,7 @@ class ImageJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     mode: Mapped[str] = mapped_column(String(16), default="light_perturb")
+    # replace_bg=背景替换 / blur_bg=背景虚化 / light_perturb=轻量扰动 / original=原图
     status: Mapped[str] = mapped_column(String(16), default="processing")
     source: Mapped[str] = mapped_column(String(512), default="")  # 原图标识/URL
     result_url: Mapped[str] = mapped_column(String(512), default="")

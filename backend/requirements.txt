@@ -9,3 +9,5 @@ bcrypt==4.0.1
 python-multipart>=0.0.9
 pillow>=10.0
 psycopg[binary]>=3.1  # PostgreSQL 驱动（docker-compose 用）
+onnxruntime>=1.17  # RMBG-1.4 本地抠图（CPU）
+numpy>=1.26
