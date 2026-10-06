@@ -3,8 +3,8 @@ import request from '@/utils/request';
 export const authApi = {
   login: (username: string, password: string) =>
     request.post('/api/auth/login', { username, password }),
-  register: (username: string, password: string) =>
-    request.post('/api/auth/register', { username, password }),
+  register: (data: { username: string; password: string; invite_code: string }) =>
+    request.post('/api/auth/register', data),
   refresh: (refreshToken: string) =>
     request.post('/api/auth/refresh', { refresh_token: refreshToken }),
   logout: () => request.post('/api/auth/logout'),

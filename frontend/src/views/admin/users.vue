@@ -3,6 +3,17 @@
     <a-card title="超级管理员 · 用户管控" style="margin-bottom: 16px">
       <div style="color: #666">可管理所有会员/用户账号：新增、删除、开关管理员权限、禁用/启用、重置密码</div>
     </a-card>
+    <a-card title="邀请码" style="margin-bottom: 16px">
+      <a-space style="margin-bottom: 12px">
+        <a-button type="primary" @click="genCode">生成邀请码</a-button>
+        <span style="color: #666">把邀请码发给会员，他在登录页点"注册"即可自助注册账号密码</span>
+      </a-space>
+      <a-table :columns="codeColumns" :data-source="codes" row-key="code" size="small" :pagination="{ pageSize: 8 }">
+        <template #bodyCell="{ column, record }">
+          <a v-if="column.key === 'copy'" @click="copyCode(record.code)">复制</a>
+        </template>
+      </a-table>
+    </a-card>
     <a-button type="primary" @click="openEditor" style="margin-bottom: 16px">新增账号</a-button>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
@@ -49,7 +60,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { userApi } from '@/api';
+import { userApi, inviteApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
@@ -115,5 +126,25 @@ async function remove(id: number) {
   try { await userApi.remove(id); message.success('已删除'); load(); }
   catch (e: any) { message.error(e.message); }
 }
-onMounted(load);
+const codeColumns = [
+  { title: '邀请码', dataIndex: 'code' },
+  { title: '操作', key: 'copy', width: 80 },
+];
+const codes = ref<any[]>([]);
+async function loadCodes() {
+  try { codes.value = (await inviteApi.list()).codes || []; } catch {}
+}
+async function genCode() {
+  try {
+    const r: any = await inviteApi.generate();
+    message.success('邀请码已生成：' + r.code);
+    loadCodes();
+  } catch (e: any) { message.error(e.message); }
+}
+function copyCode(code: string) {
+  navigator.clipboard.writeText(code).then(
+    () => message.success('已复制：' + code),
+    () => message.error('复制失败，请手动复制'));
+}
+onMounted(() => { load(); loadCodes(); });
 </script>

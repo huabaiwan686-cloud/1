@@ -26,7 +26,7 @@ class RegisterIn(BaseModel):
     username: str
     password: str
     display_name: str = ""
-    invite_code: str = ""  # 可选：邀请码
+    invite_code: str = ""  # 必填：超管生成的邀请码
 
 
 class RefreshIn(BaseModel):
@@ -55,8 +55,12 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "账号已存在")
     invite_code = (body.invite_code or "").strip().upper()
-    if invite_code and not db.query(InviteCode).filter(InviteCode.code == invite_code).first():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "邀请码不存在")
+    is_first = db.query(User).count() == 0
+    if not is_first:
+        if not invite_code:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "注册需要邀请码，请找管理员获取")
+        if not db.query(InviteCode).filter(InviteCode.code == invite_code).first():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "邀请码不存在")
     user = User(
         username=body.username,
         display_name=body.display_name or body.username,
