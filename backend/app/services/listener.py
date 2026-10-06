@@ -7,7 +7,7 @@
   → 每组按「文字+媒体相册，紧跟验证视频」DM 发给发消息的人
 
 去重：同一用户 + 同一城市 cooldown 小时内只触发一次
-      （GlobalSetting listen_cooldown_hours，默认 1）。
+      （GlobalSetting listen_cooldown_hours，默认 3）。
 上限：单次触发最多发 listen_max_notes 组（默认 10），组间 sleep 防 flood。
 """
 import asyncio
@@ -128,7 +128,7 @@ async def _send_note_dm(client, sender, note, db) -> bool:
 
 def _cooldown_ok(db, plan_id: int, tg_user_id: int, city_id: int) -> bool:
     from app.models.distribution import ListenHit
-    hours = float(_setting(db, COOLDOWN_KEY, "1") or 1)
+    hours = float(_setting(db, COOLDOWN_KEY, "3") or 3)
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     hit = (
         db.query(ListenHit)

@@ -124,14 +124,14 @@ with TestClient(app):
     check("无映射时未知词仍为None",
           L._city_for_keyword(db, "京妞", {}) is None)
 
-    # 7) 冷却窗口为 1 小时：2 小时前的命中不再拦截
+    # 7) 冷却窗口为 3 小时：4 小时前的命中不再拦截
     old_hit = db.query(ListenHit).filter(ListenHit.result == "success").first()
+    old_hit.created_at = datetime.utcnow() - timedelta(hours=4)
+    db.commit()
+    check("4小时前命中不拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is True)
     old_hit.created_at = datetime.utcnow() - timedelta(hours=2)
     db.commit()
-    check("2小时前命中不拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is True)
-    old_hit.created_at = datetime.utcnow() - timedelta(minutes=30)
-    db.commit()
-    check("30分钟前命中仍拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is False)
+    check("2小时前命中仍拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is False)
 
     db.close()
 
