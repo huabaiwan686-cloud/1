@@ -1,27 +1,27 @@
 /* ============================================================
- * App 风格深色主题（仿 Muse 网页版）
- * 背景 #1a1a1a / 卡片 #2d2d2d / 主色 Muse 橙 #d97757
- * 移动优先：卡片流、全宽、大圆角
+ * Muse 网页版精确复刻主题
+ * 背景 #212121 / 卡片 #2f2f2f / 文字 #ececec/#b4b4b4
+ * 强调 #d97757（Muse 橙）/ 边框 rgba(255,255,255,0.1)
  * 纯视觉层：不改任何业务逻辑
  * ============================================================ */
 
 :root {
-  --app-bg: #1a1a1a;
-  --app-bg-soft: #212121;
-  --app-card: #2d2d2d;
-  --app-card-hover: #353535;
-  --app-input: #242424;
-  --app-border: rgba(255, 255, 255, 0.09);
-  --app-border-soft: rgba(255, 255, 255, 0.06);
+  --app-bg: #212121;
+  --app-bg-soft: #2a2a2a;
+  --app-card: #2f2f2f;
+  --app-card-hover: #383838;
+  --app-input: #2f2f2f;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-soft: rgba(255, 255, 255, 0.07);
   --app-text: #ececec;
-  --app-text-secondary: #a3a3a3;
-  --app-text-tertiary: #6e6e6e;
+  --app-text-secondary: #b4b4b4;
+  --app-text-tertiary: #8e8e8e;
   --app-accent: #d97757;
   --app-accent-hover: #c66545;
   --app-accent-soft: rgba(217, 119, 87, 0.14);
-  --app-radius-card: 16px;
-  --app-radius-btn: 12px;
-  --app-radius-input: 12px;
+  --app-radius-card: 12px;
+  --app-radius-btn: 10px;
+  --app-radius-input: 10px;
   --app-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     'Helvetica Neue', Arial, sans-serif;
@@ -35,6 +35,7 @@ body {
   font-family: var(--app-font);
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 #app {
@@ -48,38 +49,65 @@ h1, h2, h3, h4, h5 {
 
 /* 深色滚动条 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* ---------- Layout ---------- */
+/* ---------- 滚动隔离：layout 不滚动，内容区独立滚动 ---------- */
 .ant-layout {
   background: var(--app-bg);
+  overflow: hidden;
+  height: 100vh;
 }
+.ant-layout-sider,
+.ant-layout-header,
+.mobile-tabbar {
+  flex-shrink: 0;
+}
+.ant-layout-content,
+.pro-content {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* 所有滚动容器：触摸滚动优化 + 滚动链隔离 */
+.ant-card-body,
+.ant-modal-body,
+.ant-drawer-body,
+.ant-table-body,
+.ant-menu,
+.note-grid {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ---------- Layout ---------- */
 .ant-layout-sider {
-  background: #161616;
+  background: #1e1e1e;
 }
 .ant-layout-header {
-  background: var(--app-bg-soft);
+  background: var(--app-bg);
 }
 .ant-layout-content {
   background: var(--app-bg);
 }
 
-/* ---------- 顶栏（App 风：汉堡 + 标题 + 头像） ---------- */
+/* ---------- 顶栏：56px 深色 ---------- */
 .pro-header {
-  background: var(--app-bg-soft);
+  background: var(--app-bg);
   padding: 0 16px 0 4px;
   display: flex;
   align-items: center;
-  height: 60px;
+  height: 56px;
+  min-height: 56px;
   border-bottom: 1px solid var(--app-border-soft);
   position: relative;
   z-index: 10;
@@ -87,16 +115,17 @@ h1, h2, h3, h4, h5 {
 .pro-header .trigger-btn {
   font-size: 20px;
   padding: 0 14px;
-  height: 60px;
-  line-height: 60px;
+  height: 56px;
+  line-height: 56px;
   cursor: pointer;
   color: var(--app-text);
+  transition: opacity 0.2s;
 }
 .pro-header .trigger-btn:hover {
-  color: var(--app-accent);
+  opacity: 0.75;
 }
 .pro-app-title {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--app-text);
   letter-spacing: 0.3px;
@@ -116,10 +145,10 @@ h1, h2, h3, h4, h5 {
   font-size: 14px;
 }
 .pro-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--app-accent), #a34a2e);
+  background: var(--app-accent);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -128,19 +157,19 @@ h1, h2, h3, h4, h5 {
   font-weight: 700;
 }
 .pro-header .ant-btn {
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
-/* ---------- 侧边栏（桌面端） ---------- */
+/* ---------- 侧边栏 ---------- */
 .pro-sider {
-  background: #161616 !important;
+  background: #1e1e1e !important;
 }
 .pro-logo {
-  height: 60px;
+  height: 56px;
   display: flex;
   align-items: center;
   padding: 0 16px;
-  background: #161616;
+  background: #1e1e1e;
   overflow: hidden;
   white-space: nowrap;
   border-bottom: 1px solid var(--app-border-soft);
@@ -150,18 +179,17 @@ h1, h2, h3, h4, h5 {
   justify-content: center;
 }
 .pro-logo-badge {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--app-accent) 0%, #a34a2e 100%);
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 10px;
+  background: var(--app-accent);
   color: #fff;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 10px rgba(217, 119, 87, 0.4);
 }
 .pro-logo-title {
   margin-left: 12px;
@@ -177,12 +205,12 @@ h1, h2, h3, h4, h5 {
   letter-spacing: 2px;
 }
 .ant-menu-dark {
-  background: #161616;
+  background: #1e1e1e;
 }
 .ant-menu-dark .ant-menu-item,
 .ant-menu-dark .ant-menu-submenu-title {
   color: var(--app-text-secondary);
-  border-radius: 10px;
+  border-radius: 8px;
   margin: 2px 8px;
   width: calc(100% - 16px);
 }
@@ -200,15 +228,17 @@ h1, h2, h3, h4, h5 {
   color: var(--app-text);
 }
 
-/* ---------- 内容区 ---------- */
+/* ---------- 内容区：max-width 768px 居中 ---------- */
 .pro-content {
-  margin: 16px;
-  padding: 20px;
+  margin: 0 auto;
+  padding: 16px;
   background: transparent;
-  min-height: calc(100vh - 92px);
+  min-height: calc(100vh - 56px);
+  max-width: 768px;
+  width: 100%;
 }
 
-/* ---------- 卡片 ---------- */
+/* ---------- 卡片：12px 圆角，无大阴影 ---------- */
 .ant-card {
   background: var(--app-card);
   border: 1px solid var(--app-border-soft);
@@ -239,14 +269,18 @@ h1, h2, h3, h4, h5 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.ant-btn:active {
+  transform: scale(0.98);
 }
 .ant-btn-sm {
   min-height: 32px;
   font-size: 13px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .ant-btn-default {
-  background: #3a3a3a;
+  background: #3d3d3d;
   border-color: var(--app-border);
   color: var(--app-text);
 }
@@ -260,7 +294,6 @@ h1, h2, h3, h4, h5 {
   border-color: var(--app-accent);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 2px 10px rgba(217, 119, 87, 0.35);
 }
 .ant-btn-primary:hover {
   background: var(--app-accent-hover);
@@ -283,7 +316,7 @@ h1, h2, h3, h4, h5 {
   background: rgba(255, 255, 255, 0.06);
 }
 .ant-btn-dangerous {
-  color: #ff7a7a;
+  color: #ff8a8a;
 }
 
 /* ---------- 输入框 / 选择器 ---------- */
@@ -333,13 +366,13 @@ textarea.ant-input {
 }
 .ant-select-dropdown,
 .ant-picker-dropdown .ant-picker-panel-container {
-  background: #2d2d2d;
+  background: var(--app-card);
   border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .ant-select-item {
   color: var(--app-text);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .ant-select-item-option-selected,
 .ant-select-item-option-active {
@@ -365,7 +398,7 @@ textarea.ant-input {
   font-size: 14px;
 }
 .ant-table-thead > tr > th {
-  background: #262626;
+  background: #2a2a2a;
   color: var(--app-text-secondary);
   font-weight: 600;
   border-bottom: 1px solid var(--app-border-soft);
@@ -388,9 +421,9 @@ textarea.ant-input {
 
 /* ---------- 分页 ---------- */
 .ant-pagination .ant-pagination-item {
-  background: #3a3a3a;
+  background: #3d3d3d;
   border-color: var(--app-border);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .ant-pagination .ant-pagination-item a {
   color: var(--app-text-secondary);
@@ -404,10 +437,10 @@ textarea.ant-input {
 }
 .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
 .ant-pagination .ant-pagination-next .ant-pagination-item-link {
-  background: #3a3a3a;
+  background: #3d3d3d;
   border-color: var(--app-border);
   color: var(--app-text-secondary);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .ant-pagination .ant-pagination-disabled .ant-pagination-item-link {
   color: var(--app-text-tertiary);
@@ -418,13 +451,13 @@ textarea.ant-input {
 .ant-modal-content,
 .ant-drawer-content {
   background: var(--app-card);
-  border-radius: 20px;
+  border-radius: 16px;
   color: var(--app-text);
 }
 .ant-modal-header {
   background: var(--app-card);
   border-bottom: 1px solid var(--app-border-soft);
-  border-radius: 20px 20px 0 0;
+  border-radius: 16px 16px 0 0;
 }
 .ant-modal-title {
   color: var(--app-text);
@@ -486,7 +519,7 @@ textarea.ant-input {
 
 /* ---------- 标签 ---------- */
 .ant-tag {
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 13px;
   padding: 2px 10px;
 }
@@ -495,30 +528,27 @@ textarea.ant-input {
 .ant-empty-description {
   color: var(--app-text-tertiary);
 }
-.ant-spin {
-  color: var(--app-accent);
-}
 .ant-spin-dot-item {
   background: var(--app-accent);
 }
 
 /* ---------- 下拉菜单 ---------- */
 .ant-dropdown-menu {
-  background: #2d2d2d;
+  background: var(--app-card);
   border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 6px;
 }
 .ant-dropdown-menu-item {
   color: var(--app-text);
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 14px;
 }
 .ant-dropdown-menu-item:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 .ant-dropdown-menu-item-danger {
-  color: #ff7a7a;
+  color: #ff8a8a;
 }
 
 /* ---------- Tabs ---------- */
@@ -536,10 +566,10 @@ textarea.ant-input {
 
 /* ---------- Alert ---------- */
 .ant-alert {
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
-/* ---------- 移动端底部 TabBar（App 风） ---------- */
+/* ---------- 移动端底部 TabBar：5 tab，24px 图标，11px 文字 ---------- */
 .mobile-tabbar {
   display: none;
   position: fixed;
@@ -558,25 +588,28 @@ textarea.ant-input {
   text-align: center;
   padding: 8px 0 6px;
   color: var(--app-text-tertiary);
-  font-size: 11px;
   cursor: pointer;
   transition: color 0.2s;
+}
+.tab-icon {
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.tab-label {
+  font-size: 11px;
+  line-height: 1.2;
 }
 .tab-item.active {
   color: var(--app-accent);
   font-weight: 600;
-}
-.tab-icon {
-  font-size: 22px;
-  margin-bottom: 2px;
-  line-height: 1;
 }
 
 /* ---------- 页面级深色覆盖（scoped 样式兜底） ---------- */
 .note-card {
   background: var(--app-card) !important;
   border-color: var(--app-border-soft) !important;
-  border-radius: 16px !important;
+  border-radius: 12px !important;
 }
 .note-card:hover {
   border-color: var(--app-border) !important;
@@ -602,7 +635,7 @@ textarea.ant-input {
   border-color: var(--app-border-soft) !important;
 }
 
-/* ---------- global.css 浅色工具类 → 深色 ---------- */
+/* ---------- global.css 工具类深色适配 ---------- */
 .section-title,
 .form-section-title {
   color: var(--app-text) !important;
@@ -617,7 +650,7 @@ textarea.ant-input {
   color: var(--app-text-secondary) !important;
 }
 
-/* ---------- 登录页（App 风深色） ---------- */
+/* ---------- 登录页 ---------- */
 .pro-login-page {
   min-height: 100vh;
   display: flex;
@@ -625,8 +658,8 @@ textarea.ant-input {
   justify-content: center;
   padding: 24px;
   background:
-    radial-gradient(900px 500px at 20% 8%, rgba(217, 119, 87, 0.14), transparent 60%),
-    radial-gradient(800px 500px at 85% 95%, rgba(217, 119, 87, 0.1), transparent 60%),
+    radial-gradient(900px 500px at 20% 8%, rgba(217, 119, 87, 0.12), transparent 60%),
+    radial-gradient(800px 500px at 85% 95%, rgba(217, 119, 87, 0.08), transparent 60%),
     var(--app-bg);
   position: relative;
   overflow: hidden;
@@ -634,10 +667,9 @@ textarea.ant-input {
 .pro-login-card {
   width: 400px;
   max-width: 100%;
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--app-card);
   border: 1px solid var(--app-border-soft);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
   position: relative;
   z-index: 1;
 }
@@ -649,10 +681,10 @@ textarea.ant-input {
   margin-bottom: 8px;
 }
 .pro-login-brand .pro-logo-badge {
-  width: 60px;
-  height: 60px;
-  font-size: 30px;
-  border-radius: 18px;
+  width: 56px;
+  height: 56px;
+  font-size: 28px;
+  border-radius: 16px;
   margin: 0 auto 16px;
 }
 .pro-login-title {
@@ -673,8 +705,7 @@ textarea.ant-input {
   border-radius: var(--app-radius-btn);
 }
 .pro-login-card .ant-input,
-.pro-login-card .ant-input-password,
-.pro-login-card .ant-affix-wrapper {
+.pro-login-card .ant-input-password {
   height: 48px;
   border-radius: var(--app-radius-input);
   font-size: 15px;
@@ -697,38 +728,45 @@ textarea.ant-input {
     font-size: 15px;
   }
   .pro-content {
-    margin: 0;
+    margin: 0 auto;
     padding: 12px 12px 88px;
-    min-height: calc(100vh - 60px);
+    min-height: calc(100vh - 56px);
+    max-width: 100%;
   }
   .mobile-tabbar {
     display: flex;
   }
   .pro-header {
     height: 56px;
+    min-height: 56px;
   }
   .pro-header .trigger-btn {
     height: 56px;
     line-height: 56px;
   }
   .pro-app-title {
-    font-size: 16px;
+    font-size: 15px;
   }
-  /* 移动端侧边栏变抽屉 */
+  /* 移动端侧边栏：transform 滑入滑出（非 display 切换） */
   .ant-layout-sider {
     position: fixed !important;
     z-index: 1001;
     height: 100vh;
-    width: 220px !important;
-    max-width: 220px !important;
-    min-width: 220px !important;
-    flex: 0 0 220px !important;
+    top: 0;
+    left: 0;
+    width: 240px !important;
+    max-width: 240px !important;
+    min-width: 240px !important;
+    flex: 0 0 240px !important;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+  }
+  .ant-layout-sider:not(.ant-layout-sider-collapsed) {
+    transform: translateX(0);
   }
   .ant-layout-sider-collapsed {
-    width: 0 !important;
-    max-width: 0 !important;
-    min-width: 0 !important;
-    flex: 0 0 0 !important;
+    transform: translateX(-100%);
     overflow: hidden;
   }
   .mobile-sider-mask {
@@ -737,23 +775,29 @@ textarea.ant-input {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.28s;
   }
   /* 移动端卡片全宽流 */
   .ant-card {
-    border-radius: 16px;
+    border-radius: 12px;
   }
   .pro-login-card .ant-card-body {
     padding: 28px 22px;
+  }
+  /* 移动端弹窗全屏化 */
+  .ant-modal {
+    max-width: 100vw;
+    margin: 0;
+    padding: 12px;
   }
 }
 
 /* ---------- 桌面端 ---------- */
 @media (min-width: 769px) {
   .pro-content {
-    max-width: 1440px;
-    margin-left: auto;
-    margin-right: auto;
+    max-width: 768px;
   }
 }
