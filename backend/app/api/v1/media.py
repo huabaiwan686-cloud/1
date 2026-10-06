@@ -69,7 +69,17 @@ async def upload_material(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    data = await file.read()
+    # 分块读取 + 大小上限（200MB），防超大文件打爆内存
+    chunks, total = [], 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > 200 * 1024 * 1024:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "文件过大（上限 200MB）")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     suffix = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
     if suffix not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".webm"):
         suffix = ".jpg"
@@ -113,7 +123,19 @@ async def process_image(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    data = await file.read()
+    if mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知处理模式：{mode}")
+    # 分块读取 + 大小上限（200MB）
+    chunks, total = [], 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > 200 * 1024 * 1024:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "文件过大（上限 200MB）")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     src_hash = _sha256(data)
     job = ImageJob(mode=mode, source=f"upload:{file.filename}")
     fallback = False

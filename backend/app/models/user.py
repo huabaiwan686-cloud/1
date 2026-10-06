@@ -17,4 +17,5 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     remark: Mapped[str] = mapped_column(Text, default="")
+    invited_by_code: Mapped[str] = mapped_column(String(16), default="")  # 注册时填写的邀请码
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

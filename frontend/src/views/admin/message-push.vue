@@ -26,6 +26,7 @@
       <a-button type="primary" @click="openPlan()" style="margin-bottom: 16px">新建计划</a-button>
       <a-table :columns="planCols" :data-source="plans" row-key="id">
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'tpl'">{{ tplName(record.templateId) }}</template>
           <a-popconfirm v-if="column.key === 'action'" title="确认删除？" @confirm="delPlan(record.id)">
             <a>删除</a>
           </a-popconfirm>
@@ -77,10 +78,14 @@ const tplCols = [
 ];
 const planCols = [
   { title: 'ID', dataIndex: 'id', width: 60 },
-  { title: '模板', dataIndex: 'templateId', width: 80 },
+  { title: '模板', key: 'tpl', width: 160 },
   { title: '间隔', dataIndex: 'intervalDays', width: 80 },
   { title: '操作', key: 'action', width: 80 },
 ];
+function tplName(id: number) {
+  const t = templates.value.find((x: any) => x.id === id);
+  return t ? `${t.name} (${t.code})` : '#' + id;
+}
 const templates = ref<any[]>([]); const plans = ref<any[]>([]);
 const loading = ref(false);
 const tplVisible = ref(false); const planVisible = ref(false);

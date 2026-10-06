@@ -14,6 +14,7 @@ export const authApi = {
 
 export const userApi = {
   list: () => request.get('/api/account/list'),
+  create: (data: any) => request.post('/api/account/create', data),
 };
 
 export const noteApi = {
@@ -74,6 +75,8 @@ export const listenApi = {
     request.get('/api/listen/plans', { params: { keyword } }),
   create: (data: any) => request.post('/api/listen/plans', data),
   remove: (id: number) => request.delete(`/api/listen/plans/${id}`),
+  toggle: (id: number, enabled: boolean) =>
+    request.put(`/api/listen/plans/${id}/enabled`, { enabled }),
   hits: (planId = 0, limit = 50) =>
     request.get('/api/listen/hits', { params: { plan_id: planId, limit } }),
 };
@@ -109,7 +112,7 @@ export const socialApi = {
     request.post('/api/social/friends/apply', { username }),
   bindings: () => request.get('/api/social/bindings'),
   createBinding: (bind_code: string) =>
-    request.post('/api/social/bindings', null, { params: { bind_code } }),
+    request.post('/api/social/bindings', { bind_code }),
   cooperations: () => request.get('/api/social/cooperations'),
   importCoops: (usernames: string[]) =>
     request.post('/api/social/cooperations/import', usernames),

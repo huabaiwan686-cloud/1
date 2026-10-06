@@ -33,6 +33,7 @@
             <a @click="openEditor(record)">编辑</a>
             <a @click="check(record.id)">检测</a>
             <a @click="pushAll(record.id)">全量推送</a>
+            <a-popconfirm title="清空该频道的待发送定时队列？" @confirm="clearQueue(record.id)"><a>清空队列</a></a-popconfirm>
             <a-popconfirm title="确认删除？" @confirm="remove(record.id)"><a>删除</a></a-popconfirm>
           </a-space>
         </template>
@@ -139,5 +140,6 @@ async function save() {
 async function remove(id: number) { await channelApi.remove(id); message.success('已删除'); load(); }
 async function check(id: number) { const r: any = await channelApi.check(id); message.info(r.msg); }
 async function pushAll(id: number) { const r: any = await channelApi.pushAll(id); message.success(r.msg || '全量推送完成'); }
+async function clearQueue(id: number) { const r: any = await channelApi.clearQueue(id); message.success(r.msg || '队列已清空'); }
 onMounted(load);
 </script>

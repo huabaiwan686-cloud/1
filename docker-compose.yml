@@ -20,7 +20,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      APP_ENV: prod
       TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
       TG_API_ID: ${TG_API_ID:-}
       TG_API_HASH: ${TG_API_HASH:-}
@@ -42,7 +43,8 @@ services:
     command: ["python", "-m", "app.worker"]
     environment:
       DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      APP_ENV: prod
       TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
       TG_API_ID: ${TG_API_ID:-}
       TG_API_HASH: ${TG_API_HASH:-}

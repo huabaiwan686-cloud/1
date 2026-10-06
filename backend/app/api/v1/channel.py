@@ -62,6 +62,8 @@ def update_channel(channel_id: int, body: ChannelIn, user: User = Depends(get_cu
 
 @router.delete("/{channel_id}")
 def delete_channel(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     c = db.query(Channel).filter(Channel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
@@ -114,6 +116,8 @@ def push_all(channel_id: int, user: User = Depends(get_current_user), db: Sessio
 
     跳过定时未到（scheduled_at 在未来且未发送）的笔记；单条失败不影响其他。
     """
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     from datetime import datetime
 
     from app.api.v1.note import _send_to_channels

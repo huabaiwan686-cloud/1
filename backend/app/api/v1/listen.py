@@ -58,6 +58,21 @@ def delete_plan(plan_id: int, user: User = Depends(get_current_user), db: Sessio
     return ok(msg="计划已删除")
 
 
+class PlanToggleIn(BaseModel):
+    enabled: bool
+
+
+@router.put("/plans/{plan_id}/enabled")
+def toggle_plan(plan_id: int, body: PlanToggleIn,
+                user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
+    if not p:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "计划不存在")
+    p.enabled = body.enabled
+    db.commit()
+    return ok(msg="已" + ("启用" if body.enabled else "停用"))
+
+
 @router.get("/hits")
 def list_hits(plan_id: int = 0, limit: int = 50,
               user: User = Depends(get_current_user), db: Session = Depends(get_db)):

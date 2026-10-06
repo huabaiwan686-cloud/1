@@ -1,4 +1,5 @@
 """笔记/资料库接口：/api/note/*（对齐原站）。"""
+import os
 import re
 from datetime import datetime
 
@@ -6,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, ok
+from app.api.deps import get_current_user, ok, require_vip
 from app.core.database import get_db
 from app.models.account import BotToken
 from app.models.content import Note, NoteMedia, TaskLog
@@ -72,12 +73,14 @@ def list_notes(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
     q = db.query(Note)
     if status_ and status_ != "all":
         if status_ == "collected":
             q = q.filter(Note.source == "collect")
         elif status_ == "mine":
-            q = q.filter(Note.account_id == user.id)
+            q = q.filter(Note.created_by == user.id)
         else:
             q = q.filter(Note.status == status_)
     if keyword:
@@ -160,6 +163,7 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     if n.scheduled_at and n.scheduled_at > datetime.utcnow():
         return ok(msg="已发布（定时，到点自动发送到频道）")
     sent, failed = _send_to_channels(n, user, db)
+    n.scheduled_sent = True  # 立即发送成功后标记，防 worker 重复发送
     db.commit()
     if failed and not sent:
         return ok(msg=f"已发布，但发送失败：{failed[0]}")
@@ -200,7 +204,10 @@ def _send_to_channels(n: Note, user: User, db: Session,
     cids = channel_ids if channel_ids is not None else (n.channel_ids or [])
     for cid in cids:
         ch = db.query(Channel).filter(Channel.id == cid).first()
-        if not ch or not ch.is_active:
+        if not ch:
+            failed.append(f"频道#{cid}：频道不存在（可能已被删除）")
+            continue
+        if not ch.is_active:
             continue
         chat = ch.tg_channel_id or ch.username
         if not chat:
@@ -243,7 +250,10 @@ def _review_note(note_id: int, approve: bool, user: User, db: Session):
         n.published_at = datetime.utcnow()
         action, detail, msg = "review_approve", "审核通过并发布", "审核通过，已发布"
         if not (n.scheduled_at and n.scheduled_at > datetime.utcnow()):
-            _send_to_channels(n, user, db)
+            sent, failed = _send_to_channels(n, user, db)
+            n.scheduled_sent = True  # 防 worker 重复发送
+            if failed and not sent:
+                msg = f"审核通过，但发送失败：{failed[0]}"
     else:
         n.status = "offline"
         action, detail, msg = "review_reject", "审核拒绝（下架，可恢复）", "已拒绝（移入下架）"
@@ -280,9 +290,19 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
             n.published_at = datetime.utcnow()
             if user is not None and not (n.scheduled_at and n.scheduled_at > datetime.utcnow()):
                 _send_to_channels(n, user, db)
+                n.scheduled_sent = True  # 防 worker 重复发送
         elif op == "unpublish":
             n.status = "offline"
         elif op == "delete":
+            # 同步删磁盘文件（与素材删除一致），避免 uploads 残留
+            from app.api.v1.media import _fs_path
+            for m in db.query(NoteMedia).filter(NoteMedia.note_id == n.id).all():
+                try:
+                    fp = _fs_path(m.url)
+                    if os.path.exists(fp):
+                        os.remove(fp)
+                except Exception:
+                    pass
             db.query(NoteMedia).filter(NoteMedia.note_id == n.id).delete()
             db.delete(n)
         elif op == "strip_number_title":
@@ -323,8 +343,7 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
 
 
 @router.post("/batch")
-def batch_op(body: BatchIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # TODO(Phase 5): VIP 鉴权——批量操作为 VIP 功能
+def batch_op(body: BatchIn, user: User = Depends(require_vip), db: Session = Depends(get_db)):
     notes = db.query(Note).filter(Note.id.in_(body.ids)).all()
     result = _apply_batch_op(notes, body.op, body.params, db, user)
     db.add(

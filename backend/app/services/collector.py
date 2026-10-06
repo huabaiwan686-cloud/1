@@ -101,78 +101,77 @@ def _save_media(data: bytes, ext: str, channel_id: int, msg_id: int) -> str:
 
 async def _collect_channel(db, ch) -> dict:
     """采集单个来源。返回 {"notes": n, "skipped": m}。"""
-    from telethon import TelegramClient
     from app.models.account import TgAccount
     from app.models.content import CollectRule, Note, NoteMedia, TaskLog
-    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config
+    from app.services.tg_client import get_shared_client, TgNotConfigured
 
     rule = db.query(CollectRule).filter(CollectRule.id == ch.rule_id).first() if ch.rule_id else None
     acc = db.query(TgAccount).filter(TgAccount.id == ch.account_id).first()
     if not acc or not acc.phone:
         return {"notes": 0, "skipped": 0, "error": "未绑定采集账号"}
-    api_id, api_hash = _require_config()
-    client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
-    await client.start()
     try:
-        if not await client.is_user_authorized():
-            return {"notes": 0, "skipped": 0, "error": "协议号未登录"}
-        try:
-            entity = await client.get_entity(ch.source_target)
-        except Exception as e:  # noqa: BLE001
-            return {"notes": 0, "skipped": 0, "error": f"来源解析失败: {e}"}
-        min_id = ch.last_msg_id or 0
-        msgs = [m async for m in client.iter_messages(entity, min_id=min_id, limit=100)]
-        msgs.sort(key=lambda m: m.id)
-        notes, skipped = 0, 0
-        max_id = min_id
-        for m in msgs:
-            max_id = max(max_id, m.id)
-            text = (m.text or "").strip()
-            has_media = bool(m.photo or m.video or m.document)
-            reason = _blocked(text, has_media, rule)
-            if reason:
-                skipped += 1
-                continue
-            media_urls = []
-            if has_media:
-                try:
-                    data = await client.download_media(m, file=bytes)
-                except Exception as e:  # noqa: BLE001
-                    log.warning("collect download failed %s: %s", m.id, e)
-                    data = None
-                if data:
-                    ext = ".mp4" if (m.video or (m.document and "video" in (m.file.mime_type or ""))) else (m.file.ext or ".jpg")
-                    media_urls.append((_save_media(data, ext, ch.id, m.id),
-                                       "video" if ext == ".mp4" else "image"))
-            body = _process_text(text, rule)
-            if not body and not media_urls:
-                skipped += 1
-                continue
-            if _text_duplicate(db, body, rule):
-                skipped += 1
-                continue
-            title = (body.split("\n")[0] if body else "采集素材")[:30] or "采集素材"
-            note = Note(title=title, body=body,
-                        status="pending" if (rule is None or rule.need_review) else "published",
-                        source="collect", collect_rule_id=rule.id if rule else None)
-            db.add(note)
-            db.flush()
-            for url, mtype in media_urls:
-                db.add(NoteMedia(note_id=note.id, url=url, media_type=mtype, kind="show"))
-            db.commit()
-            notes += 1
-        ch.last_msg_id = max_id
-        db.add(TaskLog(action="collect", executor="worker",
-                       result="success" if notes or not msgs else "success",
-                       detail=f"采集[{ch.name}]：新增 {notes} 条，跳过 {skipped} 条"))
+        client = await get_shared_client(acc.phone)
+    except TgNotConfigured:
+        return {"notes": 0, "skipped": 0, "error": "协议号未登录"}
+    try:
+        entity = await client.get_entity(ch.source_target)
+    except Exception as e:  # noqa: BLE001
+        return {"notes": 0, "skipped": 0, "error": f"来源解析失败: {e}"}
+    min_id = ch.last_msg_id or 0
+    msgs = [m async for m in client.iter_messages(entity, min_id=min_id, limit=100)]
+    msgs.sort(key=lambda m: m.id)
+    notes, skipped = 0, 0
+    max_id = min_id
+    for m in msgs:
+        max_id = max(max_id, m.id)
+        text = (m.text or "").strip()
+        has_media = bool(m.photo or m.video or m.document)
+        reason = _blocked(text, has_media, rule)
+        if reason:
+            skipped += 1
+            continue
+        media_urls = []
+        if has_media:
+            try:
+                data = await client.download_media(m, file=bytes)
+            except Exception as e:  # noqa: BLE001
+                log.warning("collect download failed %s: %s", m.id, e)
+                data = None
+            if data:
+                ext = ".mp4" if (m.video or (m.document and "video" in (m.file.mime_type or ""))) else (m.file.ext or ".jpg")
+                media_urls.append((_save_media(data, ext, ch.id, m.id),
+                                   "video" if ext == ".mp4" else "image"))
+        body = _process_text(text, rule)
+        if not body and not media_urls:
+            skipped += 1
+            continue
+        if _text_duplicate(db, body, rule):
+            skipped += 1
+            continue
+        title = (body.split("\n")[0] if body else "采集素材")[:30] or "采集素材"
+        note = Note(title=title, body=body,
+                    status="pending" if (rule is None or rule.need_review) else "published",
+                    source="collect", collect_rule_id=rule.id if rule else None)
+        db.add(note)
+        db.flush()
+        for url, mtype in media_urls:
+            db.add(NoteMedia(note_id=note.id, url=url, media_type=mtype, kind="show"))
         db.commit()
-        return {"notes": notes, "skipped": skipped}
-    finally:
-        await client.disconnect()
+        notes += 1
+    ch.last_msg_id = max_id
+    db.add(TaskLog(action="collect", executor="worker",
+                   detail=f"采集[{ch.name}]：新增 {notes} 条，跳过 {skipped} 条"))
+    db.commit()
+    return {"notes": notes, "skipped": skipped}
 
 
 def sweep_collect() -> dict:
-    """扫一轮启用的采集来源（worker 每 60s 调用）。"""
+    """扫一轮启用的采集来源（同步入口，供测试/手动调用）。"""
+    return asyncio.run(asweep_collect())
+
+
+async def asweep_collect() -> dict:
+    """扫一轮启用的采集来源（worker 主循环内直接 await，不经过 to_thread）。"""
     from app.core.database import SessionLocal
     from app.models.content import CollectChannel
     db = SessionLocal()
@@ -189,7 +188,7 @@ def sweep_collect() -> dict:
             if not ch or not ch.is_active:
                 continue
             try:
-                r = asyncio.run(_collect_channel(db, ch))
+                r = await _collect_channel(db, ch)
             except Exception:  # noqa: BLE001
                 log.exception("collect channel %s 异常", cid)
                 continue

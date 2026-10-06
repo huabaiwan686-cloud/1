@@ -4,14 +4,14 @@
       <a-input-search v-model:value="keyword" placeholder="搜索详情" @search="load" style="width: 240px" />
       <a-select v-model:value="result" style="width: 130px" @change="load" allow-clear placeholder="结果">
         <a-select-option value="success">成功</a-select-option>
-        <a-select-option value="fail">失败</a-select-option>
+        <a-select-option value="failed">失败</a-select-option>
         <a-select-option value="processing">处理中</a-select-option>
       </a-select>
     </a-space>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading"
       :pagination="{ total, current: page, pageSize, onChange: (p: number) => { page = p; load(); } }">
       <template #bodyCell="{ column, record }">
-        <a-tag v-if="column.key === 'result'" :color="record.result === 'success' ? 'green' : record.result === 'fail' ? 'red' : 'orange'">
+        <a-tag v-if="column.key === 'result'" :color="record.result === 'success' ? 'green' : record.result === 'failed' ? 'red' : 'orange'">
           {{ record.result }}
         </a-tag>
       </template>

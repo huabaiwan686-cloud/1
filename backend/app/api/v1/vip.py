@@ -3,7 +3,6 @@ import secrets
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, ok
@@ -93,8 +92,20 @@ def create_order(user: User = Depends(get_current_user), db: Session = Depends(g
 
 def _activate_order(db: Session, o: VipOrder) -> None:
     """订单已支付 → 开通 PRO + 发放当月额度（mark_paid 与自动监听共用）。"""
+    from app.models.user import User
     o.status = "paid"
     o.paid_at = datetime.utcnow()
+    # 工作区首单付费 → 邀请奖励（注册时填了邀请码才触发）
+    try:
+        from app.api.v1.invite import grant_invite_reward
+        first_paid_ever = db.query(VipOrder).filter(
+            VipOrder.status == "paid", VipOrder.id != o.id).count() == 0
+        if first_paid_ever:
+            admin = db.query(User).filter(User.is_admin.is_(True)).order_by(User.id).first()
+            if admin:
+                grant_invite_reward(db, "first_paid", admin.username)
+    except Exception:  # noqa: BLE001  奖励失败不影响开通
+        pass
     sub = db.query(VipSubscription).order_by(VipSubscription.id.desc()).first() or VipSubscription()
     base = max(sub.active_until or datetime.utcnow(), datetime.utcnow())
     sub.plan = "pro"
@@ -161,17 +172,21 @@ def quota_available(db: Session, n: int = 1) -> bool:
 
 
 def consume_quota(db: Session, n: int = 1) -> tuple[bool, str]:
-    """扣额度：优先月度额度，再扣额外额度。返回 (是否成功, 模式)。"""
+    """扣额度：优先月度额度，再扣额外额度。返回 (是否成功, 模式）。
+
+    注意：只做 flush 不 commit，与调用方的 ImageJob 写同一事务提交，
+    避免「额度已扣、业务回滚」导致下次重试重复扣费。
+    """
     q = _get_or_create_quota(db)
     monthly_left = q.monthly_quota - q.monthly_used
     if monthly_left >= n:
         q.monthly_used += n
-        db.commit()
+        db.flush()
         return True, "quota"
     extra_left = q.extra_quota - q.extra_used
     if extra_left >= n:
         q.extra_used += n
-        db.commit()
+        db.flush()
         return True, "quota"
     # 额度用完 → 自动切换轻量随机扰动（不扣费）
     return False, "light_perturb"

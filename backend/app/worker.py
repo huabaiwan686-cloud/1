@@ -79,6 +79,13 @@ def sweep_once() -> dict:
                 log.info("note %s 定时发送完成：成功 %d 频道", n.id, len(sent))
             except Exception as e:  # noqa: BLE001 单条失败不影响其他
                 db.rollback()
+                # 按设计：单次尝试后即标记，避免每 60 秒无限重试打爆 Bot API；
+                # 失败原因记 TaskLog，管理员可手动重发
+                n.scheduled_sent = True
+                db.add(TaskLog(
+                    note_id=n.id, action="scheduled_send", executor=EXECUTOR,
+                    result="failed", detail=f"定时发送异常：{e}"))
+                db.commit()
                 failed += 1
                 log.exception("note %s 定时发送异常：%s", n.id, e)
         return {"done": done, "failed": failed}
@@ -122,18 +129,18 @@ async def run() -> None:
                 log.info("轮询：%s", r)
         except Exception:  # noqa: BLE001
             log.exception("轮询异常")
-        # 群聊推送计划：到点的经协议号推送
+        # 群聊推送计划：到点的经协议号推送（与监听共享同一事件循环/同一连接）
         try:
-            from app.services.group_push import sweep_push_plans
-            pr = await asyncio.to_thread(sweep_push_plans)
+            from app.services.group_push import asweep_push_plans
+            pr = await asweep_push_plans()
             if pr["plans"]:
                 log.info("推送计划：%s", pr)
         except Exception:  # noqa: BLE001
             log.exception("推送计划轮询异常")
         # 采集：拉取来源频道新消息入库
         try:
-            from app.services.collector import sweep_collect
-            cr = await asyncio.to_thread(sweep_collect)
+            from app.services.collector import asweep_collect
+            cr = await asweep_collect()
             if cr["notes"] or cr["channels"]:
                 log.info("采集：%s", cr)
         except Exception:  # noqa: BLE001

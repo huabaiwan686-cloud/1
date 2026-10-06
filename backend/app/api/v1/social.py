@@ -52,10 +52,9 @@ async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user),
     传入已有群 → 跳过建群，直接绑定记录。
     """
     from telethon.tl.functions.messages import CreateChatRequest, ExportChatInviteRequest
-    from app.api.v1.bots import _dec
     from app.models.account import BotToken, TgAccount, TwoWayBot
     from app.models.content import TaskLog
-    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, TgNotConfigured
+    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, phone_lock, TgNotConfigured
     from telethon import TelegramClient
 
     bot = db.query(BotToken).filter(BotToken.id == body.bot_token_id).first()
@@ -66,6 +65,14 @@ async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user),
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "TG 协议号不存在或未绑定手机号")
 
     group_id, group_name, invite_link = body.group_id, "", ""
+    if group_id:
+        # 传入已有群 → 用 Bot API 真实校验群存在且 Bot 为成员
+        from app.api.v1.bots import _dec, _bot_api
+        try:
+            chat = _bot_api(_dec(bot.token_secret), "getChat", {"chat_id": group_id})
+            group_name = ((chat.get("result") or {}).get("title")) or "双向通知群"
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"群组校验失败：{e}（请确认群 ID 正确且 Bot 已在群内）")
     if not group_id:
         # 真实建群
         try:
@@ -73,25 +80,26 @@ async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user),
         except TgNotConfigured as e:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
         client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
-        await client.connect()
         try:
-            if not await client.is_user_authorized():
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
-            bot_username = (bot.username or "").lstrip("@")
-            try:
-                bot_entity = await client.get_entity(bot_username)
-            except Exception:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                                    f"找不到 @{bot_username}，请确认 Bot 用户名正确")
-            group_name = f"{bot_username} 双向通知群"
-            res = await client(CreateChatRequest(users=[bot_entity], title=group_name))
-            chat = res.chats[0]
-            group_id = str(chat.id)
-            try:
-                inv = await client(ExportChatInviteRequest(chat.id))
-                invite_link = inv.link or ""
-            except Exception:  # noqa: BLE001
-                invite_link = ""
+            async with phone_lock(acc.phone):  # 同手机号 session 文件互斥，防 SQLite database is locked
+                await client.connect()
+                if not await client.is_user_authorized():
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
+                bot_username = (bot.username or "").lstrip("@")
+                try:
+                    bot_entity = await client.get_entity(bot_username)
+                except Exception:
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                        f"找不到 @{bot_username}，请确认 Bot 用户名正确")
+                group_name = f"{bot_username} 双向通知群"
+                res = await client(CreateChatRequest(users=[bot_entity], title=group_name))
+                chat = res.chats[0]
+                group_id = str(chat.id)
+                try:
+                    inv = await client(ExportChatInviteRequest(chat.id))
+                    invite_link = inv.link or ""
+                except Exception:  # noqa: BLE001
+                    invite_link = ""
         finally:
             await client.disconnect()
     b = TwoWayBot(
@@ -191,7 +199,13 @@ def review_coop(coop_id: int, approve: bool = True, user: User = Depends(get_cur
 
 @router.post("/cooperation_config")
 def save_coop_config(body: CoopConfigIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    cfg = CooperationConfig(**body.model_dump())
-    db.add(cfg)
+    # 单行配置 upsert：已有则更新，避免每点一次保存多一行
+    cfg = db.query(CooperationConfig).order_by(CooperationConfig.id.desc()).first()
+    if cfg:
+        for k, v in body.model_dump().items():
+            setattr(cfg, k, v)
+    else:
+        cfg = CooperationConfig(**body.model_dump())
+        db.add(cfg)
     db.commit()
     return ok({"id": cfg.id}, msg="合作配置已保存")

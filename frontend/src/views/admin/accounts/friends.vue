@@ -34,7 +34,7 @@ async function load() {
 }
 async function apply() {
   await socialApi.applyFriend(username.value);
-  message.success('关注申请已发送'); username.value = ''; load();
+  message.success('已关注'); username.value = ''; load();
 }
 onMounted(load);
 </script>

@@ -1,11 +1,10 @@
 """代理采集接口：/api/collect/*（规则 / 采集频道）。"""
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, ok
+from app.api.deps import get_current_user, ok, require_vip
 from app.core.database import get_db
 from app.models.content import CollectChannel, CollectRule
 from app.models.user import User
@@ -68,8 +67,7 @@ def list_rules(user: User = Depends(get_current_user), db: Session = Depends(get
 
 
 @router.post("/rules")
-def create_rule(body: RuleIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # TODO(Phase 5): 添加采集频道/规则为 VIP 功能
+def create_rule(body: RuleIn, user: User = Depends(require_vip), db: Session = Depends(get_db)):
     r = CollectRule(**body.model_dump())
     db.add(r)
     db.commit()
@@ -77,7 +75,7 @@ def create_rule(body: RuleIn, user: User = Depends(get_current_user), db: Sessio
 
 
 @router.put("/rules/{rule_id}")
-def update_rule(rule_id: int, body: RuleIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_rule(rule_id: int, body: RuleIn, user: User = Depends(require_vip), db: Session = Depends(get_db)):
     r = db.query(CollectRule).filter(CollectRule.id == rule_id).first()
     if not r:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "规则不存在")
@@ -117,7 +115,7 @@ def list_channels(
 
 
 @router.post("/channels")
-def create_channel(body: ChannelIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_channel(body: ChannelIn, user: User = Depends(require_vip), db: Session = Depends(get_db)):
     c = CollectChannel(**body.model_dump())
     db.add(c)
     db.commit()

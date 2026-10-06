@@ -5,6 +5,7 @@
 
 会话文件落在 TG_SESSION_DIR（默认 backend/data/tg_sessions），重启后免重复登录。
 """
+import asyncio
 import logging
 import os
 
@@ -16,6 +17,47 @@ SESSION_DIR = os.environ.get(
 )
 
 _clients: dict[str, object] = {}
+# 按手机号的互斥锁：同一协议号的采集/监听/群推/建群等任务串行执行，
+# 避免同时打开同一个 SQLite session 文件导致 database is locked 或会话损坏。
+_phone_locks: dict[str, asyncio.Lock] = {}
+
+
+def phone_lock(phone: str) -> asyncio.Lock:
+    """取（或创建）某手机号的互斥锁。调用方：async with phone_lock(phone): ..."""
+    lock = _phone_locks.get(phone)
+    if lock is None:
+        lock = asyncio.Lock()
+        _phone_locks[phone] = lock
+    return lock
+
+
+_shared: dict[str, object] = {}
+_shared_guard = asyncio.Lock()
+
+
+async def get_shared_client(phone: str):
+    """取该手机号的进程内共享已连接 client（worker 常驻复用）。
+
+    同一手机号全局只有一个连接，解决采集/监听/群推各自建连抢 SQLite session
+    文件的问题。断线时自动重连；账号未登录时抛 TgNotConfigured。
+    注意：仅在同一事件循环（worker 主循环）内使用；API 进程的手动操作
+    仍用短连接（跨进程无法共享）。
+    """
+    from telethon import TelegramClient
+
+    async with _shared_guard:
+        client = _shared.get(phone)
+        if client is not None and client.is_connected():
+            return client
+        api_id, api_hash = _require_config()
+        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
+        await client.connect()
+        if not await client.is_user_authorized():
+            await client.disconnect()
+            raise TgNotConfigured(f"协议号 {phone} 未登录")
+        _shared[phone] = client
+        log.info("共享 TG 连接已建立: %s", phone)
+        return client
 
 
 class TgNotConfigured(Exception):

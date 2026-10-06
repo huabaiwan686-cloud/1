@@ -26,6 +26,7 @@ class RegisterIn(BaseModel):
     username: str
     password: str
     display_name: str = ""
+    invite_code: str = ""  # 可选：邀请码
 
 
 class RefreshIn(BaseModel):
@@ -50,15 +51,23 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 
 @router.post("/register")
 def register(body: RegisterIn, db: Session = Depends(get_db)):
+    from app.models.billing import InviteCode, InviteRecord
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "账号已存在")
+    invite_code = (body.invite_code or "").strip().upper()
+    if invite_code and not db.query(InviteCode).filter(InviteCode.code == invite_code).first():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "邀请码不存在")
     user = User(
         username=body.username,
         display_name=body.display_name or body.username,
         hashed_password=hash_password(body.password),
         is_admin=(db.query(User).count() == 0),  # 首个注册用户为管理员
+        invited_by_code=invite_code,
     )
     db.add(user)
+    db.flush()
+    if invite_code:
+        db.add(InviteRecord(code=invite_code, invitee=user.username))
     db.commit()
     return ok(msg="注册成功")
 

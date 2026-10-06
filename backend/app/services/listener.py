@@ -160,7 +160,6 @@ def _log_hit(db, **kw):
 async def handle_message(client, db, plan, event) -> None:
     """单条新消息处理：关键词 → 城市 → 全部已上架素材 DM。"""
     from app.models.content import Note
-    from app.models.distribution import ListenPlan  # noqa: F401
 
     if event.out:  # 自己发的跳过
         return
@@ -216,31 +215,28 @@ async def handle_message(client, db, plan, event) -> None:
              log_detail=f"监听触发：{username or tg_uid} 在[{chat_title}]发[{hit_kw}]→{city.name}，发出 {sent}/{len(notes)} 组")
 
 
-async def _run_plan(plan_id: int):
-    """单个计划的长连接监听。"""
-    from telethon import TelegramClient, events
+async def _run_phone(phone: str, plan_ids: list[int]):
+    """同一手机号的所有监听计划共享一个长连接（避免多计划抢 session 文件）。"""
+    from telethon import events
     from app.core.database import SessionLocal
-    from app.models.account import TgAccount
     from app.models.distribution import ListenPlan
-    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config
+    from app.services.tg_client import get_shared_client, TgNotConfigured
 
     db = SessionLocal()
     try:
-        plan = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
-        if not plan or not plan.enabled:
-            return
-        acc = db.query(TgAccount).filter(TgAccount.id == plan.account_id).first()
-        if not acc or not acc.phone:
-            log.warning("listen plan %s: 未绑定协议号", plan.id)
-            return
+        plans = db.query(ListenPlan).filter(
+            ListenPlan.id.in_(plan_ids), ListenPlan.enabled.is_(True)).all()
+    finally:
+        db.close()
+    if not plans:
+        return
+    try:
+        client = await get_shared_client(phone)
+    except TgNotConfigured as e:
+        log.warning("监听: %s", e)
+        return
+    for plan in plans:
         targets = []
-        api_id, api_hash = _require_config()
-        client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
-        await client.start()
-        if not await client.is_user_authorized():
-            log.warning("listen plan %s: 协议号 %s 未登录", plan.id, acc.phone)
-            await client.disconnect()
-            return
         for t in plan.targets or []:
             try:
                 targets.append(await client.get_entity(t))
@@ -248,14 +244,13 @@ async def _run_plan(plan_id: int):
                 log.warning("listen plan %s: 目标 %s 解析失败: %s", plan.id, t, e)
         if not targets:
             log.warning("listen plan %s: 无有效监听目标", plan.id)
-            await client.disconnect()
-            return
+            continue
 
         @client.on(events.NewMessage(chats=targets))
-        async def _on_msg(event):
+        async def _on_msg(event, _pid=plan.id):
             sdb = SessionLocal()
             try:
-                p = sdb.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
+                p = sdb.query(ListenPlan).filter(ListenPlan.id == _pid).first()
                 if p and p.enabled:
                     await handle_message(client, sdb, p, event)
             except Exception as e:  # noqa: BLE001
@@ -264,21 +259,27 @@ async def _run_plan(plan_id: int):
                 sdb.close()
 
         log.info("listen plan %s started: %s targets", plan.id, len(targets))
-        await client.run_until_disconnected()
-    finally:
-        db.close()
+    await client.run_until_disconnected()
 
 
 async def run_listeners():
-    """worker 入口：为所有启用的计划启动监听（常驻）。"""
+    """worker 入口：按手机号分组，每个号一个长连接监听其名下所有启用计划。"""
     from app.core.database import SessionLocal
+    from app.models.account import TgAccount
     from app.models.distribution import ListenPlan
     db = SessionLocal()
     try:
-        ids = [p.id for p in db.query(ListenPlan).filter(ListenPlan.enabled.is_(True)).all()]
+        plans = db.query(ListenPlan).filter(ListenPlan.enabled.is_(True)).all()
+        by_phone: dict[str, list[int]] = {}
+        for p in plans:
+            acc = db.query(TgAccount).filter(TgAccount.id == p.account_id).first()
+            if acc and acc.phone:
+                by_phone.setdefault(acc.phone, []).append(p.id)
+            else:
+                log.warning("listen plan %s: 未绑定协议号", p.id)
     finally:
         db.close()
-    if not ids:
+    if not by_phone:
         log.info("listener: 无启用的监听计划")
         return
-    await asyncio.gather(*[_run_plan(pid) for pid in ids])
+    await asyncio.gather(*[_run_phone(phone, ids) for phone, ids in by_phone.items()])

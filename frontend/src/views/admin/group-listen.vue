@@ -3,8 +3,8 @@
     <a-button type="primary" @click="openEditor()" style="margin-bottom: 16px">新建监听计划</a-button>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'bind'">
-          <a-tag color="blue">{{ record.bindId }}</a-tag>
+        <template v-if="column.key === 'enabled'">
+          <a-switch :checked="record.enabled" @change="(v: boolean) => togglePlan(record.id, v)" />
         </template>
         <template v-else-if="column.key === 'account'">
           <span>{{ accountName(record.accountId) }}</span>
@@ -51,7 +51,7 @@ const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
   { title: '名称', dataIndex: 'name' },
   { title: '协议号', key: 'account', width: 170 },
-  { title: '绑定 ID', key: 'bind', width: 130 },
+  { title: '启用', key: 'enabled', width: 80 },
   { title: '操作', key: 'action', width: 80 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
@@ -114,5 +114,10 @@ async function save() {
   visible.value = false; load();
 }
 async function remove(id: number) { await listenApi.remove(id); message.success('已删除'); load(); }
+async function togglePlan(id: number, enabled: boolean) {
+  await listenApi.toggle(id, enabled);
+  message.success(enabled ? '监听已启用' : '监听已停用');
+  load();
+}
 onMounted(() => { load(); loadHits(); });
 </script>

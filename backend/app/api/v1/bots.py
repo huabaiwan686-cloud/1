@@ -107,6 +107,8 @@ class SendTestIn(BaseModel):
 @router.post("/bot/tokens/{token_id}/send-test")
 def send_test(token_id: int, body: SendTestIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """真实发一条测试消息（填你自己的 TG user id 或群组 id）。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     b = db.query(BotToken).filter(BotToken.id == token_id).first()
     if not b:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Token 不存在")
@@ -116,9 +118,14 @@ def send_test(token_id: int, body: SendTestIn, user: User = Depends(get_current_
 
 @router.delete("/bot/tokens/{token_id}")
 def delete_token(token_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     b = db.query(BotToken).filter(BotToken.id == token_id).first()
     if not b:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Token 不存在")
+    # 解除引用，避免孤儿
+    from app.models.content import Channel
+    db.query(Channel).filter(Channel.bot_id == token_id).update({"bot_id": None}, synchronize_session=False)
     db.delete(b)
     db.commit()
     return ok(msg="已删除")
@@ -148,8 +155,12 @@ async def auto_create(body: AutoCreateIn, user: User = Depends(get_current_user)
     b = BotToken(name=body.name, username=res["username"],
                  token_secret=_enc(res["token"]), remark=f"自动创建（经协议号 {a.phone}）")
     db.add(b)
+    try:
+        me = _bot_api(res["token"], "getMe")  # 落库前真实校验一次
+    except Exception as e:  # noqa: BLE001  校验失败回滚，不留脏数据
+        db.rollback()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"机器人已创建但校验失败: {e}")
     db.commit()
-    me = _bot_api(res["token"], "getMe")  # 落库后真实校验一次
     return ok(_out(b) | {"botId": me.get("id")}, msg=f"机器人 @{res['username']} 已自动创建")
 
 

@@ -20,3 +20,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# JWT 默认密钥 fail-fast：生产环境必须配置真实密钥，否则拒绝启动
+import os as _os  # noqa: E402
+if settings.JWT_SECRET_KEY == "change-me-in-production":
+    _env = _os.getenv("APP_ENV", "dev").lower()
+    if _env in ("prod", "production"):
+        raise RuntimeError(
+            "JWT_SECRET_KEY 未配置：生产环境禁止使用默认密钥，"
+            "请在 .env 或环境变量中设置 JWT_SECRET_KEY（建议 32 位以上随机字符串）")
+    import logging as _logging  # noqa: E402
+    _logging.getLogger(__name__).warning(
+        "JWT_SECRET_KEY 使用默认值，仅限开发环境；生产请务必配置！")

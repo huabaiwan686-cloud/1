@@ -142,7 +142,6 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
     - 写 ImageJob 审计行（result_url 为空，表示处理图未留存）
     """
     import hashlib
-    import io
 
     from PIL import Image as PILImage
 

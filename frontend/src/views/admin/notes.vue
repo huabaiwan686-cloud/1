@@ -32,6 +32,14 @@
       <a-button v-if="selected.length" @click="selected = []">取消选择</a-button>
     </a-space>
 
+    <a-modal v-model:open="batchParamsVisible" :title="'批量操作参数：' + (batchParamsCfg?.label || '')" @ok="confirmBatchParams">
+      <a-form layout="vertical">
+        <a-form-item v-for="f in (batchParamsCfg?.fields || [])" :key="f.key" :label="f.label">
+          <a-input v-model:value="batchParams[f.key]" :placeholder="f.placeholder" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <!-- 画廊视图 -->
     <div v-if="view === 'gallery'">
       <a-spin :spinning="loading">
@@ -86,7 +94,8 @@
     <a-modal v-model:open="previewVisible" :title="previewItem.title || '无标题'" :footer="null" width="720px">
       <a-carousel v-if="previewItem.media && previewItem.media.length" arrows>
         <div v-for="m in previewItem.media" :key="m.id" class="preview-slide">
-          <img :src="m.url" />
+          <video v-if="m.mediaType === 'video'" :src="m.url" controls style="max-width: 100%; max-height: 60vh" />
+          <img v-else :src="m.url" />
         </div>
       </a-carousel>
       <a-descriptions :column="2" size="small" style="margin-top: 12px">
@@ -134,7 +143,8 @@ const previewVisible = ref(false);
 const previewItem = ref<any>({});
 
 const STATUS_TEXT: Record<string, string> = {
-  draft: '草稿', pending: '待审核', published: '已发布', offline: '已下架',
+  draft: '草稿', pending: '待审核', approved: '已通过', published: '已发布',
+  offline: '已下架', collected: '已采集', rejected: '已拒绝',
 };
 function statusText(s: string) { return STATUS_TEXT[s] || s; }
 function coverOf(n: any) {
@@ -176,16 +186,50 @@ async function quickOp(id: number, op: string) {
   load();
 }
 async function runBatch() {
+  const needParams: Record<string, { label: string; fields: { key: string; label: string; placeholder?: string }[] }> = {
+    text_replace: { label: '文本替换', fields: [
+      { key: 'from', label: '查找', placeholder: '要替换的原文' },
+      { key: 'to', label: '替换为', placeholder: '新文本' },
+    ]},
+    remove_suffix: { label: '删除后缀', fields: [
+      { key: 'suffix', label: '后缀', placeholder: '结尾匹配才删除' },
+    ]},
+    add_suffix: { label: '添加后缀', fields: [
+      { key: 'suffix', label: '后缀', placeholder: '追加到正文末尾' },
+    ]},
+    replace_fee_line: { label: '替换最后一行介绍费', fields: [
+      { key: 'fee_text', label: '介绍费文本', placeholder: '留空会清空最后一行，请谨慎' },
+    ]},
+  };
+  const cfg = needParams[batchOp.value];
+  if (cfg) { openBatchParams(cfg); return; }
+  doBatch({});
+}
+const batchParamsVisible = ref(false);
+const batchParamsCfg = ref<any>(null);
+const batchParams = reactive<Record<string, string>>({});
+function openBatchParams(cfg: any) {
+  batchParamsCfg.value = cfg;
+  Object.keys(batchParams).forEach(k => delete batchParams[k]);
+  cfg.fields.forEach((f: any) => batchParams[f.key] = '');
+  batchParamsVisible.value = true;
+}
+async function confirmBatchParams() {
+  batchParamsVisible.value = false;
+  doBatch({ ...batchParams });
+}
+async function doBatch(params: any) {
   Modal.confirm({
     title: `确认对 ${selected.value.length} 条资料执行「${batchOp.value}」？`,
     onOk: async () => {
-      const res: any = await noteApi.batch(selected.value, batchOp.value);
+      const res: any = await noteApi.batch(selected.value, batchOp.value, params);
       if (res.duplicates) {
         Modal.info({ title: '重复资料', content: JSON.stringify(res.duplicates, null, 2) });
       } else {
         message.success(`已处理 ${res.count} 条`);
       }
       selected.value = [];
+      batchOp.value = '';
       load();
     },
   });

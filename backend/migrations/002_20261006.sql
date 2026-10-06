@@ -77,3 +77,10 @@ CREATE INDEX IF NOT EXISTS ix_vip_orders_pay_txid ON vip_orders (pay_txid);
 
 -- 13) 采集来源水位
 ALTER TABLE collect_channels ADD COLUMN IF NOT EXISTS last_msg_id INTEGER DEFAULT 0;
+
+-- 邀请链路：用户表加邀请码字段
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by_code VARCHAR(16) DEFAULT '';
+
+-- 防一笔链上转账开两单：pay_txid 非空时唯一（部分唯一索引）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_vip_orders_pay_txid
+    ON vip_orders (pay_txid) WHERE pay_txid IS NOT NULL AND pay_txid <> '';

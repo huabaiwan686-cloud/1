@@ -94,10 +94,13 @@ async function reload() {
 async function decide(approveIt: boolean) {
   if (!current.value) return;
   const id = current.value.id;
-  if (approveIt) await noteApi.approve(id);
-  else await noteApi.reject(id);
-  queue.value.shift();
-  doneCount.value += 1;
+  try {
+    if (approveIt) await noteApi.approve(id);
+    else await noteApi.reject(id);
+    queue.value.shift();
+    doneCount.value += 1;
+    message.success(approveIt ? '已通过' : '已拒绝');
+  } catch (e: any) { message.error(e.message); }
 }
 function approve() { decide(true).then(() => message.success('已通过并发布')); }
 function reject() { decide(false).then(() => message.info('已拒绝（移入下架）')); }

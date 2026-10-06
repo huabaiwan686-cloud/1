@@ -93,7 +93,15 @@ def match_and_activate(db) -> list[str]:
                     best = o
         if best is not None:
             best.pay_txid = txid
-            _activate_order(db, best)
+            try:
+                _activate_order(db, best)
+            except Exception as e:  # noqa: BLE001  并发双跑时唯一索引冲突 → 跳过，不重复开通
+                from sqlalchemy.exc import IntegrityError
+                db.rollback()
+                if isinstance(e, IntegrityError):
+                    log.warning("txid %s 已被其他轮次使用，跳过订单 %s", txid, best.order_no)
+                    continue
+                raise
             hit_orders.append(best.order_no)
             used_txids.add(txid)
     return hit_orders

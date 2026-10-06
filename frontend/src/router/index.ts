@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { authApi } from '@/api';
 
 export const routes: RouteRecordRaw[] = [
   { path: '/login', component: () => import('@/views/login.vue') },
@@ -32,9 +33,16 @@ export const routes: RouteRecordRaw[] = [
 
 const router = createRouter({ history: createWebHistory(), routes });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.path !== '/login' && !localStorage.getItem('access_token')) {
     return '/login';
+  }
+  // 非管理员禁止进入管理端页面（菜单已按角色过滤，这里防直接输 URL）
+  if (to.path.startsWith('/admin/') && to.path !== '/admin/dashboard') {
+    try {
+      const me: any = await authApi.current();
+      if (!me.isAdmin) return '/collector/upload';
+    } catch { return '/login'; }
   }
 });
 

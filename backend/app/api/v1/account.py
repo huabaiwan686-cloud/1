@@ -68,3 +68,26 @@ def list_users(user: User = Depends(get_current_user), db: Session = Depends(get
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     users = db.query(User).order_by(User.id).all()
     return ok([_user_out(u) for u in users])
+
+
+class UserCreateIn(BaseModel):
+    username: str
+    password: str
+    display_name: str = ""
+    is_admin: bool = False
+
+
+@router.post("/create")
+def create_user(body: UserCreateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """管理员新建账号（采集员/子管理员）。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    if db.query(User).filter(User.username == body.username).first():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "账号已存在")
+    if len(body.password) < 6:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "密码至少 6 位")
+    u = User(username=body.username, display_name=body.display_name or body.username,
+             hashed_password=hash_password(body.password), is_admin=body.is_admin)
+    db.add(u)
+    db.commit()
+    return ok(_user_out(u), msg="账号已创建")

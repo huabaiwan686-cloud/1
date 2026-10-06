@@ -84,12 +84,11 @@ async def _send_template(client, target, template, db) -> bool:
 
 async def run_plan(plan_id: int) -> dict:
     """执行单个推送计划。返回 {"sent": n, "failed": m}。"""
-    from telethon import TelegramClient
     from app.core.database import SessionLocal
     from app.models.account import TgAccount
     from app.models.content import TaskLog
     from app.models.distribution import MessageTemplate, PushPlan
-    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config
+    from app.services.tg_client import get_shared_client, TgNotConfigured
 
     db = SessionLocal()
     sent, failed = 0, 0
@@ -106,32 +105,28 @@ async def run_plan(plan_id: int) -> dict:
             log.warning("push plan %s: 未绑定协议号", plan.id)
             return {"sent": 0, "failed": 0}
 
-        api_id, api_hash = _require_config()
         # 先标记执行时间再发送：防止 60s 轮询重叠导致重复推送（at-most-once）
         plan.last_run_at = datetime.utcnow()
         db.commit()
-        client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
-        await client.start()
         try:
-            if not await client.is_user_authorized():
-                log.warning("push plan %s: 协议号未登录", plan.id)
-                return {"sent": 0, "failed": 0}
-            gap = plan.multi_interval_seconds or 0
-            for t in plan.target_groups or []:
-                try:
-                    target = await client.get_entity(t)
-                except Exception as e:  # noqa: BLE001
-                    failed += 1
-                    log.warning("push plan %s: 目标 %s 解析失败: %s", plan.id, t, e)
-                    continue
-                if await _send_template(client, target, tpl, db):
-                    sent += 1
-                else:
-                    failed += 1
-                if gap:
-                    await asyncio.sleep(gap)
-        finally:
-            await client.disconnect()
+            client = await get_shared_client(acc.phone)
+        except TgNotConfigured:
+            log.warning("push plan %s: 协议号未登录", plan.id)
+            return {"sent": 0, "failed": 0}
+        gap = plan.multi_interval_seconds or 0
+        for t in plan.target_groups or []:
+            try:
+                target = await client.get_entity(t)
+            except Exception as e:  # noqa: BLE001
+                failed += 1
+                log.warning("push plan %s: 目标 %s 解析失败: %s", plan.id, t, e)
+                continue
+            if await _send_template(client, target, tpl, db):
+                sent += 1
+            else:
+                failed += 1
+            if gap:
+                await asyncio.sleep(gap)
 
         db.add(TaskLog(
             action="push_plan", executor="worker",
@@ -146,7 +141,12 @@ async def run_plan(plan_id: int) -> dict:
 
 
 def sweep_push_plans() -> dict:
-    """扫一轮到点的推送计划（worker 每 60s 调用）。"""
+    """扫一轮到点的推送计划（同步入口，供测试/手动调用）。"""
+    return asyncio.run(asweep_push_plans())
+
+
+async def asweep_push_plans() -> dict:
+    """扫一轮到点的推送计划（worker 主循环内直接 await，不经过 to_thread）。"""
     from app.core.database import SessionLocal
     from app.models.distribution import PushPlan
     db = SessionLocal()
@@ -158,7 +158,7 @@ def sweep_push_plans() -> dict:
     done = {"sent": 0, "failed": 0, "plans": len(due_ids)}
     for pid in due_ids:
         try:
-            r = asyncio.run(run_plan(pid))
+            r = await run_plan(pid)
             done["sent"] += r["sent"]
             done["failed"] += r["failed"]
         except Exception:  # noqa: BLE001

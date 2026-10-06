@@ -28,6 +28,11 @@ request.interceptors.response.use(
       localStorage.removeItem('access_token');
       location.href = '/login';
     }
+    // FastAPI HTTPException 返回 {detail}，转成友好错误消息（如 403 VIP 门控）
+    const detail = error.response?.data?.detail;
+    if (detail && !error.message?.includes(detail)) {
+      error.message = typeof detail === 'string' ? detail : '请求失败';
+    }
     throw error;
   },
 );

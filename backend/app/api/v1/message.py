@@ -76,6 +76,8 @@ class TemplatePushIn(BaseModel):
 def push_template(tpl_id: int, body: TemplatePushIn | None = None,
                   user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """模板推送：把模板文案+媒体经频道绑定的 Bot 真实发送到目标频道。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     from app.api.v1.bots import _dec
     from app.models.distribution import Channel
     from app.services.publisher import send_listing_set
@@ -129,8 +131,10 @@ def _uploads_local_path(url: str) -> str | None:
 async def quick_push(tpl_id: int, body: QuickPushIn,
                      user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """快速推送：把模板文案+媒体经协议号真实发送到全部快速推送目标群组。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     from app.models.account import TgAccount
-    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, TgNotConfigured
+    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, phone_lock, TgNotConfigured
     from telethon import TelegramClient
 
     t = db.query(MessageTemplate).filter(MessageTemplate.id == tpl_id).first()
@@ -162,22 +166,23 @@ async def quick_push(tpl_id: int, body: QuickPushIn,
             await client.send_message(entity, body_text)
 
     client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
-    await client.connect()
     sent, failed = [], []
     try:
-        if not await client.is_user_authorized():
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
-        for tg in targets:
-            target = (tg.target or "").strip()
-            if not target:
-                failed.append(f"{tg.name}：目标为空")
-                continue
-            try:
-                entity = await client.get_entity(target)
-                await _send_one(client, entity, t.content)
-                sent.append(tg.name)
-            except Exception as e:  # noqa: BLE001
-                failed.append(f"{tg.name}：{e}")
+        async with phone_lock(acc.phone):  # 同手机号 session 文件互斥，防 SQLite database is locked
+            await client.connect()
+            if not await client.is_user_authorized():
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
+            for tg in targets:
+                target = (tg.target or "").strip()
+                if not target:
+                    failed.append(f"{tg.name}：目标为空")
+                    continue
+                try:
+                    entity = await client.get_entity(target)
+                    await _send_one(client, entity, t.content)
+                    sent.append(tg.name)
+                except Exception as e:  # noqa: BLE001
+                    failed.append(f"{tg.name}：{e}")
     finally:
         await client.disconnect()
     db.add(TaskLog(action="quick_push", executor=user.username,
