@@ -43,7 +43,7 @@ def list_codes(user: User = Depends(require_admin), db: Session = Depends(get_db
     codes = db.query(InviteCode).order_by(InviteCode.id.desc()).all()
     recs = db.query(InviteRecord).order_by(InviteRecord.id.desc()).limit(100).all()
     return ok({
-        "codes": [{"code": c.code} for c in codes],
+        "codes": [{"code": c.code, "used": c.used, "usedBy": c.used_by} for c in codes],
         "records": [{"code": r.code, "invitee": r.invitee, "tgBound": r.tg_bound,
                      "firstPaid": r.first_paid, "rewardDays": r.reward_days} for r in recs],
     })

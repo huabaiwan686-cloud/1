@@ -56,11 +56,15 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "账号已存在")
     invite_code = (body.invite_code or "").strip().upper()
     is_first = db.query(User).count() == 0
+    code_row = None
     if not is_first:
         if not invite_code:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "注册需要邀请码，请找管理员获取")
-        if not db.query(InviteCode).filter(InviteCode.code == invite_code).first():
+        code_row = db.query(InviteCode).filter(InviteCode.code == invite_code).first()
+        if not code_row:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "邀请码不存在")
+        if code_row.used:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "邀请码已使用")
     user = User(
         username=body.username,
         display_name=body.display_name or body.username,
@@ -70,7 +74,9 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.flush()
-    if invite_code:
+    if code_row is not None:
+        code_row.used = True
+        code_row.used_by = user.username
         db.add(InviteRecord(code=invite_code, invitee=user.username))
     db.commit()
     return ok(msg="注册成功")

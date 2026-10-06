@@ -128,6 +128,8 @@ async function remove(id: number) {
 }
 const codeColumns = [
   { title: '邀请码', dataIndex: 'code' },
+  { title: '状态', dataIndex: 'used', width: 120,
+    customRender: ({ text, record }: any) => text ? `已使用(${record.usedBy})` : '未使用' },
   { title: '操作', key: 'copy', width: 80 },
 ];
 const codes = ref<any[]>([]);

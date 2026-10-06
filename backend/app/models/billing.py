@@ -52,6 +52,8 @@ class InviteCode(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)  # 一次性：用过即作废
+    used_by: Mapped[str] = mapped_column(String(64), default="")  # 使用者
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
