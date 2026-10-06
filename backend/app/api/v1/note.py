@@ -32,8 +32,9 @@ class BatchIn(BaseModel):
     params: dict = {}
 
 
-def _note_out(n: Note, db: Session) -> dict:
-    media = db.query(NoteMedia).filter(NoteMedia.note_id == n.id).order_by(NoteMedia.sort_order).all()
+def _note_out(n: Note, media: list[NoteMedia] | None = None, db: Session | None = None) -> dict:
+    if media is None:
+        media = db.query(NoteMedia).filter(NoteMedia.note_id == n.id).order_by(NoteMedia.sort_order).all() if db else []
     return {
         "id": n.id,
         "title": n.title,
@@ -87,7 +88,13 @@ def list_notes(
     notes = q.order_by(Note.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
     if tag:
         notes = [n for n in notes if tag in (n.tags or [])]
-    return ok({"total": total, "list": [_note_out(n, db) for n in notes]})
+    # 一次查出本页所有媒体，避免 N+1
+    media_map: dict[int, list[NoteMedia]] = {}
+    ids = [n.id for n in notes]
+    if ids:
+        for m in db.query(NoteMedia).filter(NoteMedia.note_id.in_(ids)).order_by(NoteMedia.sort_order).all():
+            media_map.setdefault(m.note_id, []).append(m)
+    return ok({"total": total, "list": [_note_out(n, media_map.get(n.id, [])) for n in notes]})
 
 
 @router.get("/{note_id}")
@@ -95,7 +102,7 @@ def get_note(note_id: int, user: User = Depends(get_current_user), db: Session =
     n = db.query(Note).filter(Note.id == note_id).first()
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
-    return ok(_note_out(n, db))
+    return ok(_note_out(n, db=db))
 
 
 @router.post("/create")
@@ -125,7 +132,7 @@ def create_note(body: NoteIn, user: User = Depends(get_current_user), db: Sessio
             )
         )
     db.commit()
-    return ok(_note_out(n, db), msg="已保存草稿")
+    return ok(_note_out(n, db=db), msg="已保存草稿")
 
 
 @router.post("/{note_id}/publish")

@@ -12,7 +12,7 @@ import io
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from PIL import Image as PILImage
 from sqlalchemy.orm import Session
 
@@ -36,20 +36,24 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(os.path.join(UPLOAD_DIR, "results"), exist_ok=True)
 
 
-def _save_upload(data: bytes, suffix: str = ".jpg") -> str:
+def _store(data: bytes, subdir: str = "", suffix: str = ".jpg") -> tuple[str, str]:
+    """保存文件，返回 (fs_path, web_path)。web_path 供浏览器直接访问。"""
     name = f"{uuid.uuid4().hex}{suffix}"
-    path = os.path.join(UPLOAD_DIR, name)
-    with open(path, "wb") as f:
+    rel = f"{subdir}/{name}" if subdir else name
+    fs_path = os.path.join(UPLOAD_DIR, rel)
+    os.makedirs(os.path.dirname(fs_path), exist_ok=True)
+    with open(fs_path, "wb") as f:
         f.write(data)
-    return path
+    return fs_path, "/uploads/" + rel
 
 
-def _save_result(data: bytes) -> str:
-    name = f"{uuid.uuid4().hex}.jpg"
-    path = os.path.join(UPLOAD_DIR, "results", name)
-    with open(path, "wb") as f:
-        f.write(data)
-    return path
+def _fs_path(web_path: str) -> str:
+    """web_path → 文件系统路径（限 uploads 目录内，防止路径穿越）。"""
+    rel = web_path.replace("/uploads/", "", 1).lstrip("/")
+    rp = os.path.realpath(os.path.join(UPLOAD_DIR, rel))
+    if not rp.startswith(os.path.realpath(UPLOAD_DIR)):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "非法路径")
+    return rp
 
 
 def _sha256(data: bytes) -> str:
@@ -65,8 +69,8 @@ async def upload_material(
     db: Session = Depends(get_db),
 ):
     data = await file.read()
-    path = _save_upload(data)
-    m = BackgroundMaterial(name=name, url=path, category=category)
+    _, web_path = _store(data)
+    m = BackgroundMaterial(name=name, url=web_path, category=category)
     db.add(m)
     db.commit()
     return ok({"id": m.id, "name": m.name, "url": m.url}, msg="素材已上传")
@@ -116,9 +120,12 @@ async def process_image(
                 bg_data = None
                 if mode == "replace_bg":
                     bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
-                    if not bg or not os.path.exists(bg.url):
+                    if not bg:
                         raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
-                    with open(bg.url, "rb") as f:
+                    bg_fs = _fs_path(bg.url)
+                    if not os.path.exists(bg_fs):
+                        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
+                    with open(bg_fs, "rb") as f:
                         bg_data = f.read()
                 try:
                     if mode == "blur_bg":
@@ -142,9 +149,9 @@ async def process_image(
         else:  # light_perturb
             out = light_perturb(data)
 
-        result_path = _save_result(out)
+        _, result_web = _store(out, subdir="results")
         job.status = "success"
-        job.result_url = result_path
+        job.result_url = result_web
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
@@ -173,3 +180,32 @@ def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_
         "resultUrl": j.result_url, "quotaConsumed": bool(j.quota_consumed),
         "fallback": bool(j.fallback),
     } for j in jobs])
+
+
+@router.get("/thumb")
+def thumb(
+    src: str = Query(..., description="web 路径，如 /uploads/results/xxx.jpg"),
+    w: int = Query(400, ge=64, le=1200, description="缩略图宽度"),
+):
+    """图片缩略图（画廊列表用）：按宽度等比缩放，磁盘缓存。
+
+    注：有意不鉴权——<img> 标签无法携带 Authorization 头；
+    路径为不可猜测的 UUID，与 /uploads 静态目录的暴露面一致。
+    """
+    from fastapi.responses import FileResponse
+
+    from PIL import Image as PILImage
+
+    fs_path = _fs_path(src)
+    if not os.path.isfile(fs_path):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "图片不存在")
+    cache_dir = os.path.join(UPLOAD_DIR, "thumbs")
+    os.makedirs(cache_dir, exist_ok=True)
+    key = hashlib.sha256(f"{os.path.realpath(fs_path)}:{w}".encode()).hexdigest()
+    cached = os.path.join(cache_dir, f"{key}.jpg")
+    if not os.path.exists(cached):
+        img = PILImage.open(fs_path).convert("RGB")
+        if img.width > w:
+            img = img.resize((w, int(img.height * w / img.width)), PILImage.LANCZOS)
+        img.save(cached, "JPEG", quality=82)
+    return FileResponse(cached, media_type="image/jpeg")
