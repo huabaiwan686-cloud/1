@@ -2,16 +2,17 @@
   <a-config-provider :theme="antdTheme">
   <router-view v-if="isLoginPage" />
   <a-layout v-else style="min-height: 100vh">
+    <!-- 移动端遮罩 -->
     <div v-if="isMobile && !collapsed" class="mobile-sider-mask" @click="collapsed = true" />
     <a-layout-sider
       class="pro-sider"
-      collapsible
       v-model:collapsed="collapsed"
+      :collapsedWidth="isMobile ? 0 : 200"
       width="200"
       :trigger="null"
     >
-      <div class="pro-logo" :class="{ collapsed }">
-        <span v-if="!collapsed" class="pro-logo-title">小灰机管理平台</span>
+      <div class="pro-logo">
+        <span class="pro-logo-title">小灰机管理平台</span>
       </div>
       <a-menu
         v-model:selectedKeys="selected"
@@ -21,42 +22,35 @@
       >
         <template v-for="g in menus" :key="g.title">
           <a-menu-item-group :title="g.title">
-            <a-menu-item v-for="c in g.children" :key="c.path">{{ c.title }}</a-menu-item>
+            <a-menu-item
+              v-for="c in g.children"
+              :key="c.path"
+              :data-menu-id="c.path"
+              class="pro-menu-item"
+            >{{ c.title }}</a-menu-item>
           </a-menu-item-group>
         </template>
       </a-menu>
     </a-layout-sider>
     <a-layout>
       <a-layout-header class="pro-header">
-        <span class="trigger-btn" @click="collapsed = !collapsed">
-          <menu-outlined v-if="collapsed" />
-          <menu-fold-outlined v-else />
+        <span v-if="isMobile" class="trigger-btn" @click="collapsed = !collapsed">
+          <menu-outlined />
         </span>
-        <span class="pro-app-title">小灰机管理平台</span>
+        <span class="pro-page-title">{{ pageTitle }}</span>
         <div class="pro-header-right">
-          <span class="vip-badge" @click="router.push('/admin/vip')">VIP</span>
-          <span class="pro-username">
-            <span class="uname">{{ username || '主账号' }}</span>
-          </span>
-          <span class="pro-version">v1.0.0</span>
-          <span class="pro-doc-link" @click="router.push('/admin/announcements')">使用说明</span>
-          <span class="pro-doc-link" @click="logout">退出</span>
+          <span class="vip-trial-badge">试用 26 天</span>
+          <span class="pro-account-type">{{ username || '主账号' }}</span>
+          <span class="pro-version">v6.3</span>
+          <a class="topbar-docs" href="/docs/" target="_blank">📖 使用说明</a>
+          <a-button type="link" size="small" @click="logout"><span>退出</span></a-button>
         </div>
       </a-layout-header>
       <a-layout-content class="pro-content">
-        <router-view />
+        <main class="ant-layout-content content-area">
+          <router-view />
+        </main>
       </a-layout-content>
-      <!-- 移动端底部导航 -->
-      <div v-if="isMobile" class="mobile-tabbar">
-        <div
-          v-for="t in tabItems" :key="t.path"
-          class="tab-item" :class="{ active: isTabActive(t.path) }"
-          @click="router.push(t.path)"
-        >
-          <div class="tab-icon"><component :is="t.icon" /></div>
-          <div class="tab-label">{{ t.title }}</div>
-        </div>
-      </div>
     </a-layout>
     <a-modal v-model:open="annVisible" :title="annCurrent.title" @ok="dismissAnn" ok-text="知道了">
       <div style="white-space: pre-wrap">{{ annCurrent.content }}</div>
@@ -68,13 +62,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import {
-  MenuOutlined, MenuFoldOutlined,
-  HomeOutlined, UploadOutlined, FileTextOutlined, BellOutlined, UserOutlined,
-} from '@ant-design/icons-vue';
+import { MenuOutlined } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
-// meiren.pro 主题 token（live browser 逆向确认）
+// antd v5 默认主题 token（REVERSE_ENGINEERING.md 实测值）
 const antdTheme = {
   token: {
     colorPrimary: '#1677ff',
@@ -84,10 +75,12 @@ const antdTheme = {
     colorInfo: '#1677ff',
     borderRadius: 6,
     borderRadiusLG: 8,
-    fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans',sans-serif",
+    fontSize: 14,
     colorText: 'rgba(0, 0, 0, 0.88)',
     colorTextSecondary: 'rgba(0, 0, 0, 0.45)',
-    colorBorder: '#f0f0f0',
+    colorBorder: '#d9d9d9',
+    colorSplit: '#f0f0f0',
   },
   components: {
     Card: { borderRadiusLG: 8 },
@@ -101,64 +94,89 @@ const antdTheme = {
 
 const route = useRoute();
 const router = useRouter();
-// 移动端默认收起侧边栏，桌面端默认展开
+// meiren 无折叠功能；移动端默认收起（抽屉式），桌面端默认展开
 const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-// 底部导航 5 Tab：工作台 / 上传 / 笔记 / 消息 / 我的
-const tabItems = [
-  { path: '/admin/dashboard', title: '工作台', icon: HomeOutlined },
-  { path: '/collector/upload', title: '上传', icon: UploadOutlined },
-  { path: '/admin/notes', title: '笔记', icon: FileTextOutlined },
-  { path: '/admin/announcements', title: '消息', icon: BellOutlined },
-  { path: '/admin/vip', title: '我的', icon: UserOutlined },
-];
-// meiren.pro 1:1 菜单（24 项，3 分组）
-// 路由复用现有页面，不存在的指向占位页
+
+// meiren.pro 1:1 菜单（REVERSE_ENGINEERING.md §2，4 分组 24 项）
+// 路由复用现有页面
 const MEIREN_MENUS = [
   {
     title: '运营管理',
     children: [
-      { path: '/admin/dashboard', title: '工作台' },
+      { path: '/admin/dashboard', title: '首页' },
       { path: '/admin/users', title: '用户管理' },
-      { path: '/admin/customer', title: '客户管理' },
-      { path: '/admin/message-push', title: '群发管理' },
+      { path: '/admin/channels-up', title: '上架频道' },
+      { path: '/admin/channels-down', title: '下架频道' },
+      { path: '/admin/accounts/protocol', title: '协议号' },
+      { path: '/admin/relay', title: '自动转发' },
       { path: '/admin/logs', title: '发送记录' },
-      { path: '/admin/dedup', title: '去重记录' },
     ],
   },
   {
     title: '配置管理',
     children: [
-      { path: '/admin/city', title: '城市管理' },
-      { path: '/collector/content', title: '资料库' },
-      { path: '/admin/phrases', title: '话术库' },
-      { path: '/admin/accounts/protocol', title: '协议号管理' },
-      { path: '/admin/collection', title: '采集源管理' },
-      { path: '/admin/sensitive', title: '敏感词管理' },
-      { path: '/admin/message-push', title: '消息推送配置' },
-      { path: '/admin/global/loop', title: '定时任务管理' },
-      { path: '/admin/accounts/protocol', title: 'TG 账号管理' },
-      { path: '/admin/tg-groups', title: 'TG 群组管理' },
-      { path: '/admin/announcements', title: '公告管理' },
+      { path: '/admin/group-listen', title: '关键词监控' },
+      { path: '/admin/global/confuse', title: '防扫图' },
+      { path: '/admin/settings', title: '系统设置' },
+      { path: '/admin/collection', title: '代理采集' },
+      { path: '/admin/antidedup', title: '防去重' },
+      { path: '/admin/dedup', title: '去重记录' },
     ],
   },
   {
     title: '内容管理',
     children: [
-      { path: '/admin/ads', title: '广告管理' },
-      { path: '/admin/accounts/two-way-bots', title: '自动回复管理' },
+      { path: '/collector/content', title: '资料库' },
       { path: '/admin/collection/review', title: '采集审核' },
-      { path: '/admin/group-listen', title: '关键词管理' },
-      { path: '/admin/blacklist', title: '黑名单管理' },
-      { path: '/admin/global/confuse', title: '系统配置' },
-      { path: '/admin/logs', title: '操作日志' },
+      { path: '/admin/message-push', title: '消息推送' },
+      { path: '/admin/friends', title: '好友关注' },
+      { path: '/admin/tags', title: '标签库' },
+      { path: '/collector/upload', title: '素材上传' },
+      { path: '/admin/distribution', title: '分发规则' },
+      { path: '/admin/bots', title: 'Bot 管理' },
+      { path: '/admin/group-listen-manage', title: '群监听' },
+      { path: '/admin/accounts/two-way-bots', title: '双向机器人' },
+    ],
+  },
+  {
+    title: '财务',
+    children: [
+      { path: '/admin/vip', title: 'VIP 会员' },
     ],
   },
 ];
 // 会员不可见
 const MEMBER_HIDDEN = ['/admin/users'];
-// 普通用户仅可见
-const USER_ONLY = ['/admin/notes'];
+
+// 顶栏左标题：按路由显示页面名
+const PAGE_TITLES: Record<string, string> = {
+  '/admin/dashboard': '小灰机管理平台',
+  '/admin/vip': 'VIP 会员',
+  '/admin/users': '用户管理',
+  '/admin/channels-up': '上架频道',
+  '/admin/channels-down': '下架频道',
+  '/admin/accounts/protocol': '协议号',
+  '/admin/relay': '自动转发',
+  '/admin/logs': '发送记录',
+  '/admin/group-listen': '关键词监控',
+  '/admin/global/confuse': '防扫图',
+  '/admin/settings': '系统设置',
+  '/admin/collection': '代理采集',
+  '/admin/antidedup': '防去重',
+  '/admin/dedup': '去重记录',
+  '/collector/content': '资料库',
+  '/admin/collection/review': '采集审核',
+  '/admin/message-push': '消息推送',
+  '/admin/friends': '好友关注',
+  '/admin/tags': '标签库',
+  '/collector/upload': '素材上传',
+  '/admin/distribution': '分发规则',
+  '/admin/bots': 'Bot 管理',
+  '/admin/group-listen-manage': '群监听',
+  '/admin/accounts/two-way-bots': '双向机器人',
+};
+const pageTitle = computed(() => PAGE_TITLES[route.path] || '小灰机管理平台');
 
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
@@ -166,13 +184,6 @@ const username = ref('');
 const annQueue = ref<any[]>([]);
 const annCurrent = ref<any>({});
 const annVisible = ref(false);
-
-function isTabActive(path: string) {
-  const p = route.path;
-  if (p === path) return true;
-  if (path !== '/admin/dashboard' && p.startsWith(path + '/')) return true;
-  return false;
-}
 
 function onResize() {
   const mobile = window.innerWidth < 768;
@@ -218,14 +229,13 @@ function logout() {
 
 watch(() => route.path, (p) => { selected.value = [p]; }, { immediate: true });
 
-// 登录后从 /login 进入后台时需加载菜单（onMounted 在登录页已执行过）
 async function loadUserState() {
   if (isLoginPage.value) return;
   if (!localStorage.getItem('access_token')) return;
   try {
     const me: any = await authApi.current();
     username.value = me.username;
-    // 按权限过滤 meiren 菜单（前端静态，不再依赖后端 /menu/all）
+    // 按权限过滤 meiren 菜单（前端静态）
     if (me.isAdmin) {
       menus.value = MEIREN_MENUS;
     } else if (me.isMember) {

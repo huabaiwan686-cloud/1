@@ -125,7 +125,7 @@ a {
   border-radius: 8px;
   margin: 2px 0;
   padding-left: 24px !important;
-  color: var(--app-text);
+  color: rgba(0, 0, 0, 0.88);
   font-size: 14px;
 }
 .pro-sider .ant-menu-submenu .ant-menu-item {
@@ -134,11 +134,11 @@ a {
 .pro-sider .ant-menu-item:hover,
 .pro-sider .ant-menu-submenu-title:hover {
   background: #f5f5f5 !important;
-  color: var(--app-text);
+  color: rgba(0, 0, 0, 0.88);
 }
 .pro-sider .ant-menu-item-selected {
-  background: var(--app-primary-soft) !important;
-  color: var(--app-primary) !important;
+  background: #e6f4ff !important;
+  color: #1677ff !important;
   font-weight: 600;
 }
 .pro-sider .ant-menu-item-selected::after {
@@ -154,29 +154,32 @@ a {
 
 /* ---------- 布局：顶栏 ---------- */
 .pro-header {
-  height: 60px;
-  line-height: 60px;
+  height: 56px;
+  line-height: 56px;
   padding: 0 24px;
   background: #ffffff;
-  border-bottom: 1px solid var(--app-border);
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .pro-header .trigger-btn {
   font-size: 18px;
   cursor: pointer;
-  color: var(--app-text);
+  color: rgba(0, 0, 0, 0.88);
   display: inline-flex;
   align-items: center;
 }
 .pro-header .trigger-btn:hover {
-  color: var(--app-primary);
+  color: #1677ff;
 }
-.pro-app-title {
+.pro-page-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--app-text);
+  color: rgba(0, 0, 0, 0.88);
 }
 .pro-header-right {
   margin-left: auto;
@@ -184,6 +187,36 @@ a {
   align-items: center;
   gap: 12px;
   line-height: 1;
+}
+/* meiren 顶栏右侧：绿色描边试用标签 */
+.vip-trial-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid #52c41a;
+  color: #52c41a;
+  background: #f6ffed;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.pro-account-type {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.65);
+}
+.pro-version {
+  font-size: 12px;
+  color: #8a91a5;
+}
+.topbar-docs {
+  font-size: 14px;
+  color: #1677ff;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.topbar-docs:hover {
+  color: #69b1ff;
 }
 .vip-badge {
   display: inline-flex;
@@ -237,8 +270,12 @@ a {
 /* ---------- 布局：内容区 ---------- */
 .pro-content {
   padding: 24px;
-  background: var(--app-bg);
-  min-height: calc(100vh - 60px);
+  background: #f5f5f5;
+  min-height: calc(100vh - 56px);
+}
+/* meiren 主内容区 wrapper */
+.pro-content .content-area {
+  display: block;
 }
 .page {
   padding: 0;
