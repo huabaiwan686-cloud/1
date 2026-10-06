@@ -184,3 +184,95 @@ def bind_status(session_key: str, user: User = Depends(get_current_user)):
 @router.get("/youban-bot/bot/bind/info")
 def bind_info(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return ok({"total": db.query(BotToken).count()})
+
+
+# ---------------- 官方一键创建（Managed Bots，Bot API 9.6） ----------------
+# 与 BotFather 自动创建并存：前者官方稳定（手机上点一下确认），后者全自动（依赖协议号+话术）。
+
+class ManagedSetupIn(BaseModel):
+    token: str  # 管理机器人的 token（需先在 BotFather 开 Management Mode）
+
+
+class ManagedCreateIn(BaseModel):
+    name: str = ""
+    username: str = ""  # 以 bot 结尾
+
+
+def _mget(db: Session, key: str, default: str = "") -> str:
+    from app.models.media import GlobalSetting
+    r = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
+    return r.value if r else default
+
+
+def _mset(db: Session, key: str, value: str) -> None:
+    from app.models.media import GlobalSetting
+    r = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
+    if r:
+        r.value = value
+    else:
+        db.add(GlobalSetting(key=key, value=value))
+
+
+@router.post("/bot/tokens/managed/setup")
+def managed_setup(body: ManagedSetupIn, user: User = Depends(get_current_user),
+                  db: Session = Depends(get_db)):
+    """配置管理机器人（仅管理员）：校验 token 并落库（Fernet 加密）。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "token 不能为空")
+    me = _bot_api(token, "getMe")  # 400 说明 token 无效
+    _mset(db, "managed_bot_token", _enc(token))
+    _mset(db, "managed_bot_username", me.get("username", ""))
+    db.commit()
+    return ok({"username": me.get("username")}, msg="管理机器人已配置")
+
+
+@router.get("/bot/tokens/managed/status")
+def managed_status(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    username = _mget(db, "managed_bot_username")
+    return ok({"configured": bool(_mget(db, "managed_bot_token")), "username": username})
+
+
+@router.post("/bot/tokens/managed/create")
+def managed_create(body: ManagedCreateIn, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    """生成官方创建链接：在手机 TG 里打开并点确认，worker 会自动把 token 取回入库。"""
+    from urllib.parse import quote
+    from app.models.account import ManagedBotRequest
+
+    username = body.username.lstrip("@").lower()
+    if not username.endswith("bot"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Bot 用户名需以 bot 结尾")
+    if not _mget(db, "managed_bot_token"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "请先配置管理机器人")
+    mgr_username = _mget(db, "managed_bot_username")
+    if not mgr_username:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "管理机器人用户名缺失，请重新配置")
+    done = db.query(ManagedBotRequest).filter(
+        ManagedBotRequest.username == username,
+        ManagedBotRequest.status == "done").first()
+    if done:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "该用户名已创建过")
+    req = db.query(ManagedBotRequest).filter(ManagedBotRequest.username == username).first()
+    if not req:
+        req = ManagedBotRequest(username=username, name=body.name, requested_by=user.id)
+        db.add(req)
+    else:
+        req.name, req.requested_by, req.status, req.bot_token_id = \
+            body.name, user.id, "pending", None
+    db.commit()
+    link = f"https://t.me/newbot/{mgr_username}/{username}?name={quote(body.name or username)}"
+    return ok({"link": link, "requestId": req.id}, msg="请在手机 TG 里打开链接并点确认")
+
+
+@router.get("/bot/tokens/managed/pending")
+def managed_pending(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """我发起的待确认创建（前端轮询用）。"""
+    from app.models.account import ManagedBotRequest
+    rows = db.query(ManagedBotRequest).filter(
+        ManagedBotRequest.requested_by == user.id,
+        ManagedBotRequest.status == "pending").order_by(ManagedBotRequest.id.desc()).all()
+    return ok([{"id": r.id, "username": r.username, "name": r.name,
+                "createdAt": r.created_at.isoformat() if r.created_at else None} for r in rows])

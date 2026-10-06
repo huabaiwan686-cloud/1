@@ -117,3 +117,18 @@ class TgDialog(Base):
     username: Mapped[str] = mapped_column(String(128), default="")
     kind: Mapped[str] = mapped_column(String(16), default="group")  # group/channel/user
     cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ManagedBotRequest(Base):
+    """官方一键创建（Managed Bots）待办：用户在手机上点确认后，worker 拉取 token 入库。"""
+
+    __tablename__ = "managed_bot_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(128), unique=True, index=True)  # 要建的子机器人用户名
+    name: Mapped[str] = mapped_column(String(128), default="")
+    requested_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending/done/failed
+    bot_token_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("bot_tokens.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

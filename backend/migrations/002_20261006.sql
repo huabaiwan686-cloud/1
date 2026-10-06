@@ -44,3 +44,15 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(i
 
 -- 7) 协议号所属人（账号转移用，空=公共）
 ALTER TABLE tg_accounts ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+
+-- 8) 官方一键创建（Managed Bots）待办
+CREATE TABLE IF NOT EXISTS managed_bot_requests (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(128) UNIQUE NOT NULL,
+    name VARCHAR(128) DEFAULT '',
+    requested_by INTEGER REFERENCES users(id),
+    status VARCHAR(16) DEFAULT 'pending',
+    bot_token_id INTEGER REFERENCES bot_tokens(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
