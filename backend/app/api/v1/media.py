@@ -181,7 +181,7 @@ async def process_image(
                         ImageJob.quota_consumed.is_(True),
                         ImageJob.detail.contains(src_hash),
                     ).first()
-                    if not dup and not quota_available(db, 1):
+                    if not dup and not quota_available(db, 1, user):
                         # 额度不足 → 按产品规则降级轻量扰动（不推理、不扣费）
                         out = light_perturb(data)
                         fallback = True
@@ -194,7 +194,7 @@ async def process_image(
                                 out = replace_background(data, bg_data)
                             # 首次成功抠图才扣额度；缓存命中/重复图不重复扣
                             if not dup:
-                                ok_q, _ = consume_quota(db, 1)
+                                ok_q, _ = consume_quota(db, 1, user)
                                 quota_consumed = ok_q
                             job.detail = cache_key
                         except NotImplementedError:

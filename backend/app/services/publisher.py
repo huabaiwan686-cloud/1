@@ -232,7 +232,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     return result
 
 
-def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
+def matt_for_publish(data: bytes, bg_data: bytes, db, user=None) -> bytes:
     """全局抠图（发布时用）：内存中处理，**不落盘**；服务器只保留原图。
 
     - 表格/自评表：走轻量扰动，不扣额度（与手动处理一致）
@@ -266,7 +266,7 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
     if not dup:
         from app.api.v1.vip import quota_available
 
-        if not quota_available(db, 1):
+        if not quota_available(db, 1, user):
             # 额度不足 → 降级轻量扰动，不扣费、不中断上架
             db.add(ImageJob(mode="replace_bg", status="success", source="publish",
                             result_url="", quota_consumed=False, fallback=True,
@@ -280,7 +280,7 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
     quota_consumed = False
     if not dup:
         from app.api.v1.vip import consume_quota
-        ok_q, _ = consume_quota(db, 1)
+        ok_q, _ = consume_quota(db, 1, user)
         quota_consumed = ok_q
     db.add(ImageJob(mode="replace_bg", status="success", source="publish",
                     result_url="", quota_consumed=quota_consumed,
