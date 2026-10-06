@@ -22,6 +22,7 @@
   --app-accent: #d97757;
   --app-accent-hover: #c66545;
   --app-accent-soft: rgba(217, 119, 87, 0.14);
+  --app-hover-overlay: rgba(255, 255, 255, 0.06);
   --app-radius-card: 12px;
   --app-radius-btn: 10px;
   --app-radius-input: 10px;
@@ -47,6 +48,7 @@
   --app-text-tertiary: rgba(0, 0, 0, 0.35);
   --app-accent: #1890ff;
   --app-accent-hover: #40a9ff;
+  --app-hover-overlay: rgba(0, 0, 0, 0.04);
   --app-accent-soft: rgba(24, 144, 255, 0.1);
 }
 
@@ -240,7 +242,7 @@ h1, h2, h3, h4, h5 {
 .ant-menu-dark .ant-menu-item:hover,
 .ant-menu-dark .ant-menu-submenu-title:hover {
   color: var(--app-text);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--app-hover-overlay);
 }
 .ant-menu-dark .ant-menu-item-selected {
   background: var(--app-accent-soft) !important;
@@ -336,7 +338,7 @@ h1, h2, h3, h4, h5 {
 }
 .ant-btn-text:hover {
   color: var(--app-text);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--app-hover-overlay);
 }
 .ant-btn-dangerous {
   color: #ff8a8a;
@@ -568,7 +570,7 @@ textarea.ant-input {
   font-size: 14px;
 }
 .ant-dropdown-menu-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--app-hover-overlay);
 }
 .ant-dropdown-menu-item-danger {
   color: #ff8a8a;
@@ -879,4 +881,77 @@ textarea.ant-input {
   .pro-content {
     padding-bottom: 70px;
   }
+}
+
+/* 笔记卡片封面 */
+.note-cover {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
+  background: var(--app-bg-soft);
+}
+.note-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.note-status-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #fff;
+  background: #1890ff;
+}
+.note-status-badge.status-published { background: #52c41a; }
+.note-status-badge.status-pending { background: #fa8c16; }
+.note-status-badge.status-offline { background: #8c8c8c; }
+.note-status-badge.status-draft { background: #8c8c8c; }
+.note-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+.note-tags {
+  margin-left: 8px;
+  color: var(--app-text-tertiary);
+  font-size: 12px;
+}
+
+/* 侧边栏菜单可滚动 */
+.ant-layout-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.ant-layout-sider .ant-menu {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 亮色模式：确保零暗色 */
+[data-theme="light"] .pro-header,
+[data-theme="light"] .ant-layout-header {
+  background: #ffffff !important;
+}
+[data-theme="light"] .pro-sider,
+[data-theme="light"] .ant-layout-sider {
+  background: #ffffff !important;
+}
+[data-theme="light"] .ant-menu-dark {
+  background: #ffffff !important;
+}
+[data-theme="light"] .ant-menu-dark .ant-menu-item,
+[data-theme="light"] .ant-menu-dark .ant-menu-submenu-title {
+  color: rgba(0, 0, 0, 0.65) !important;
+}
+[data-theme="light"] .mobile-tabbar {
+  background: #ffffff !important;
 }

@@ -26,8 +26,12 @@ request.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
+      // Token 失效：清除 token，但不硬跳转（避免布局闪断）
+      // 由路由守卫统一处理跳转到登录页
       localStorage.removeItem('access_token');
-      if (location.pathname !== '/login') location.href = '/login';
+      const err: any = new Error('登录已过期，请重新登录');
+      err.code = 401;
+      throw err;
     }
     // FastAPI HTTPException 返回 {detail}，转成友好错误消息（如 403 VIP 门控）
     const detail = error.response?.data?.detail;

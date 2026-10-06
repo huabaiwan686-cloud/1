@@ -39,7 +39,12 @@
         <a-empty v-if="!list.length && !loading" description="暂无笔记" />
         <div v-else-if="viewMode === 'card'" class="note-grid">
           <div v-for="n in list" :key="n.id" class="note-card" :class="{ selected: selected.includes(n.id) }">
-            <div class="note-header">
+            <div class="note-cover" v-if="n.images && n.images.length">
+              <img :src="n.images[0]" alt="" />
+              <span class="note-status-badge" :class="'status-' + n.status">{{ statusText(n.status) }}</span>
+              <a-checkbox class="note-check" :checked="selected.includes(n.id)" @change="(e) => toggleSelect(n.id, e.target.checked)" />
+            </div>
+            <div class="note-header" v-else>
               <a-checkbox :checked="selected.includes(n.id)" @change="(e) => toggleSelect(n.id, e.target.checked)" />
               <span class="note-id">#{{ n.id }}</span>
               <a-tag :color="statusColor(n.status)" size="small">{{ statusText(n.status) }}</a-tag>
@@ -47,11 +52,15 @@
               <a-button type="link" size="small" @click="preview(n)">预览</a-button>
             </div>
             <div class="note-title">{{ n.title || '(无标题)' }}</div>
-            <div class="note-preview">{{ (n.content || '').slice(0, 90) }}</div>
-            <div class="note-meta" v-if="n.images && n.images.length"><span>{{ n.images.length }} 张图</span></div>
+            <div class="note-preview">{{ (n.content || '').slice(0, 60) }}</div>
+            <div class="note-meta">
+              <span v-if="n.images && n.images.length">{{ n.images.length }} 张图</span>
+              <span v-if="n.tags && n.tags.length" class="note-tags">{{ (n.tags || []).slice(0, 2).join(' · ') }}</span>
+            </div>
             <div class="note-footer">
               <span class="note-time">{{ fmtTime(n.createdAt) }}</span>
               <div class="note-actions">
+                <a-button size="small" type="link" @click="preview(n)">预览</a-button>
                 <a-button size="small" type="link" @click="quickOp(n.id, 'publish')" v-if="n.status !== 'published'">上架</a-button>
                 <a-button size="small" type="link" @click="quickOp(n.id, 'unpublish')" v-if="n.status === 'published'">下架</a-button>
               </div>

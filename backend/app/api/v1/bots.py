@@ -174,3 +174,37 @@ async def auto_create(body: AutoCreateIn, user: User = Depends(require_member), 
 @router.get("/youban-bot/bot/bind/info")
 def bind_info(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok({"total": db.query(BotToken).count()})
+
+
+class BotUpdateIn(BaseModel):
+    enabled: bool | None = None
+    name: str | None = None
+    remark: str | None = None
+
+
+@router.patch("/bot/tokens/{token_id}")
+def update_token(token_id: int, body: BotUpdateIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    b = db.query(BotToken).filter(BotToken.id == token_id).first()
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Token 不存在")
+    if body.enabled is not None:
+        b.enabled = body.enabled
+    if body.name is not None:
+        b.name = body.name
+    if body.remark is not None:
+        b.remark = body.remark
+    db.commit()
+    return ok(_out(b), msg="已更新")
+
+
+@router.get("/bot/tokens/{token_id}/token")
+def get_token_plain(token_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
+    """获取明文 Token（用于复制）。仅超管可用。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    b = db.query(BotToken).filter(BotToken.id == token_id).first()
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Token 不存在")
+    return ok({"token": _dec(b.token_secret)})

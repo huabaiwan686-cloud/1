@@ -82,8 +82,9 @@ async def upload_material(
         chunks.append(chunk)
     data = b"".join(chunks)
     suffix = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    if suffix not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".webm"):
-        suffix = ".jpg"
+    # 背景素材仅允许图片格式（抠图背景替换用）
+    if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材仅支持 JPG/PNG/WebP 图片格式")
     _, web_path = _store(data, suffix=suffix)
     m = BackgroundMaterial(name=name, url=web_path, category=category)
     db.add(m)
@@ -94,7 +95,13 @@ async def upload_material(
 @router.get("/materials")
 def list_materials(user: User = Depends(require_member), db: Session = Depends(get_db)):
     ms = db.query(BackgroundMaterial).order_by(BackgroundMaterial.id.desc()).all()
-    return ok([{"id": m.id, "name": m.name, "url": m.url, "category": m.category} for m in ms])
+    # 仅返回图片格式的背景素材，过滤掉误上传的视频
+    result = []
+    for m in ms:
+        url_lower = (m.url or "").lower()
+        if url_lower.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")):
+            result.append({"id": m.id, "name": m.name, "url": m.url, "category": m.category})
+    return ok(result)
 
 
 @router.delete("/materials/{material_id}")

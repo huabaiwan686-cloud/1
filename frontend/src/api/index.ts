@@ -120,6 +120,8 @@ export const botApi = {
   verify: (id: number) => request.post(`/api/bot/tokens/${id}/verify`),
   remove: (id: number) => request.delete(`/api/bot/tokens/${id}`),
   autoCreate: (data: any) => request.post('/api/bot/tokens/auto-create', data),
+  setEnabled: (id: number, enabled: boolean) => request.patch(`/api/bot/tokens/${id}`, { enabled }),
+  getToken: (id: number) => request.get(`/api/bot/tokens/${id}/token`),
 };
 
 export const socialApi = {

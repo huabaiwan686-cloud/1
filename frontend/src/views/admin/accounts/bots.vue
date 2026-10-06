@@ -3,8 +3,12 @@
     <a-button type="primary" @click="openEditor()" style="margin-bottom: 16px">添加 Bot Token</a-button>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
+        <template v-if="column.dataIndex === 'enabled'">
+          <a-switch :checked="record.enabled" size="small" @change="(v) => toggleEnabled(record, v)" />
+        </template>
         <a-space v-if="column.key === 'action'">
           <a @click="verify(record.id)">验证</a>
+          <a @click="copyToken(record.id)">复制</a>
           <a-popconfirm title="确认删除？" @confirm="remove(record.id)"><a>删除</a></a-popconfirm>
         </a-space>
       </template>
@@ -35,7 +39,8 @@ const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
   { title: '名称', dataIndex: 'name' },
   { title: '用户名', dataIndex: 'username' },
-  { title: '操作', key: 'action', width: 140 },
+  { title: '启用', dataIndex: 'enabled', width: 80 },
+  { title: '操作', key: 'action', width: 180 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
 const visible = ref(false); const saving = ref(false);
@@ -72,6 +77,20 @@ async function save() {
 }
 async function verify(id: number) {
   const r: any = await botApi.verify(id); message.info(r.msg);
+}
+async function toggleEnabled(record: any, enabled: boolean) {
+  try {
+    await botApi.setEnabled(record.id, enabled);
+    record.enabled = enabled;
+    message.success(enabled ? '已启用' : '已停用');
+  } catch (e: any) { message.error(e.message || '操作失败'); load(); }
+}
+async function copyToken(id: number) {
+  try {
+    const r: any = await botApi.getToken(id);
+    await navigator.clipboard.writeText(r.token);
+    message.success('Token 已复制到剪贴板');
+  } catch (e: any) { message.error(e.message || '复制失败'); }
 }
 async function remove(id: number) { await botApi.remove(id); message.success('已删除'); load(); }
 onMounted(load);

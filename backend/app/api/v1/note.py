@@ -353,13 +353,23 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知操作: {op}")
     count = 0
     extra: dict = {}
+    publish_details = []
     for n in notes:
         if op == "publish":
             n.status = "published"
             n.published_at = datetime.utcnow()
             if user is not None and not (n.scheduled_at and n.scheduled_at > datetime.utcnow()):
-                _send_to_channels(n, user, db)
+                sent, failed = _send_to_channels(n, user, db)
                 n.scheduled_sent = True  # 防 worker 重复发送
+                if failed:
+                    publish_details.append(f"笔记#{n.id}: {'; '.join(failed)}")
+                elif not sent:
+                    # 没有绑定频道或频道未激活
+                    if not (n.channel_ids or []):
+                        publish_details.append(f"笔记#{n.id}: 未选择推送频道")
+                    else:
+                        publish_details.append(f"笔记#{n.id}: 频道未激活或未绑定Bot")
+            count += 1
         elif op == "unpublish":
             n.status = "offline"
             _queue_removal(db, n.id)
@@ -409,6 +419,8 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
             seen.setdefault(key, []).append(n.id)
         extra["duplicates"] = {k: v for k, v in seen.items() if len(v) > 1 and k}
     db.commit()
+    if publish_details:
+        extra["publish_warnings"] = publish_details
     return {"count": count, **extra}
 
 
