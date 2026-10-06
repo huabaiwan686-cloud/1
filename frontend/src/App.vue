@@ -1,6 +1,7 @@
 <template>
   <router-view v-if="isLoginPage" />
   <a-layout v-else style="min-height: 100vh">
+    <div v-if="isMobile && !collapsed" class="mobile-sider-mask" @click="collapsed = true" />
     <a-layout-sider
       class="pro-sider"
       collapsible
@@ -134,7 +135,10 @@ async function loadAnnouncements() {
 
 const isLoginPage = computed(() => route.path === '/login');
 
-function onMenu({ key }: any) { router.push(key); }
+function onMenu({ key }: any) {
+  router.push(key);
+  if (isMobile.value) collapsed.value = true;
+}
 function logout() {
   authApi.logout().finally(() => {
     localStorage.removeItem('access_token');
@@ -182,6 +186,18 @@ onUnmounted(() => {
 .tab-icon { font-size: 20px; margin-bottom: 2px; }
 @media (max-width: 768px) {
   .mobile-tabbar { display: flex; }
-  .ant-layout-sider { position: fixed !important; z-index: 101; height: 100vh; }
+  .ant-layout-sider {
+    position: fixed !important; z-index: 1001; height: 100vh;
+    width: 220px !important; max-width: 220px !important; min-width: 220px !important;
+    flex: 0 0 220px !important;
+  }
+  .ant-layout-sider-collapsed {
+    width: 0 !important; max-width: 0 !important; min-width: 0 !important;
+    flex: 0 0 0 !important; overflow: hidden;
+  }
+  .mobile-sider-mask {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45); z-index: 1000;
+  }
 }
 </style>
