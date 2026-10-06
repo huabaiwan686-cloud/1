@@ -67,6 +67,8 @@ onMounted(async () => {
   tags.value = await metaApi.tags();
   cities.value = await metaApi.cityTree();
   channels.value = await channelApi.list(true);
+  // 默认选中的频道自动勾选，第二次上传不用重新选
+  form.channel_ids = channels.value.filter((c: any) => c.isDefault).map((c: any) => c.id);
 });
 
 async function buildPayload() {
