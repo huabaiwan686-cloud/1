@@ -7,6 +7,15 @@ from app.models.content import (  # noqa: F401
     Tag,
     TaskLog,
 )
+from app.models.account import (  # noqa: F401
+    BotToken,
+    CooperationApplication,
+    CooperationConfig,
+    FriendRelation,
+    PlatformBinding,
+    TgAccount,
+    TwoWayBot,
+)
 from app.models.distribution import (  # noqa: F401
     Channel,
     ListenPlan,
