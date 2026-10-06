@@ -9,8 +9,7 @@
         <a-button @click="rejectSelected" danger :disabled="!selected.length">批量拒绝</a-button>
       </div>
     </div>
-    <div class="aq-card">
-  <div class="review" tabindex="0" @keydown="onKey">
+  <div class="review aq-card" tabindex="0" @keydown="onKey">
     <!-- 顶部：进度 + 操作 -->
     <div class="topbar">
       <div class="progress-wrap">
