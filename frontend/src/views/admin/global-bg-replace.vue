@@ -92,6 +92,10 @@ function remove(id: number) {
       try {
         await mediaApi.deleteMaterial(id);
         message.success('已删除');
+        // 如果删除的是当前默认背景，清空选择
+        if (matting.value.backgroundId === id) {
+          matting.value.backgroundId = null;
+        }
         load();
       } catch (e: any) { message.error(e.message || '删除失败'); }
     },

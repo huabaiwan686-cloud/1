@@ -150,7 +150,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import { channelApi, mediaApi, botApi } from '@/api';
 
 const columns = [
@@ -258,7 +258,18 @@ async function save() {
 }
 async function remove(id: number) { await channelApi.remove(id); message.success('已删除'); load(); }
 async function check(id: number) { const r: any = await channelApi.check(id); message.info(r.msg); }
-async function pushAll(id: number) { const r: any = await channelApi.pushAll(id); message.success(r.msg || '全量推送完成'); }
+async function pushAll(id: number) {
+  Modal.confirm({
+    title: '确认全量推送？',
+    content: '将向该频道推送所有待发送内容',
+    onOk: async () => {
+      try {
+        const r: any = await channelApi.pushAll(id);
+        message.success(r.msg || '全量推送完成');
+      } catch (e: any) { message.error(e.message || '推送失败'); }
+    },
+  });
+}
 async function clearQueue(id: number) { const r: any = await channelApi.clearQueue(id); message.success(r.msg || '队列已清空'); }
 // 智能推荐规则
 const ruleColumns = [
