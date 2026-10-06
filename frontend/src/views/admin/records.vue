@@ -31,6 +31,7 @@
 import { onMounted, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { metaApi } from '@/api';
+import { formatDateTime } from '@/utils/date';
 
 const columns = [
   { title: '内容编号', dataIndex: 'id', width: 90 },
@@ -40,7 +41,7 @@ const columns = [
   { title: '来源', dataIndex: 'executor', width: 120 },
   { title: '状态', key: 'status', width: 90 },
   { title: '详细信息', dataIndex: 'detail' },
-  { title: '时间', dataIndex: 'createdAt', width: 180 },
+  { title: '时间', dataIndex: 'createdAt', width: 180, customRender: ({ text }: any) => formatDateTime(text) },
 ];
 const list = ref<any[]>([]); const total = ref(0);
 const page = ref(1); const pageSize = ref(20);
