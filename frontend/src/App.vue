@@ -14,6 +14,11 @@
     </a-layout-sider>
     <a-layout>
       <a-layout-header class="header">
+        <a-button type="text" @click="collapsed = !collapsed" style="font-size: 18px; padding: 0 12px;">
+          <menu-outlined v-if="collapsed" />
+          <menu-fold-outlined v-else />
+        </a-button>
+        <div style="flex: 1" />
         <a-space>
           <span>{{ username }}</span>
           <a-button size="small" @click="logout">退出</a-button>
@@ -32,11 +37,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { MenuOutlined, MenuFoldOutlined } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
 const route = useRoute();
 const router = useRouter();
-const collapsed = ref(false);
+// 移动端默认收起侧边栏，桌面端默认展开
+const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
@@ -94,6 +101,6 @@ onMounted(() => { loadUserState(); });
 
 <style scoped>
 .logo { color: #fff; text-align: center; padding: 16px 0; font-weight: bold; }
-.header { background: #fff; padding: 0 24px; display: flex; justify-content: flex-end; align-items: center; }
+.header { background: #fff; padding: 0 16px 0 0; display: flex; align-items: center; }
 .content { margin: 16px; background: #fff; padding: 16px; min-height: 80vh; }
 </style>
