@@ -16,6 +16,13 @@ from app.models.account import (  # noqa: F401
     TgAccount,
     TwoWayBot,
 )
+from app.models.billing import (  # noqa: F401
+    ImageQuota,
+    InviteCode,
+    InviteRecord,
+    VipOrder,
+    VipSubscription,
+)
 from app.models.distribution import (  # noqa: F401
     Channel,
     ListenPlan,
