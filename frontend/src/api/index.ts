@@ -103,6 +103,15 @@ export const tgApi = {
     request.get('/api/youban-bot/bot/login/status', { params: { session_key } }),
   loginVerify: (session_key: string, code: string, password = '') =>
     request.post('/api/youban-bot/bot/login/verify', { session_key, code, password }),
+  qrLogin: () => request.post('/api/tg/accounts/qr-login'),
+  qrStatus: (qr_token: string, password = '') =>
+    request.get('/api/tg/accounts/qr-status', { params: { qr_token, password } }),
+  importSession: (phone: string, file: File) => {
+    const fd = new FormData();
+    fd.append('phone', phone);
+    fd.append('file', file);
+    return request.post('/api/tg/accounts/import-session', fd);
+  },
 };
 
 export const botApi = {

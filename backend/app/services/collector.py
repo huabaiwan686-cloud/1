@@ -26,7 +26,7 @@ PAGE_SIZE = 100
 
 
 def _blocked(text: str, has_media: bool, rule) -> str | None:
-    """命中屏蔽规则返回原因，否则 None。"""
+    """命中屏蔽规则返回原因，否则 None。屏蔽词支持 * / ? 通配符（P1-16）。"""
     if rule is None:
         return None
     if rule.block_links and re.search(r"https?://|t\.me/", text or ""):
@@ -35,8 +35,9 @@ def _blocked(text: str, has_media: bool, rule) -> str | None:
         return "含用户名"
     if rule.block_plain_text and not has_media:
         return "纯文本"
+    from app.services.textutil import wildcard_match
     for b in rule.block_texts or []:
-        if b and b in (text or ""):
+        if b and wildcard_match(text, b):
             return f"命中屏蔽词[{b}]"
     return None
 
@@ -45,17 +46,18 @@ def _process_text(text: str, rule) -> str:
     """文案处理：删行/删词/替换/清理标识/前后缀。"""
     if rule is None:
         return (text or "").strip()
+    from app.services.textutil import wildcard_match, wildcard_replace
     dlks = rule.delete_line_keywords or []
     if dlks:
         text = "\n".join(l for l in (text or "").split("\n")
-                         if not any(k in l for k in dlks if k))
+                         if not any(k and wildcard_match(l, k) for k in dlks))
     for d in rule.delete_texts or []:
         if d:
-            text = text.replace(d, "")
+            text = wildcard_replace(text, d, "")
     for rr in rule.replace_rules or []:
         frm = (rr or {}).get("from", "")
         if frm:
-            text = text.replace(frm, (rr or {}).get("to", ""))
+            text = wildcard_replace(text, frm, (rr or {}).get("to", ""))
     if rule.clean_identifiers:
         text = "\n".join(l for l in text.split("\n")
                          if not re.search(r"编号|介绍费|\bID\s*[:：]", l))

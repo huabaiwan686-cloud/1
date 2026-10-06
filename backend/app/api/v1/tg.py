@@ -1,8 +1,10 @@
 """TG 协议号接口：/api/tg/*；登录流程对齐原站 /api/youban-bot/bot/login/*。"""
+import asyncio
+import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -189,3 +191,210 @@ async def login_verify(body: CodeIn, user: User = Depends(require_member), db: S
         status.HTTP_400_BAD_REQUEST,
         "TG_API_ID / TG_API_HASH 未配置，无法真实登录。请在服务器环境变量中配置后再试",
     )
+
+
+# ---------------- P1-11 Session 导入 ----------------
+
+@router.post("/tg/accounts/import-session")
+async def import_session(
+    phone: str = Form(...),
+    file: UploadFile = File(...),
+    user: User = Depends(require_member),
+    db: Session = Depends(get_db),
+):
+    """P1-11：上传 .session 文件导入协议号登录态，关联到指定手机号。
+
+    后端用该文件真实创建 Telethon client 并 connect，is_user_authorized()
+    通过才算有效，否则删除文件并 400。
+    """
+    from app.services.tg_client import (
+        SESSION_DIR, _phone_session_path, drop_shared_client, tg_configured,
+    )
+    if not tg_configured():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "TG_API_ID / TG_API_HASH 未配置")
+    digits = "".join(c for c in (phone or "") if c.isdigit())
+    if len(digits) < 7:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "手机号格式不正确")
+    fname = (file.filename or "").lower()
+    if not fname.endswith(".session"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "请上传 .session 文件")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "session 文件过大（>5MB）")
+    if len(data) < 64 or not data.startswith(b"SQLite format 3"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不是有效的 Telethon session 文件")
+
+    base_path = _phone_session_path(phone)  # 不带扩展名，Telethon 自动加 .session
+    dest = base_path + ".session"
+    os.makedirs(SESSION_DIR, exist_ok=True)
+    with open(dest, "wb") as f:
+        f.write(data)
+
+    # 丢掉该手机号的共享连接缓存，避免旧 client 占用
+    try:
+        await drop_shared_client(phone)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # 真实验证：能 connect 且已授权才算有效
+    authed, me, err = False, None, ""
+    try:
+        from telethon import TelegramClient
+        from app.services.tg_client import _require_config, _proxy_kwargs
+        api_id, api_hash = _require_config()
+        client = TelegramClient(base_path, api_id, api_hash, **_proxy_kwargs())
+        await client.connect()
+        try:
+            authed = await client.is_user_authorized()
+            me = await client.get_me() if authed else None
+        finally:
+            await client.disconnect()
+    except Exception as e:  # noqa: BLE001
+        err = str(e)
+    if not authed:
+        try:
+            os.remove(dest)
+        except OSError:  # noqa: BLE001
+            pass
+        detail = "session 无效或未授权（无法登录）" + (f"：{err}" if err else "")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail)
+
+    name = (getattr(me, "first_name", "") or "") + (getattr(me, "last_name", "") or "")
+    username = getattr(me, "username", "") or ""
+    tg_uid = str(getattr(me, "id", ""))
+    a = db.query(TgAccount).filter(TgAccount.phone == phone).first()
+    if a:
+        a.name = name or username or phone
+        a.username = username or a.username
+        a.tg_user_id = tg_uid or a.tg_user_id
+        a.status = "online"
+    else:
+        a = TgAccount(name=name or username or phone, phone=phone,
+                      username=username, tg_user_id=tg_uid, status="online")
+        db.add(a)
+    db.commit()
+    return ok(_out(a), msg="Session 导入成功，账号已上线")
+
+
+# ---------------- P1-12 扫码登录 ----------------
+
+# 扫码登录会话（内存态；token -> {client, qr, expires}）
+_qr_sessions: dict[str, dict] = {}
+
+
+def _clean_qr_sessions() -> None:
+    now = datetime.now(timezone.utc)
+    dead = [k for k, v in _qr_sessions.items()
+            if v.get("expires") and v["expires"] < now]
+    for k in dead:
+        s = _qr_sessions.pop(k, None)
+        if s:
+            try:
+                asyncio.get_event_loop().create_task(s["client"].disconnect())
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def _qr_image_b64(url: str) -> str:
+    try:
+        import base64
+        import io
+        import qrcode
+        img = qrcode.make(url)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception:  # noqa: BLE001  未装 qrcode 时只返回 url
+        return ""
+
+
+@router.post("/tg/accounts/qr-login")
+async def qr_login_start(user: User = Depends(require_member)):
+    """P1-12：生成扫码登录二维码。返回 qrToken + tg:// url（+可选 base64 二维码图）。
+
+    前端展示二维码后，轮询 GET /tg/accounts/qr-status?qr_token=xxx。
+    """
+    from app.services.tg_client import _require_config, _proxy_kwargs, _session_path, tg_configured
+    if not tg_configured():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "TG_API_ID / TG_API_HASH 未配置")
+    _clean_qr_sessions()
+    from telethon import TelegramClient
+    api_id, api_hash = _require_config()
+    token = secrets.token_hex(8)
+    client = TelegramClient(_session_path(f"qr_{token}"), api_id, api_hash, **_proxy_kwargs())
+    await client.connect()
+    qr = await client.qr_login()
+    _qr_sessions[token] = {"client": client, "qr": qr, "expires": qr.expires}
+    return ok({"qrToken": token, "url": qr.url, "qrImage": _qr_image_b64(qr.url),
+               "expiresAt": qr.expires.isoformat()}, msg="请用 Telegram 手机端扫码")
+
+
+@router.get("/tg/accounts/qr-status")
+async def qr_login_status(qr_token: str, password: str = "",
+                          user: User = Depends(require_member),
+                          db: Session = Depends(get_db)):
+    """P1-12：轮询扫码状态。返回 stage: waiting/scanned/expired/done/need_password。"""
+    from telethon.errors import SessionPasswordNeededError
+    s = _qr_sessions.get(qr_token or "")
+    if not s:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "扫码会话不存在或已过期，请重新生成")
+    client, qr = s["client"], s["qr"]
+
+    async def _finish() -> dict:
+        me = await client.get_me()
+        phone = getattr(me, "phone", "") or ""
+        name = (getattr(me, "first_name", "") or "") + (getattr(me, "last_name", "") or "")
+        username = getattr(me, "username", "") or ""
+        tg_uid = str(getattr(me, "id", ""))
+        a = None
+        if phone:
+            a = db.query(TgAccount).filter(TgAccount.phone == phone).first()
+        if a is None and tg_uid:
+            a = db.query(TgAccount).filter(TgAccount.tg_user_id == tg_uid).first()
+        if a:
+            a.name = name or username or a.name
+            a.username = username or a.username
+            a.status = "online"
+            if phone:
+                a.phone = phone
+        else:
+            a = TgAccount(name=name or username or phone or "扫码账号", phone=phone,
+                          username=username, tg_user_id=tg_uid, status="online")
+            db.add(a)
+        db.commit()
+        _qr_sessions.pop(qr_token, None)
+        try:
+            await client.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
+        return ok({"stage": "done", "account": _out(a)}, msg="扫码登录成功")
+
+    # 已授权（可能上一轮已扫码确认）→ 直接完成
+    try:
+        if await client.is_user_authorized():
+            return await _finish()
+    except Exception:  # noqa: BLE001
+        pass
+
+    if qr.expires and qr.expires < datetime.now(timezone.utc):
+        _qr_sessions.pop(qr_token, None)
+        try:
+            await client.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
+        return ok({"stage": "expired"}, msg="二维码已过期，请重新生成")
+
+    # 短轮询一次（3 秒），不阻塞
+    try:
+        await asyncio.wait_for(qr.wait(), timeout=3)
+        return await _finish()
+    except asyncio.TimeoutError:
+        return ok({"stage": "waiting"}, msg="等待扫码…")
+    except SessionPasswordNeededError:
+        if password:
+            try:
+                await client.sign_in(password=password)
+                return await _finish()
+            except Exception as e:  # noqa: BLE001
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, f"二级密码错误: {e}")
+        return ok({"stage": "need_password"}, msg="该账号开启了两步验证，请输入二级密码")
