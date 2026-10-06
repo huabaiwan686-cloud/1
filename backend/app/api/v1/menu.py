@@ -44,8 +44,16 @@ MENU_TREE = [
     {"name": "Friends", "path": "/admin/accounts/friends", "title": "好友关注"},
     {"name": "Vip", "path": "/admin/vip", "title": "VIP会员"},
     {"name": "Announcements", "path": "/admin/announcements", "title": "系统公告"},
-    {"name": "Backgrounds", "path": "/admin/backgrounds", "title": "背景素材"},
-    {"name": "PublishConfig", "path": "/admin/publish-config", "title": "发布设置"},
+    {
+        "name": "GlobalSettings",
+        "path": "/admin/global",
+        "title": "全局设置",
+        "children": [
+            {"name": "BgReplace", "path": "/admin/global/bg-replace", "title": "背景替换"},
+            {"name": "Confuse", "path": "/admin/global/confuse", "title": "混淆"},
+            {"name": "LoopPublish", "path": "/admin/global/loop", "title": "循环发布"},
+        ],
+    },
 ]
 
 

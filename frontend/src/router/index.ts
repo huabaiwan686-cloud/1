@@ -29,8 +29,13 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/announcements', component: () => import('@/views/admin/announcements.vue') },
   { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
   { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
-  { path: '/admin/backgrounds', component: () => import('@/views/admin/backgrounds.vue') },
-  { path: '/admin/publish-config', component: () => import('@/views/admin/publish-config.vue') },
+  // 全局设置：背景替换 / 混淆 / 循环发布
+  { path: '/admin/global/bg-replace', component: () => import('@/views/admin/global-bg-replace.vue') },
+  { path: '/admin/global/confuse', component: () => import('@/views/admin/global-confuse.vue') },
+  { path: '/admin/global/loop', component: () => import('@/views/admin/global-loop.vue') },
+  // 旧路由兼容重定向
+  { path: '/admin/backgrounds', redirect: '/admin/global/bg-replace' },
+  { path: '/admin/publish-config', redirect: '/admin/global/loop' },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });
