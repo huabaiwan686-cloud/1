@@ -47,12 +47,23 @@ import dayjs, { Dayjs } from 'dayjs';
 import request from '@/utils/request';
 
 const stats = ref<any>({ notesByStatus: {} });
-const statCards = computed(() => [
-  { label: '资料总数', value: stats.value.notesTotal || 0 },
-  { label: '今日发布', value: stats.value.todayPublishes || 0 },
-  { label: '上架频道', value: stats.value.channelsActive || 0 },
-  { label: '图片额度剩余', value: stats.value.quotaLeft || 0 },
-]);
+const statCards = computed(() => {
+  const byStatus = stats.value.notesByStatus || {};
+  const total = stats.value.notesTotal || 0;
+  const published = byStatus.published || byStatus['已上架'] || 0;
+  const failed = stats.value.todayPublishes !== undefined ? (stats.value.publishFailed || 0) : 0;
+  const successRate = total > 0 ? Math.round((published / total) * 100) + '%' : '0%';
+  return [
+    { label: '资料总数', value: total },
+    { label: '已上架', value: published },
+    { label: '待上架', value: (byStatus.draft || byStatus['待上架'] || 0) },
+    { label: '发布失败', value: failed },
+    { label: '上架账号', value: stats.value.tgAccounts || 0 },
+    { label: '在线协议号', value: stats.value.tgAccounts || 0 },
+    { label: '可用频道', value: stats.value.channelsActive || 0 },
+    { label: '发布成功率', value: successRate },
+  ];
+});
 
 // 趋势图
 const W = 800, H = 260, padL = 44, padR = 16, padT = 12, padB = 28;

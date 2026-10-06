@@ -33,10 +33,17 @@ def stats(user: User = Depends(require_member), db: Session = Depends(get_db)):
     q = _get_or_create_quota(db)
     sub = db.query(VipSubscription).order_by(VipSubscription.id.desc()).first()
     active = bool(sub and sub.active_until and sub.active_until > datetime.utcnow())
+    publish_failed = (
+        db.query(func.count(TaskLog.id))
+        .filter(TaskLog.action == "publish", TaskLog.result == "fail",
+                TaskLog.created_at >= day_start)
+        .scalar()
+    )
     return ok({
         "notesTotal": db.query(func.count(Note.id)).scalar(),
         "notesByStatus": by_status,
         "todayPublishes": today_publishes or 0,
+        "publishFailed": publish_failed or 0,
         "channelsActive": db.query(func.count(Channel.id)).filter(Channel.is_active.is_(True)).scalar(),
         "tgAccounts": db.query(func.count(TgAccount.id)).scalar(),
         "botTokens": db.query(func.count(BotToken.id)).scalar(),

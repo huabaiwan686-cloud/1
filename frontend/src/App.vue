@@ -6,7 +6,7 @@
       class="pro-sider"
       collapsible
       v-model:collapsed="collapsed"
-      width="220"
+      width="200"
       :trigger="null"
     >
       <div class="pro-logo" :class="{ collapsed }">
