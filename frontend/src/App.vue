@@ -38,6 +38,10 @@
         </span>
         <span class="pro-app-title">小灰机 · 商家后台</span>
         <div class="pro-header-right">
+          <a-button type="text" @click="toggleTheme" class="theme-btn" :title="theme === 'dark' ? '切换亮色' : '切换夜色'">
+            <bulb-outlined v-if="theme === 'dark'" />
+            <bulb-filled v-else />
+          </a-button>
           <span class="pro-username">
             <span class="pro-avatar">{{ username ? username.slice(0, 1).toUpperCase() : 'U' }}</span>
             <span class="uname">{{ username }}</span>
@@ -59,7 +63,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  MenuOutlined, MenuFoldOutlined,
+  MenuOutlined, MenuFoldOutlined, BulbOutlined, BulbFilled,
 } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
@@ -68,6 +72,22 @@ const router = useRouter();
 // 移动端默认收起侧边栏，桌面端默认展开
 const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+// 主题切换：dark（默认）/ light，localStorage 持久化
+const theme = ref('dark');
+try {
+  const saved = localStorage.getItem('app_theme');
+  if (saved === 'light' || saved === 'dark') theme.value = saved;
+} catch { /* ignore */ }
+function applyTheme() {
+  try {
+    document.documentElement.setAttribute('data-theme', theme.value);
+    localStorage.setItem('app_theme', theme.value);
+  } catch { /* ignore */ }
+}
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
+  applyTheme();
+}
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
@@ -132,6 +152,7 @@ async function loadUserState() {
 }
 watch(() => route.path, () => { loadUserState(); });
 onMounted(() => {
+  applyTheme();
   loadUserState();
   window.addEventListener('resize', onResize);
 });

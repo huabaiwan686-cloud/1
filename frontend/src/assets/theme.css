@@ -27,6 +27,23 @@
     'Helvetica Neue', Arial, sans-serif;
 }
 
+/* ---------- 亮色主题 ---------- */
+[data-theme="light"] {
+  --app-bg: #f0f2f5;
+  --app-bg-soft: #ffffff;
+  --app-card: #ffffff;
+  --app-card-hover: #fafafa;
+  --app-input: #ffffff;
+  --app-border: #e8e8e8;
+  --app-border-soft: #f0f0f0;
+  --app-text: rgba(0, 0, 0, 0.85);
+  --app-text-secondary: rgba(0, 0, 0, 0.55);
+  --app-text-tertiary: rgba(0, 0, 0, 0.35);
+  --app-accent: #1890ff;
+  --app-accent-hover: #40a9ff;
+  --app-accent-soft: rgba(24, 144, 255, 0.1);
+}
+
 /* ---------- 全局 ---------- */
 html,
 body {
@@ -800,4 +817,13 @@ textarea.ant-input {
   .pro-content {
     max-width: 768px;
   }
+}
+
+/* 主题切换按钮 */
+.theme-btn {
+  font-size: 18px;
+  color: var(--app-text-secondary);
+}
+.theme-btn:hover {
+  color: var(--app-accent);
 }
