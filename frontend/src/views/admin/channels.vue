@@ -67,7 +67,7 @@
         <a-radio-button :value="false">已下架</a-radio-button>
       </a-radio-group>
     </div>
-    <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
+    <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading" :scroll="{ x: 'max-content' }">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.isActive ? 'green' : 'default'">{{ record.isActive ? '上架' : '下架' }}</a-tag>

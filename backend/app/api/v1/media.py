@@ -275,6 +275,7 @@ def thumb(
 class MattingGlobalIn(BaseModel):
     enabled: bool
     background_id: int | None = None
+    mode: str = "replace_bg"  # replace_bg | blur_bg | light_perturb | original
 
 
 def _get_setting(db: Session, key: str, default: str = "") -> str:
@@ -291,21 +292,26 @@ def _set_setting(db: Session, key: str, value: str) -> None:
 
 
 def get_matting_global(db: Session) -> dict | None:
-    """全局抠图配置：启用返回 {"background_id", "bg_data"}，否则 None。"""
+    """全局抠图配置：启用返回 {"mode", "background_id", "bg_data"}，否则 None。"""
     if _get_setting(db, "matting_global_enabled") != "1":
         return None
-    try:
-        bg_id = int(_get_setting(db, "matting_global_background_id") or 0)
-    except ValueError:
-        return None
-    bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == bg_id).first()
-    if not bg:
-        return None
-    try:
-        _, bg_data = _media_bytes_local(bg.url)
-    except Exception:  # noqa: BLE001
-        return None
-    return {"background_id": bg_id, "bg_data": bg_data}
+    mode = _get_setting(db, "matting_global_mode", "replace_bg")
+    if mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+        mode = "replace_bg"
+    bg_id, bg_data = None, None
+    if mode == "replace_bg":
+        try:
+            bg_id = int(_get_setting(db, "matting_global_background_id") or 0)
+        except ValueError:
+            return None
+        bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == bg_id).first()
+        if not bg:
+            return None
+        try:
+            _, bg_data = _media_bytes_local(bg.url)
+        except Exception:  # noqa: BLE001
+            return None
+    return {"mode": mode, "background_id": bg_id, "bg_data": bg_data}
 
 
 def _media_bytes_local(url: str) -> tuple[str, bytes]:
@@ -320,12 +326,13 @@ def _media_bytes_local(url: str) -> tuple[str, bytes]:
 @router.get("/matting-global")
 def get_matting_global_ep(user: User = Depends(require_member), db: Session = Depends(get_db)):
     enabled = _get_setting(db, "matting_global_enabled") == "1"
+    mode = _get_setting(db, "matting_global_mode", "replace_bg")
     try:
         bg_id = int(_get_setting(db, "matting_global_background_id") or 0) or None
     except ValueError:
         bg_id = None
     bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == bg_id).first() if bg_id else None
-    return ok({"enabled": enabled, "backgroundId": bg_id,
+    return ok({"enabled": enabled, "mode": mode, "backgroundId": bg_id,
                "backgroundName": bg.name if bg else "",
                "backgroundUrl": bg.url if bg else ""})
 
@@ -333,13 +340,16 @@ def get_matting_global_ep(user: User = Depends(require_member), db: Session = De
 @router.post("/matting-global")
 def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(require_member),
                           db: Session = Depends(get_db)):
-    if body.enabled:
+    if body.mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不支持的抠图模式")
+    if body.enabled and body.mode == "replace_bg":
         if not body.background_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "请先选择抠图背景素材")
         bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == body.background_id).first()
         if not bg:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "背景素材不存在")
     _set_setting(db, "matting_global_enabled", "1" if body.enabled else "0")
+    _set_setting(db, "matting_global_mode", body.mode)
     _set_setting(db, "matting_global_background_id", str(body.background_id or ""))
     db.commit()
     return ok(msg="全局抠图模式已" + ("开启" if body.enabled else "关闭"))
