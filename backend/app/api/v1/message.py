@@ -1,4 +1,5 @@
 """群聊推送接口：/api/message/*（模板 / 计划 / 快速推送）。"""
+import os
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -108,6 +109,85 @@ def push_template(tpl_id: int, body: TemplatePushIn | None = None,
     return ok(msg=f"模板推送完成：成功 {len(sent)} 个频道" + (f"，失败 {len(failed)} 个" if failed else ""))
 
 
+class QuickPushIn(BaseModel):
+    account_id: int
+
+
+def _uploads_local_path(url: str) -> str | None:
+    """把 /uploads/xxx 的 URL 映射为本地磁盘路径（安全限定在上传目录内）。"""
+    rel = (url or "").replace("/uploads/", "", 1).lstrip("/")
+    if not rel or ".." in rel:
+        return None
+    upload_dir = os.environ.get("UPLOAD_DIR", os.path.join(os.getcwd(), "uploads"))
+    rp = os.path.realpath(os.path.join(upload_dir, rel))
+    if not rp.startswith(os.path.realpath(upload_dir)) or not os.path.isfile(rp):
+        return None
+    return rp
+
+
+@router.post("/templates/{tpl_id}/quick-push")
+async def quick_push(tpl_id: int, body: QuickPushIn,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """快速推送：把模板文案+媒体经协议号真实发送到全部快速推送目标群组。"""
+    from app.models.account import TgAccount
+    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, TgNotConfigured
+    from telethon import TelegramClient
+
+    t = db.query(MessageTemplate).filter(MessageTemplate.id == tpl_id).first()
+    if not t:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "模板不存在")
+    targets = db.query(QuickPushTarget).all()
+    if not targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "还没有快速推送目标，请先添加")
+    acc = db.query(TgAccount).filter(TgAccount.id == body.account_id).first()
+    if not acc or not acc.phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "TG 协议号不存在或未绑定手机号")
+    try:
+        api_id, api_hash = _require_config()
+    except TgNotConfigured as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+
+    media = t.media or []
+    img_urls = [m.get("url") for m in media if m.get("type") != "video" and m.get("url")]
+    vid_urls = [m.get("url") for m in media if m.get("type") == "video" and m.get("url")]
+    img_paths = [p for u in img_urls if (p := _uploads_local_path(u))]
+    vid_paths = [p for u in vid_urls if (p := _uploads_local_path(u))]
+
+    async def _send_one(client, entity, body_text):
+        if img_paths:
+            await client.send_file(entity, img_paths, caption=body_text or "")
+        for p in vid_paths:
+            await client.send_file(entity, p, supports_streaming=True)
+        if not img_paths and not vid_paths and body_text:
+            await client.send_message(entity, body_text)
+
+    client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
+    await client.connect()
+    sent, failed = [], []
+    try:
+        if not await client.is_user_authorized():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
+        for tg in targets:
+            target = (tg.target or "").strip()
+            if not target:
+                failed.append(f"{tg.name}：目标为空")
+                continue
+            try:
+                entity = await client.get_entity(target)
+                await _send_one(client, entity, t.content)
+                sent.append(tg.name)
+            except Exception as e:  # noqa: BLE001
+                failed.append(f"{tg.name}：{e}")
+    finally:
+        await client.disconnect()
+    db.add(TaskLog(action="quick_push", executor=user.username,
+                   result="success" if not failed else "failed",
+                   detail=f"模板 {t.code} 快速推送：成功 {len(sent)} 个目标"
+                          + (f"；失败：{'; '.join(failed)}" if failed else "")))
+    db.commit()
+    return ok(msg=f"快速推送完成：成功 {len(sent)} 个目标" + (f"，失败 {len(failed)} 个" if failed else ""))
+
+
 def _plan_out(p: PushPlan) -> dict:
     return {
         "id": p.id, "accountId": p.account_id, "templateId": p.template_id,
@@ -159,6 +239,16 @@ def create_quick_target(body: QuickTargetIn, user: User = Depends(get_current_us
     db.add(t)
     db.commit()
     return ok({"id": t.id, "name": t.name, "target": t.target}, msg="快速推送目标已创建")
+
+
+@router.delete("/quick_targets/{target_id}")
+def delete_quick_target(target_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    t = db.query(QuickPushTarget).filter(QuickPushTarget.id == target_id).first()
+    if not t:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "目标不存在")
+    db.delete(t)
+    db.commit()
+    return ok(msg="目标已删除")
 
 
 class DialogRefreshIn(BaseModel):

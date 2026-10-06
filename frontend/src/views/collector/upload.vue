@@ -13,7 +13,7 @@
         </a-select>
       </a-form-item>
       <a-form-item label="城市">
-        <a-cascader v-model:value="form.city" :options="cities" placeholder="选择城市" style="width: 100%" />
+        <a-cascader v-model:value="form.city" :options="cities" :field-names="{ label: 'name', value: 'id', children: 'children' }" placeholder="选择城市" style="width: 100%" />
       </a-form-item>
       <a-form-item label="展示资料">
         <a-upload list-type="picture-card" :before-upload="() => false" v-model:file-list="showList">
@@ -101,11 +101,19 @@ async function buildPayload() {
     media,
   };
 }
+async function resetForm() {
+  Object.assign(form, {
+    title: '', body: '', tags: [], city: [], scheduled_at: null, service_remark: '',
+    channel_ids: channels.value.filter((c: any) => c.isDefault).map((c: any) => c.id),
+  });
+  showList.value = []; verifyList.value = [];
+}
 async function onSubmit() {
   loading.value = true;
   try {
     await noteApi.create(await buildPayload());
     message.success('已保存草稿');
+    resetForm();
   } catch (e: any) { message.error(e.message); } finally { loading.value = false; }
 }
 async function onPublish() {
@@ -114,6 +122,7 @@ async function onPublish() {
     const n: any = await noteApi.create(await buildPayload());
     await noteApi.publish(n.id);
     message.success('已发布');
+    resetForm();
   } catch (e: any) { message.error(e.message); } finally { loading.value = false; }
 }
 </script>

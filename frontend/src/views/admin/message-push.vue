@@ -14,6 +14,11 @@
         <a-form :model="tplEditing" layout="vertical">
           <a-form-item label="名称"><a-input v-model:value="tplEditing.name" /></a-form-item>
           <a-form-item label="内容"><a-textarea v-model:value="tplEditing.content" :rows="4" /></a-form-item>
+          <a-form-item label="媒体（图片/视频混合，最多 10 个）">
+            <a-upload v-model:file-list="tplMediaList" :before-upload="() => false" multiple list-type="picture-card">
+              <div>+ 上传</div>
+            </a-upload>
+          </a-form-item>
         </a-form>
       </a-modal>
     </a-tab-pane>
@@ -61,7 +66,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { messageApi, tgApi } from '@/api';
+import { messageApi, tgApi, mediaApi } from '@/api';
 
 const tplCols = [
   { title: 'ID', dataIndex: 'id', width: 60 },
@@ -111,9 +116,22 @@ async function refreshDialogs() {
     await loadDialogs();
   } catch (e: any) { message.error(e.message); } finally { dlgLoading.value = false; }
 }
-function openTpl() { Object.assign(tplEditing, { name: '', content: '' }); tplVisible.value = true; }
+function openTpl() { Object.assign(tplEditing, { name: '', content: '' }); tplMediaList.value = []; tplVisible.value = true; }
+const tplMediaList = ref<any[]>([]);
 async function saveTpl() {
-  await messageApi.createTemplate(tplEditing);
+  const media: any[] = [];
+  for (const f of tplMediaList.value.slice(0, 10)) {
+    let url = f.url;
+    if (!url && f.originFileObj) {
+      const res: any = await mediaApi.uploadMaterial(f.originFileObj, 'template');
+      url = res.url; f.url = url;
+    }
+    if (url) {
+      const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(f.name || url);
+      media.push({ url, type: isVideo ? 'video' : 'image' });
+    }
+  }
+  await messageApi.createTemplate({ name: tplEditing.name, content: tplEditing.content, media });
   message.success('已创建'); tplVisible.value = false; load();
 }
 async function delTpl(id: number) { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }

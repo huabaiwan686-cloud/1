@@ -41,7 +41,10 @@
     <a-modal v-model:open="visible" title="频道配置" @ok="save">
       <a-form :model="editing" layout="vertical">
         <a-form-item label="频道名称"><a-input v-model:value="editing.name" /></a-form-item>
-        <a-form-item label="用户名"><a-input v-model:value="editing.username" placeholder="@xxx" /></a-form-item>
+        <a-form-item label="用户名"><a-input v-model:value="editing.username" placeholder="@xxx（公开频道）" /></a-form-item>
+        <a-form-item label="频道 ID（私有频道填，如 -1001234567890，优先于用户名）">
+          <a-input v-model:value="editing.tg_channel_id" placeholder="-100..." />
+        </a-form-item>
         <a-form-item label="推送机器人（需为该频道管理员）">
           <a-select v-model:value="editing.bot_id" placeholder="选择机器人" style="width: 100%" allow-clear>
             <a-select-option v-for="b in botTokens" :key="b.id" :value="b.id">@{{ b.username || b.name }}</a-select-option>
@@ -112,8 +115,18 @@ async function saveGm() {
   } catch (e: any) { message.error(e.message); load(); }
 }
 function openEditor(r?: any) {
-  Object.assign(editing, { name: '', username: '', anti_scan_mode: 'original', is_active: true, is_default: false, bot_id: null, ...r });
-  if (r && r.botId && !editing.bot_id) editing.bot_id = r.botId;
+  Object.assign(editing, { name: '', username: '', tg_channel_id: '', anti_scan_mode: 'original', is_active: true, is_default: false, bot_id: null });
+  if (r) {
+    // 后端返回 camelCase，表单用 snake_case，逐个映射避免编辑时静默重置
+    editing.id = r.id;
+    editing.name = r.name ?? '';
+    editing.username = r.username ?? '';
+    editing.tg_channel_id = r.tgChannelId ?? '';
+    editing.anti_scan_mode = r.antiScanMode ?? 'original';
+    editing.is_active = r.isActive ?? true;
+    editing.is_default = r.isDefault ?? false;
+    editing.bot_id = r.botId ?? null;
+  }
   visible.value = true;
 }
 async function save() {

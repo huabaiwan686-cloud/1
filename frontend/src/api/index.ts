@@ -59,6 +59,10 @@ export const messageApi = {
   createPlan: (data: any) => request.post('/api/message/plans', data),
   deletePlan: (id: number) => request.delete(`/api/message/plans/${id}`),
   quickTargets: () => request.get('/api/message/quick_targets'),
+  createQuickTarget: (data: any) => request.post('/api/message/quick_targets', data),
+  deleteQuickTarget: (id: number) => request.delete(`/api/message/quick_targets/${id}`),
+  quickPush: (tpl_id: number, account_id: number) =>
+    request.post(`/api/message/templates/${tpl_id}/quick-push`, { account_id }),
   dialogs: (account_id: number) =>
     request.get('/api/message/dialogs', { params: { account_id } }),
   refreshDialogs: (account_id: number) =>
