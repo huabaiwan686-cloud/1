@@ -25,6 +25,9 @@
         <template v-if="column.key === 'status'">
           <a-tag :color="record.isActive ? 'green' : 'default'">{{ record.isActive ? '上架' : '下架' }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'bot'">
+          <span>{{ botName(record.botId) }}</span>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a @click="openEditor(record)">编辑</a>
@@ -39,6 +42,11 @@
       <a-form :model="editing" layout="vertical">
         <a-form-item label="频道名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="用户名"><a-input v-model:value="editing.username" placeholder="@xxx" /></a-form-item>
+        <a-form-item label="推送机器人（需为该频道管理员）">
+          <a-select v-model:value="editing.bot_id" placeholder="选择机器人" style="width: 100%" allow-clear>
+            <a-select-option v-for="b in botTokens" :key="b.id" :value="b.id">@{{ b.username || b.name }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="防扫图模式">
           <a-select v-model:value="editing.anti_scan_mode">
             <a-select-option value="original">原图</a-select-option>
@@ -59,12 +67,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { channelApi, mediaApi } from '@/api';
+import { channelApi, mediaApi, botApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
   { title: '名称', dataIndex: 'name' },
   { title: '用户名', dataIndex: 'username' },
+  { title: '推送机器人', key: 'bot', width: 150 },
   { title: '防扫图', dataIndex: 'antiScanMode', width: 120 },
   { title: '状态', key: 'status', width: 80 },
   { title: '操作', key: 'action', width: 260 },
@@ -74,6 +83,12 @@ const filter = ref<any>('all'); const visible = ref(false);
 const editing = reactive<any>({});
 const gm = reactive<any>({ enabled: false, background_id: null });
 const materials = ref<any[]>([]);
+const botTokens = ref<any[]>([]);
+
+function botName(id: number) {
+  const b = botTokens.value.find((x: any) => x.id === id);
+  return b ? '@' + (b.username || b.name) : (id ? '#' + id : '未绑定');
+}
 
 async function load() {
   loading.value = true;
@@ -82,6 +97,7 @@ async function load() {
     const g: any = await mediaApi.mattingGlobal();
     gm.enabled = g.enabled; gm.background_id = g.backgroundId;
     materials.value = await mediaApi.materials();
+    botTokens.value = await botApi.tokens();
   } finally { loading.value = false; }
 }
 async function saveGm() {
@@ -96,7 +112,8 @@ async function saveGm() {
   } catch (e: any) { message.error(e.message); load(); }
 }
 function openEditor(r?: any) {
-  Object.assign(editing, { name: '', username: '', anti_scan_mode: 'original', is_active: true, is_default: false, ...r });
+  Object.assign(editing, { name: '', username: '', anti_scan_mode: 'original', is_active: true, is_default: false, bot_id: null, ...r });
+  if (r && r.botId && !editing.bot_id) editing.bot_id = r.botId;
   visible.value = true;
 }
 async function save() {
