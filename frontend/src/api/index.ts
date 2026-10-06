@@ -209,3 +209,8 @@ export const collectorApi = {
   myNotes: (params: any) => request.get('/api/collector/notes', { params }),
   myRecords: (params: any) => request.get('/api/collector/records', { params }),
 };
+
+export const sysconfigApi = {
+  getPublish: () => request.get('/api/sysconfig/publish'),
+  setPublish: (data: any) => request.post('/api/sysconfig/publish', data),
+};

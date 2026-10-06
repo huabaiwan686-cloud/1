@@ -29,6 +29,8 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/announcements', component: () => import('@/views/admin/announcements.vue') },
   { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
   { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
+  { path: '/admin/backgrounds', component: () => import('@/views/admin/backgrounds.vue') },
+  { path: '/admin/publish-config', component: () => import('@/views/admin/publish-config.vue') },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });

@@ -44,6 +44,8 @@ MENU_TREE = [
     {"name": "Friends", "path": "/admin/accounts/friends", "title": "好友关注"},
     {"name": "Vip", "path": "/admin/vip", "title": "VIP会员"},
     {"name": "Announcements", "path": "/admin/announcements", "title": "系统公告"},
+    {"name": "Backgrounds", "path": "/admin/backgrounds", "title": "背景素材"},
+    {"name": "PublishConfig", "path": "/admin/publish-config", "title": "发布设置"},
 ]
 
 

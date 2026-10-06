@@ -48,17 +48,6 @@
       <a-layout-content class="pro-content">
         <router-view />
       </a-layout-content>
-      <!-- 移动端底部导航（App 风 5 Tab） -->
-      <div v-if="isMobile" class="mobile-tabbar">
-        <div
-          v-for="t in tabItems" :key="t.path"
-          class="tab-item" :class="{ active: isTabActive(t.path) }"
-          @click="router.push(t.path)"
-        >
-          <div class="tab-icon"><component :is="t.icon" /></div>
-          <div class="tab-label">{{ t.title }}</div>
-        </div>
-      </div>
     </a-layout>
     <a-modal v-model:open="annVisible" :title="annCurrent.title" @ok="dismissAnn" ok-text="知道了">
       <div style="white-space: pre-wrap">{{ annCurrent.content }}</div>
@@ -71,8 +60,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   MenuOutlined, MenuFoldOutlined,
-  HomeOutlined, UploadOutlined, FileTextOutlined,
-  BellOutlined, UserOutlined,
 } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
@@ -81,28 +68,12 @@ const router = useRouter();
 // 移动端默认收起侧边栏，桌面端默认展开
 const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-// 底部导航 5 Tab：工作台 / 上传 / 笔记 / 消息 / 我的
-const tabItems = [
-  { path: '/admin/dashboard', title: '工作台', icon: HomeOutlined },
-  { path: '/collector/upload', title: '上传', icon: UploadOutlined },
-  { path: '/admin/notes', title: '笔记', icon: FileTextOutlined },
-  { path: '/admin/announcements', title: '消息', icon: BellOutlined },
-  { path: '/admin/vip', title: '我的', icon: UserOutlined },
-];
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
 const annQueue = ref<any[]>([]);
 const annCurrent = ref<any>({});
 const annVisible = ref(false);
-
-function isTabActive(path: string) {
-  const p = route.path;
-  if (p === path) return true;
-  // 子路由也算选中（如 /admin/announcements/xxx）
-  if (path !== '/admin/dashboard' && p.startsWith(path + '/')) return true;
-  return false;
-}
 
 function onResize() {
   const mobile = window.innerWidth < 768;
@@ -170,13 +141,4 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* TabBar 基础样式（颜色由 theme.css 深色主题接管） */
-.mobile-tabbar {
-  display: none;
-}
-@media (max-width: 768px) {
-  .mobile-tabbar {
-    display: flex;
-  }
-}
 </style>
