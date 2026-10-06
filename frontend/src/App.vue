@@ -69,6 +69,8 @@ function onMenu({ key }: any) { router.push(key); }
 function logout() {
   authApi.logout().finally(() => {
     localStorage.removeItem('access_token');
+    menus.value = [];
+    username.value = '';
     router.push('/login');
   });
 }
@@ -79,7 +81,6 @@ watch(() => route.path, (p) => { selected.value = [p]; }, { immediate: true });
 async function loadUserState() {
   if (isLoginPage.value) return;
   if (!localStorage.getItem('access_token')) return;
-  if (menus.value.length) return;
   try {
     menus.value = await authApi.menu();
     const me: any = await authApi.current();

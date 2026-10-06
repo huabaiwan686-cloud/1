@@ -53,8 +53,9 @@ def menu_all(user: User = Depends(get_current_user)):
         # 去掉 /publish/ 重复项（与 /admin/ 同名）
         return ok([m for m in MENU_TREE if not m["path"].startswith("/publish/")])
     if user.is_member:
-        # 会员：除账号管理外的全部功能
-        return ok([m for m in MENU_TREE if m["path"] != "/admin/users"])
+        # 会员：除账号管理外的全部功能（去掉 /publish/ 重复项）
+        return ok([m for m in MENU_TREE
+                   if m["path"] != "/admin/users" and not m["path"].startswith("/publish/")])
     # 普通用户：仅上下架（笔记列表的发布/下架）
     return ok([
         {"name": "AdminNotes", "path": "/admin/notes", "title": "上下架"},
