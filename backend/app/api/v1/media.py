@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, ok
-from app.api.v1.vip import consume_quota
+from app.api.v1.vip import consume_quota, quota_available
 from app.core.database import get_db
 from app.models.media import BackgroundMaterial, GlobalSetting, ImageJob
 from app.models.user import User
@@ -144,26 +144,33 @@ async def process_image(
                     out = light_perturb(data)
                     job.detail = f"table_skipped:{src_hash}"
                 else:
-                    try:
-                        if mode == "blur_bg":
-                            out = blur_background(data, {"blur_radius": blur_radius})
-                        else:
-                            out = replace_background(data, bg_data)
-                        # 首次成功抠图才扣额度；缓存命中不重复扣
-                        dup = db.query(ImageJob).filter(
-                            ImageJob.mode.in_(list(MATTING_MODES)),
-                            ImageJob.status == "success",
-                            ImageJob.quota_consumed.is_(True),
-                            ImageJob.detail.contains(src_hash),
-                        ).first()
-                        if not dup:
-                            ok_q, _ = consume_quota(db, 1)
-                            quota_consumed = ok_q
-                        job.detail = cache_key
-                    except NotImplementedError:
-                        # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
+                    # 去重：同一原图首次成功才扣额度，重复图不重复扣
+                    dup = db.query(ImageJob).filter(
+                        ImageJob.mode.in_(list(MATTING_MODES)),
+                        ImageJob.status == "success",
+                        ImageJob.quota_consumed.is_(True),
+                        ImageJob.detail.contains(src_hash),
+                    ).first()
+                    if not dup and not quota_available(db, 1):
+                        # 额度不足 → 按产品规则降级轻量扰动（不推理、不扣费）
                         out = light_perturb(data)
                         fallback = True
+                        job.detail = f"quota_exhausted:{src_hash}"
+                    else:
+                        try:
+                            if mode == "blur_bg":
+                                out = blur_background(data, {"blur_radius": blur_radius})
+                            else:
+                                out = replace_background(data, bg_data)
+                            # 首次成功抠图才扣额度；缓存命中/重复图不重复扣
+                            if not dup:
+                                ok_q, _ = consume_quota(db, 1)
+                                quota_consumed = ok_q
+                            job.detail = cache_key
+                        except NotImplementedError:
+                            # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
+                            out = light_perturb(data)
+                            fallback = True
         else:  # light_perturb
             out = light_perturb(data)
 

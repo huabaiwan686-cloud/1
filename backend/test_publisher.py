@@ -16,6 +16,7 @@ def fake_post(url, data=None, files=None, timeout=120):
     calls.append({"method": method,
                   "caption": (media[0].get("caption") if media else data.get("text")),
                   "n_media": len(media) if media else 0,
+                  "types": [m.get("type") for m in media] if media else None,
                   "files": sorted((files or {}).keys())})
 
     class R:
@@ -55,6 +56,13 @@ with patch("app.services.publisher.httpx.post", side_effect=fake_post):
                [c["method"] for c in calls] == ["sendMediaGroup"] and "video_message_id" not in res))
 
     ok.append(("caption格式", build_caption("T", "B", ["a"]) == "T\n\nB\n\n#a"))
+
+    calls.clear()
+    send_listing_set("tok", "@ch", title="T",
+                     show_media=[{"url": "/uploads/t/p1.jpg", "media_type": "image"},
+                                 {"url": "/uploads/t/v.mp4", "type": "video"}])
+    ok.append(("混排相册一次发完", [c["method"] for c in calls] == ["sendMediaGroup"]))
+    ok.append(("混排类型 photo+video", calls[0]["types"] == ["photo", "video"]))
 
 for n, v in ok:
     print(("PASS " if v else "FAIL ") + n)

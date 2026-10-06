@@ -152,6 +152,12 @@ def quota(user: User = Depends(get_current_user), db: Session = Depends(get_db))
     })
 
 
+def quota_available(db: Session, n: int = 1) -> bool:
+    """额度预检：只查不扣。用于抠图前判断，不够则直接降级轻扰动。"""
+    q = _get_or_create_quota(db)
+    return (q.monthly_quota - q.monthly_used) >= n or (q.extra_quota - q.extra_used) >= n
+
+
 def consume_quota(db: Session, n: int = 1) -> tuple[bool, str]:
     """扣额度：优先月度额度，再扣额外额度。返回 (是否成功, 模式)。"""
     q = _get_or_create_quota(db)

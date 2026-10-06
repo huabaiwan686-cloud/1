@@ -77,6 +77,11 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
 
     show_media: [{"url":...}] 展示图（混合媒体），最多取 10 张（TG 相册上限）
     verify_media: [{"url":...}] 验证视频，取第 1 个单独发送
+    show_media 单项支持：
+      - {"url":..., "media_type": "image"|"video"}（NoteMedia / 模板媒体；模板里也可能是 "type" 键）
+      - {"data": bytes, "name": ...} 内存图片（全局抠图已处理好，不落盘）→ 按 photo
+      - 有 .url / .media_type 属性的对象
+    相册内图片/视频可混排（sendMediaGroup 原生支持）。
     """
     show_media = show_media or []
     verify_media = verify_media or []
@@ -90,12 +95,18 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
             if isinstance(m, dict) and "data" in m:
                 # 内存图片（全局抠图已处理好，不落盘）
                 fname, data = m.get("name", "image.jpg"), m["data"]
+                mtype = "photo"
             else:
-                fname, data = _media_bytes(m["url"] if isinstance(m, dict) else m.url)
-                data = _apply_anti_scan(data, anti_scan_mode)
-            key = f"photo{i}"
+                url = m["url"] if isinstance(m, dict) else m.url
+                mtype_raw = (m.get("media_type") or m.get("type")) if isinstance(m, dict) \
+                    else getattr(m, "media_type", "image")
+                mtype = "video" if mtype_raw == "video" else "photo"
+                fname, data = _media_bytes(url)
+                if mtype == "photo":
+                    data = _apply_anti_scan(data, anti_scan_mode)
+            key = f"media{i}"
             files[key] = (fname, data)
-            item: dict = {"type": "photo", "media": f"attach://{key}"}
+            item: dict = {"type": mtype, "media": f"attach://{key}"}
             if i == 0 and caption:
                 item["caption"] = caption
             media.append(item)
@@ -126,7 +137,8 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
 
     - 表格/自评表：走轻量扰动，不扣额度（与手动处理一致）
     - 抠图服务未配置：返回原图，不中断上架
-    - 额度：同一原图首次成功扣 1 次，重复图不重复扣（与手动处理共用去重规则）
+    - 额度：同一原图首次成功扣 1 次，重复图不重复扣（与手动处理共用去重规则）；
+      额度不足时按产品规则降级为轻量扰动（不推理、不扣费），不中断上架
     - 写 ImageJob 审计行（result_url 为空，表示处理图未留存）
     """
     import hashlib
@@ -145,10 +157,6 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
             return light_perturb(data)
     except Exception:  # noqa: BLE001
         pass
-    try:
-        out = replace_background(data, bg_data)
-    except NotImplementedError:
-        return data
     # 去重扣额度（与 /api/media/process 共用规则）
     dup = db.query(ImageJob).filter(
         ImageJob.mode.in_(["replace_bg", "blur_bg"]),
@@ -156,6 +164,20 @@ def matt_for_publish(data: bytes, bg_data: bytes, db) -> bytes:
         ImageJob.quota_consumed.is_(True),
         ImageJob.detail.contains(src_hash),
     ).first()
+    if not dup:
+        from app.api.v1.vip import quota_available
+
+        if not quota_available(db, 1):
+            # 额度不足 → 降级轻量扰动，不扣费、不中断上架
+            db.add(ImageJob(mode="replace_bg", status="success", source="publish",
+                            result_url="", quota_consumed=False, fallback=True,
+                            detail=f"quota_exhausted:{src_hash}"))
+            db.flush()
+            return light_perturb(data)
+    try:
+        out = replace_background(data, bg_data)
+    except NotImplementedError:
+        return data
     quota_consumed = False
     if not dup:
         from app.api.v1.vip import consume_quota

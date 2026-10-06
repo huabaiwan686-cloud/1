@@ -165,10 +165,12 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     return ok(msg="已发布" + (f"，已发送到 {sent} 个频道" if sent else ""))
 
 
-def _send_to_channels(n: Note, user: User, db: Session) -> tuple[list[str], list[str]]:
+def _send_to_channels(n: Note, user: User, db: Session,
+                      channel_ids: list[int] | None = None) -> tuple[list[str], list[str]]:
     """把一组上架内容真实发送到笔记绑定的频道。
 
     一组 =（文字+混合媒体）打包发送，紧跟一条单独验证视频。
+    channel_ids：覆盖发送目标（push_all 全量推送时只发指定频道）。
     返回 (成功频道名, 失败原因)。
     """
     from app.api.v1.bots import _dec
@@ -176,7 +178,7 @@ def _send_to_channels(n: Note, user: User, db: Session) -> tuple[list[str], list
     from app.services.publisher import _media_bytes, matt_for_publish, send_listing_set
 
     media = db.query(NoteMedia).filter(NoteMedia.note_id == n.id).order_by(NoteMedia.sort_order).all()
-    show = [{"url": m.url} for m in media if m.kind == "show"]
+    show = [{"url": m.url, "media_type": m.media_type} for m in media if m.kind == "show"]
     verify = [{"url": m.url} for m in media if m.kind == "verify"]
 
     # 全局抠图模式：开启后所有发往频道的展示图按所选背景自动抠图（内存处理，不落盘）；
@@ -194,7 +196,8 @@ def _send_to_channels(n: Note, user: User, db: Session) -> tuple[list[str], list
         show = processed
 
     sent, failed = [], []
-    for cid in n.channel_ids or []:
+    cids = channel_ids if channel_ids is not None else (n.channel_ids or [])
+    for cid in cids:
         ch = db.query(Channel).filter(Channel.id == cid).first()
         if not ch or not ch.is_active:
             continue

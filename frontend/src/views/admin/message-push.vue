@@ -113,7 +113,7 @@ async function saveTpl() {
   message.success('已创建'); tplVisible.value = false; load();
 }
 async function delTpl(id: number) { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }
-async function pushTpl(id: number) { await messageApi.pushTemplate(id); message.success('推送任务已创建'); }
+async function pushTpl(id: number) { const r: any = await messageApi.pushTemplate(id); message.success(r.msg || '推送完成'); }
 function openPlan() {
   Object.assign(planEditing, { template_id: null, account_id: null, target_groups: [], interval_days: 1, times_str: '' });
   dlgOptions.value = []; dlgCachedAt.value = '';

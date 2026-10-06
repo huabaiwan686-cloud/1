@@ -24,10 +24,12 @@ services:
       TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
       TG_API_ID: ${TG_API_ID:-}
       TG_API_HASH: ${TG_API_HASH:-}
+      TG_SESSION_DIR: /srv/data/tg_sessions
       USDT_TRC20_ADDRESS: ${USDT_TRC20_ADDRESS:-}
       TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
     volumes:
       - uploads:/srv/uploads
+      - tg_sessions:/srv/data/tg_sessions
       - ./models:/srv/models:ro  # RMBG-1.4 抠图模型（手动下载，不进 git）
     expose:
       - "8000"
@@ -44,10 +46,12 @@ services:
       TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
       TG_API_ID: ${TG_API_ID:-}
       TG_API_HASH: ${TG_API_HASH:-}
+      TG_SESSION_DIR: /srv/data/tg_sessions
       USDT_TRC20_ADDRESS: ${USDT_TRC20_ADDRESS:-}
       TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
     volumes:
       - uploads:/srv/uploads
+      - tg_sessions:/srv/data/tg_sessions
       - ./models:/srv/models:ro
     restart: unless-stopped
 
@@ -61,3 +65,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  tg_sessions:

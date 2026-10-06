@@ -81,14 +81,36 @@ def check_channel(channel_id: int, user: User = Depends(get_current_user), db: S
 
 @router.post("/{channel_id}/push_all")
 def push_all(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """全量推送（TODO Phase 4：接 Celery 队列真实推送）。"""
+    """全量推送：把所有已上架笔记逐个真实发送到该频道（一组=文字+媒体打包，紧跟验证视频）。
+
+    跳过定时未到（scheduled_at 在未来且未发送）的笔记；单条失败不影响其他。
+    """
+    from datetime import datetime
+
+    from app.api.v1.note import _send_to_channels
+    from app.models.content import Note
+
     c = db.query(Channel).filter(Channel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
-    db.add(TaskLog(action="push_all", executor=user.username, result="processing",
-                   detail=f"频道 {c.name} 全量推送任务已创建"))
+    now = datetime.utcnow()
+    notes = db.query(Note).filter(Note.status == "published").order_by(Note.id).all()
+    ok_count, fail_count, skipped = 0, 0, 0
+    for n in notes:
+        if n.scheduled_at and n.scheduled_at > now and not n.scheduled_sent:
+            skipped += 1
+            continue
+        sent, failed = _send_to_channels(n, user, db, channel_ids=[channel_id])
+        db.commit()
+        if failed and not sent:
+            fail_count += 1
+        else:
+            ok_count += 1
+    db.add(TaskLog(action="push_all", executor=user.username,
+                   result="success" if not fail_count else "failed",
+                   detail=f"频道 {c.name} 全量推送：成功 {ok_count} 条，失败 {fail_count} 条，跳过定时未到 {skipped} 条"))
     db.commit()
-    return ok(msg="全量推送任务已创建")
+    return ok(msg=f"全量推送完成：成功 {ok_count} 条，失败 {fail_count} 条，跳过 {skipped} 条")
 
 
 @router.post("/{channel_id}/clear_queue")

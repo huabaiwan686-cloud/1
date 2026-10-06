@@ -5,8 +5,8 @@
         <a-switch v-model:checked="gm.enabled" @change="saveGm" />
         <span style="color: #666">开启后，所有发往频道的资料按所选背景自动抠图后发送；服务器只保留原图，处理图不留存，每次循环重新处理</span>
       </a-space>
-      <div style="margin-top: 12px" v-if="gm.enabled">
-        <a-select v-model:value="gm.background_id" placeholder="选择抠图背景素材" style="width: 320px" @change="saveGm">
+      <div style="margin-top: 12px">
+        <a-select v-model:value="gm.background_id" placeholder="选择抠图背景素材（先选背景再开开关）" style="width: 320px" @change="saveGm">
           <a-select-option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}</a-select-option>
         </a-select>
         <span style="color: #999; margin-left: 12px">每次上架/循环推送时实时处理，按次扣额度（重复图不重复扣）</span>
@@ -85,6 +85,11 @@ async function load() {
   } finally { loading.value = false; }
 }
 async function saveGm() {
+  if (gm.enabled && !gm.background_id) {
+    message.warning('请先选择抠图背景素材，再开启全局抠图');
+    gm.enabled = false;
+    return;
+  }
   try {
     await mediaApi.setMattingGlobal({ enabled: gm.enabled, background_id: gm.background_id });
     message.success('全局抠图模式已' + (gm.enabled ? '开启' : '关闭'));
@@ -103,6 +108,6 @@ async function save() {
 }
 async function remove(id: number) { await channelApi.remove(id); message.success('已删除'); load(); }
 async function check(id: number) { const r: any = await channelApi.check(id); message.info(r.msg); }
-async function pushAll(id: number) { await channelApi.pushAll(id); message.success('全量推送任务已创建'); }
+async function pushAll(id: number) { const r: any = await channelApi.pushAll(id); message.success(r.msg || '全量推送完成'); }
 onMounted(load);
 </script>
