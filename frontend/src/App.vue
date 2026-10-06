@@ -27,6 +27,17 @@
       <a-layout-content class="content">
         <router-view />
       </a-layout-content>
+      <!-- 移动端底部导航 -->
+      <div v-if="isMobile" class="mobile-tabbar">
+        <div
+          v-for="t in tabItems" :key="t.path"
+          class="tab-item" :class="{ active: selected.includes(t.path) }"
+          @click="router.push(t.path)"
+        >
+          <div class="tab-icon"><component :is="t.icon" /></div>
+          <div class="tab-label">{{ t.title }}</div>
+        </div>
+      </div>
     </a-layout>
     <a-modal v-model:open="annVisible" :title="annCurrent.title" @ok="dismissAnn" ok-text="知道了">
       <div style="white-space: pre-wrap">{{ annCurrent.content }}</div>
@@ -37,13 +48,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MenuOutlined, MenuFoldOutlined } from '@ant-design/icons-vue';
+import { MenuOutlined, MenuFoldOutlined, HomeOutlined, UploadOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
 const route = useRoute();
 const router = useRouter();
 // 移动端默认收起侧边栏，桌面端默认展开
 const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+// 底部导航：工作台 / 上传 / 笔记 / 我的
+const tabItems = [
+  { path: '/admin/dashboard', title: '工作台', icon: HomeOutlined },
+  { path: '/collector/upload', title: '上传', icon: UploadOutlined },
+  { path: '/admin/notes', title: '笔记', icon: FileTextOutlined },
+  { path: '/admin/vip', title: '我的', icon: UserOutlined },
+];
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
@@ -103,4 +122,21 @@ onMounted(() => { loadUserState(); });
 .logo { color: #fff; text-align: center; padding: 16px 0; font-weight: bold; }
 .header { background: #fff; padding: 0 16px 0 0; display: flex; align-items: center; }
 .content { margin: 16px; background: #fff; padding: 16px; min-height: 80vh; }
+.mobile-tabbar {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: #fff; border-top: 1px solid #f0f0f0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-item {
+  flex: 1; text-align: center; padding: 8px 0 6px;
+  color: #999; font-size: 12px; cursor: pointer;
+}
+.tab-item.active { color: #1890ff; }
+.tab-icon { font-size: 20px; margin-bottom: 2px; }
+@media (max-width: 768px) {
+  .mobile-tabbar { display: flex; }
+  .content { margin: 8px; padding: 12px; margin-bottom: 70px; }
+  .ant-layout-sider { position: fixed !important; z-index: 101; height: 100vh; }
+}
 </style>
