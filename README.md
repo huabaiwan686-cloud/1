@@ -49,6 +49,8 @@
 
 ```bash
 cp .env.example .env   # 修改 JWT_SECRET_KEY
+# 下载抠图模型（约 170MB，一次即可）
+mkdir -p models && curl -L -o models/rmbg-1.4.onnx https://huggingface.co/briaai/RMBG-1.4/resolve/main/onnx/model.onnx
 docker compose up -d --build
 ```
 

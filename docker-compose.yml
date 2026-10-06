@@ -23,6 +23,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
     volumes:
       - uploads:/srv/uploads
+      - ./models:/srv/models:ro  # RMBG-1.4 抠图模型（手动下载，不进 git）
     expose:
       - "8000"
 
