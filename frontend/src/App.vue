@@ -6,7 +6,7 @@
       class="pro-sider"
       collapsible
       v-model:collapsed="collapsed"
-      width="200"
+      width="190"
       :trigger="null"
     >
       <div class="pro-logo" :class="{ collapsed }">
@@ -19,7 +19,7 @@
       <a-menu
         v-model:selectedKeys="selected"
         mode="inline"
-        theme="dark"
+        theme="light"
         @click="onMenu"
       >
         <template v-for="m in menus" :key="m.path">
@@ -38,8 +38,8 @@
         </span>
         <span class="pro-app-title">小灰机 · 商家后台</span>
         <div class="pro-header-right">
-          <a-button type="text" @click="toggleTheme" class="theme-btn" :title="theme === 'dark' ? '切换亮色' : '切换夜色'">
-            <bulb-outlined v-if="theme === 'dark'" />
+          <a-button type="text" @click="toggleTheme" class="theme-btn" :title="theme === 'light' ? '切换夜色' : '切换亮色'">
+            <bulb-outlined v-if="theme === 'light'" />
             <bulb-filled v-else />
           </a-button>
           <span class="pro-username">
@@ -93,7 +93,7 @@ const tabItems = [
   { path: '/admin/vip', title: '我的', icon: UserOutlined },
 ];
 // 主题切换：dark（默认）/ light，localStorage 持久化
-const theme = ref('dark');
+const theme = ref('light');
 try {
   const saved = localStorage.getItem('app_theme');
   if (saved === 'light' || saved === 'dark') theme.value = saved;

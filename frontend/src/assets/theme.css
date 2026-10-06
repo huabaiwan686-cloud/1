@@ -1,28 +1,29 @@
 /* ============================================================
- * 小灰机聊手上架系统 1:1 复刻主题（原站深色）
- * 背景 #0B0F14 / 侧边栏顶栏 #0F141A / 卡片 #151B24
- * 主色蓝 #2E7CF6 / 文字 #FFFFFF/#8B94A1
+ * meiren.pro 风格浅色主题
+ * 主色 #2f55e0（靛蓝）/ 深色 #2546c4 / 浅底 #eef1ff
+ * 侧栏 190px 浅色，右边框 #dfe3eb
  * ============================================================ */
 
 :root {
-  --app-bg: #0B0F14;
-  --app-sider: #0F141A;
-  --app-topbar: #0F141A;
-  --app-btn-default: #1c2530;
-  --app-btn-default-hover: #243040;
-  --app-bg-soft: #0F141A;
-  --app-card: #151B24;
-  --app-card-hover: #1a2230;
-  --app-input: #151B24;
-  --app-border: rgba(255, 255, 255, 0.08);
-  --app-border-soft: rgba(255, 255, 255, 0.06);
-  --app-text: #FFFFFF;
-  --app-text-secondary: #8B94A1;
-  --app-text-tertiary: #5B6470;
-  --app-accent: #2E7CF6;
-  --app-accent-hover: #4a90f7;
-  --app-accent-soft: rgba(46, 124, 246, 0.14);
-  --app-hover-overlay: rgba(255, 255, 255, 0.06);
+  --app-bg: #f5f6fa;
+  --app-sider: #ffffff;
+  --app-topbar: #ffffff;
+  --app-sider-border: #dfe3eb;
+  --app-btn-default: #ffffff;
+  --app-btn-default-hover: #eef1ff;
+  --app-bg-soft: #ffffff;
+  --app-card: #ffffff;
+  --app-card-hover: #fafbff;
+  --app-input: #ffffff;
+  --app-border: #dfe3eb;
+  --app-border-soft: #eef1ff;
+  --app-text: rgba(0, 0, 0, 0.85);
+  --app-text-secondary: rgba(0, 0, 0, 0.55);
+  --app-text-tertiary: rgba(0, 0, 0, 0.35);
+  --app-accent: #2f55e0;
+  --app-accent-hover: #2546c4;
+  --app-accent-soft: #eef1ff;
+  --app-hover-overlay: rgba(47, 85, 224, 0.06);
   --app-radius-card: 12px;
   --app-radius-btn: 8px;
   --app-radius-input: 8px;
@@ -36,26 +37,27 @@
   --app-vip-gold: #E3B341;
 }
 
-/* ---------- 亮色主题 ---------- */
-[data-theme="light"] {
-  --app-bg: #f0f2f5;
-  --app-sider: #ffffff;
-  --app-topbar: #ffffff;
-  --app-btn-default: #ffffff;
-  --app-btn-default-hover: #f5f5f5;
-  --app-bg-soft: #ffffff;
-  --app-card: #ffffff;
-  --app-card-hover: #fafafa;
-  --app-input: #ffffff;
-  --app-border: #e8e8e8;
-  --app-border-soft: #f0f0f0;
-  --app-text: rgba(0, 0, 0, 0.85);
-  --app-text-secondary: rgba(0, 0, 0, 0.55);
-  --app-text-tertiary: rgba(0, 0, 0, 0.35);
-  --app-accent: #2E7CF6;
-  --app-accent-hover: #4a90f7;
-  --app-hover-overlay: rgba(0, 0, 0, 0.04);
-  --app-accent-soft: rgba(46, 124, 246, 0.1);
+/* ---------- 深色主题（meiren 深色版） ---------- */
+[data-theme="dark"] {
+  --app-bg: #0f1420;
+  --app-sider: #141a28;
+  --app-topbar: #141a28;
+  --app-sider-border: rgba(255, 255, 255, 0.08);
+  --app-btn-default: #1c2530;
+  --app-btn-default-hover: #243040;
+  --app-bg-soft: #141a28;
+  --app-card: #1a2233;
+  --app-card-hover: #212b40;
+  --app-input: #1a2233;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-border-soft: rgba(255, 255, 255, 0.06);
+  --app-text: #FFFFFF;
+  --app-text-secondary: #8B94A1;
+  --app-text-tertiary: #5B6470;
+  --app-accent: #2f55e0;
+  --app-accent-hover: #4a6ff0;
+  --app-accent-soft: rgba(47, 85, 224, 0.2);
+  --app-hover-overlay: rgba(255, 255, 255, 0.06);
   --app-success: #22C55E;
   --app-danger: #F0435A;
   --app-warning: #F5A623;
