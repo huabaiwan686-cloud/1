@@ -77,6 +77,7 @@ watch(() => route.path, (p) => { selected.value = [p]; }, { immediate: true });
 
 onMounted(async () => {
   if (isLoginPage.value) return;
+  if (!localStorage.getItem('access_token')) return;
   try {
     menus.value = await authApi.menu();
     const me: any = await authApi.current();

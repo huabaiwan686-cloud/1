@@ -27,7 +27,7 @@ request.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
-      location.href = '/login';
+      if (location.pathname !== '/login') location.href = '/login';
     }
     // FastAPI HTTPException 返回 {detail}，转成友好错误消息（如 403 VIP 门控）
     const detail = error.response?.data?.detail;
