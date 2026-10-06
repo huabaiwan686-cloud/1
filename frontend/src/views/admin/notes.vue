@@ -1,8 +1,8 @@
 <template>
   <div>
-    <a-space style="margin-bottom: 16px">
-      <a-input-search v-model:value="keyword" placeholder="搜索标题/正文" @search="load" style="width: 240px" />
-      <a-select v-model:value="status" style="width: 140px" @change="load">
+    <a-space style="margin-bottom: 16px" wrap>
+      <a-input-search v-model:value="keyword" placeholder="搜索标题/正文" @search="load" style="width: 220px" />
+      <a-select v-model:value="status" style="width: 130px" @change="load">
         <a-select-option value="all">全部</a-select-option>
         <a-select-option value="draft">草稿</a-select-option>
         <a-select-option value="pending">待审核</a-select-option>
@@ -10,7 +10,11 @@
         <a-select-option value="offline">已下架</a-select-option>
         <a-select-option value="collected">已采集</a-select-option>
       </a-select>
-      <a-select v-model:value="batchOp" placeholder="批量操作 (VIP)" style="width: 200px">
+      <a-radio-group v-model:value="view" button-style="solid">
+        <a-radio-button value="gallery">画廊</a-radio-button>
+        <a-radio-button value="table">表格</a-radio-button>
+      </a-radio-group>
+      <a-select v-model:value="batchOp" placeholder="批量操作 (VIP)" style="width: 190px">
         <a-select-option value="publish">上架</a-select-option>
         <a-select-option value="unpublish">下架</a-select-option>
         <a-select-option value="delete">删除</a-select-option>
@@ -25,9 +29,51 @@
       <a-button type="primary" :disabled="!selected.length || !batchOp" @click="runBatch">
         执行 ({{ selected.length }})
       </a-button>
+      <a-button v-if="selected.length" @click="selected = []">取消选择</a-button>
     </a-space>
 
+    <!-- 画廊视图 -->
+    <div v-if="view === 'gallery'">
+      <a-spin :spinning="loading">
+        <div v-if="!list.length && !loading" class="empty">
+          <inbox-outlined style="font-size: 48px; color: #ccc" />
+          <p>暂无资料</p>
+        </div>
+        <div class="gallery">
+          <div v-for="n in list" :key="n.id" class="card" :class="{ selected: selected.includes(n.id) }">
+            <div class="img-wrap" @click="openPreview(n)">
+              <img :src="thumbUrl(n)" :alt="n.title" loading="lazy" @error="onImgError" />
+              <span class="status-badge" :class="n.status">{{ statusText(n.status) }}</span>
+              <span class="media-count" v-if="n.media.length > 1">{{ n.media.length }} 张</span>
+              <div class="checker" @click.stop>
+                <a-checkbox :checked="selected.includes(n.id)" @change="(e: any) => toggleSelect(n.id, e.target.checked)" />
+              </div>
+              <div class="hover-actions" @click.stop>
+                <a-button size="small" @click="openPreview(n)">预览</a-button>
+                <a-button size="small" type="primary" v-if="n.status !== 'published'" @click="quickOp(n.id, 'publish')">上架</a-button>
+                <a-button size="small" v-if="n.status === 'published'" @click="quickOp(n.id, 'unpublish')">下架</a-button>
+              </div>
+            </div>
+            <div class="card-meta">
+              <div class="card-title" :title="n.title">{{ n.title || '无标题' }}</div>
+              <div class="card-tags">
+                <a-tag v-for="t in (n.tags || []).slice(0, 3)" :key="t" size="small">{{ t }}</a-tag>
+              </div>
+              <div class="card-time">{{ (n.createdAt || '').slice(0, 16).replace('T', ' ') }}</div>
+            </div>
+          </div>
+        </div>
+      </a-spin>
+      <a-pagination
+        :total="total" :current="page" :page-size="pageSize"
+        @change="(p: number) => { page = p; load(); }"
+        style="margin-top: 16px; text-align: right"
+      />
+    </div>
+
+    <!-- 表格视图 -->
     <a-table
+      v-else
       :columns="columns"
       :data-source="list"
       :loading="loading"
@@ -35,12 +81,36 @@
       :row-selection="{ selectedRowKeys: selected, onChange: onSelect }"
       :pagination="{ total, current: page, pageSize, onChange: onPage }"
     />
+
+    <!-- 预览弹窗 -->
+    <a-modal v-model:open="previewVisible" :title="previewItem.title || '无标题'" :footer="null" width="720px">
+      <a-carousel v-if="previewItem.media && previewItem.media.length" arrows>
+        <div v-for="m in previewItem.media" :key="m.id" class="preview-slide">
+          <img :src="m.url" />
+        </div>
+      </a-carousel>
+      <a-descriptions :column="2" size="small" style="margin-top: 12px">
+        <a-descriptions-item label="状态">{{ statusText(previewItem.status) }}</a-descriptions-item>
+        <a-descriptions-item label="来源">{{ previewItem.source }}</a-descriptions-item>
+        <a-descriptions-item label="标签">{{ (previewItem.tags || []).join('、') }}</a-descriptions-item>
+        <a-descriptions-item label="创建时间">{{ (previewItem.createdAt || '').slice(0, 16).replace('T', ' ') }}</a-descriptions-item>
+      </a-descriptions>
+      <pre class="preview-body">{{ previewItem.body }}</pre>
+      <a-space style="margin-top: 12px">
+        <a-button type="primary" v-if="previewItem.status !== 'published'" @click="quickOp(previewItem.id, 'publish'); previewVisible = false">上架</a-button>
+        <a-button v-if="previewItem.status === 'published'" @click="quickOp(previewItem.id, 'unpublish'); previewVisible = false">下架</a-button>
+        <a-popconfirm title="确认删除？" @confirm="quickOp(previewItem.id, 'delete'); previewVisible = false">
+          <a-button danger>删除</a-button>
+        </a-popconfirm>
+      </a-space>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { message, Modal } from 'ant-design-vue';
+import { InboxOutlined } from '@ant-design/icons-vue';
 import { noteApi } from '@/api';
 
 const columns = [
@@ -55,10 +125,30 @@ const total = ref(0);
 const loading = ref(false);
 const keyword = ref('');
 const status = ref('all');
+const view = ref('gallery');
 const page = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(24);
 const selected = ref<number[]>([]);
 const batchOp = ref('');
+const previewVisible = ref(false);
+const previewItem = ref<any>({});
+
+const STATUS_TEXT: Record<string, string> = {
+  draft: '草稿', pending: '待审核', published: '已发布', offline: '已下架',
+};
+function statusText(s: string) { return STATUS_TEXT[s] || s; }
+function coverOf(n: any) {
+  const show = (n.media || []).find((m: any) => m.kind === 'show') || n.media[0];
+  return show ? show.url : '';
+}
+function thumbUrl(n: any) {
+  const url = coverOf(n);
+  return url ? `/api/media/thumb?src=${encodeURIComponent(url)}&w=400` : '';
+}
+function onImgError(e: Event) {
+  (e.target as HTMLImageElement).src =
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="533"><rect width="400" height="533" fill="#f0f0f0"/><text x="200" y="266" text-anchor="middle" fill="#bbb">无图片</text></svg>');
+}
 
 async function load() {
   loading.value = true;
@@ -75,7 +165,16 @@ async function load() {
 }
 function onSelect(keys: number[]) { selected.value = keys; }
 function onPage(p: number) { page.value = p; load(); }
-
+function toggleSelect(id: number, checked: boolean) {
+  selected.value = checked ? [...selected.value, id] : selected.value.filter((x) => x !== id);
+}
+function openPreview(n: any) { previewItem.value = n; previewVisible.value = true; }
+async function quickOp(id: number, op: string) {
+  await noteApi.batch([id], op);
+  message.success('已执行');
+  selected.value = selected.value.filter((x) => x !== id);
+  load();
+}
 async function runBatch() {
   Modal.confirm({
     title: `确认对 ${selected.value.length} 条资料执行「${batchOp.value}」？`,
@@ -94,3 +193,69 @@ async function runBatch() {
 
 onMounted(load);
 </script>
+
+<style scoped>
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+.card {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); }
+.card.selected { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2); }
+.img-wrap {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  background: #f5f5f5;
+  overflow: hidden;
+}
+.img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.status-badge {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 12px; padding: 2px 8px; border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+}
+.status-badge.published { background: rgba(82, 196, 26, 0.9); }
+.status-badge.pending { background: rgba(250, 140, 22, 0.9); }
+.media-count {
+  position: absolute; bottom: 8px; right: 8px;
+  font-size: 12px; padding: 2px 8px; border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+}
+.checker {
+  position: absolute; top: 8px; right: 8px;
+  opacity: 0; transition: opacity 0.2s;
+  background: #fff; border-radius: 4px; padding: 2px;
+}
+.card:hover .checker, .card.selected .checker { opacity: 1; }
+.hover-actions {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; gap: 8px; justify-content: center;
+  padding: 8px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  opacity: 0; transition: opacity 0.2s;
+}
+.card:hover .hover-actions { opacity: 1; }
+.card-meta { padding: 10px 12px; }
+.card-title {
+  font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-tags { margin-top: 6px; min-height: 22px; }
+.card-time { margin-top: 4px; font-size: 12px; color: #999; }
+.empty { text-align: center; padding: 60px 0; color: #999; }
+.preview-slide { text-align: center; background: #000; }
+.preview-slide img { max-height: 60vh; max-width: 100%; object-fit: contain; }
+.preview-body {
+  margin-top: 12px; white-space: pre-wrap; word-break: break-word;
+  background: #fafafa; padding: 12px; border-radius: 6px; max-height: 200px; overflow: auto;
+}
+@media (max-width: 768px) {
+  .gallery { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}
+</style>
