@@ -194,15 +194,8 @@ async def auto_create_bot_via_botfather(phone: str, bot_name: str, username: str
     from telethon import TelegramClient
     from telethon.errors import TimeoutError as TgTimeout
 
-    api_id, api_hash = _require_config()
-    key = f"autobot_{phone}"
-    client = _clients.get(key)
-    if client is None:
-        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
-        await client.connect()
-        _clients[key] = client
-    if not await client.is_user_authorized():
-        raise TgNotConfigured("所选 TG 账号不在线，请先完成协议号登录")
+    # 用共享连接，避免与登录态抢 SQLite session 文件锁
+    client = await get_shared_client(phone)
 
     def _txt(m) -> str:
         return (m.text or "").lower()
