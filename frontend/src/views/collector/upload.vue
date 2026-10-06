@@ -1,7 +1,14 @@
 <template>
-  <div class="page">
-  <a-card title="上传资料" class="page-card">
-    <a-form :model="form" layout="vertical" @finish="onSubmit" class="narrow-form">
+  <div>
+    <div class="aq-header">
+      <div class="aq-title">素材上传</div>
+      <p class="aq-desc">上传资料图片与验证视频，保存为草稿或直接发布</p>
+    </div>
+    <a-tabs>
+      <a-tab-pane key="single" tab="发布资料">
+        <a-card :bordered="true">
+          <a-form :model="form" layout="horizontal" @finish="onSubmit"
+                  :label-col="{ span: 4 }" :wrapper-col="{ span: 16 }">
       <a-form-item label="标题" name="title" :rules="[{ required: true, message: '请输入标题' }]">
         <a-input v-model:value="form.title" placeholder="资料标题" />
       </a-form-item>
@@ -16,10 +23,18 @@
       <a-form-item label="城市">
         <a-cascader v-model:value="form.city" :options="cities" :field-names="{ label: 'name', value: 'id', children: 'children' }" placeholder="选择城市" style="width: 100%" />
       </a-form-item>
-      <a-form-item label="展示资料">
-        <a-upload list-type="picture-card" :before-upload="() => false" v-model:file-list="showList">
-          <div><plus-outlined /><div>上传</div></div>
-        </a-upload>
+      <a-form-item label="展示资料" name="show" :rules="[{ required: true, message: '请上传展示图片' }]">
+        <div class="file-grid">
+          <a-upload list-type="picture-card" :before-upload="() => false" v-model:file-list="showList" multiple>
+            <div><plus-outlined /><div>上传</div></div>
+          </a-upload>
+        </div>
+        <div
+          style="border:1px dashed #d9d9d9;border-radius:8px;padding:12px;text-align:center;cursor:pointer"
+          @click="triggerShowUpload">
+          或点击此处拖放图片批量上传（支持 JPG/PNG/WebP）
+        </div>
+        <input ref="showInput" type="file" accept="image/*" multiple style="display:none" @change="onShowFiles" />
       </a-form-item>
       <a-form-item label="验证视频（单独发送，紧跟上架消息）">
         <a-upload :before-upload="() => false" v-model:file-list="verifyList" :max-count="1" accept="video/*">
@@ -41,7 +56,7 @@
       <a-form-item label="客服备注（仅后台可见）">
         <a-textarea v-model:value="form.service_remark" :rows="2" />
       </a-form-item>
-      <a-form-item>
+      <a-form-item :wrapper-col="{ offset: 4, span: 16 }">
         <a-space>
           <a-button type="primary" html-type="submit" :loading="loading">保存</a-button>
           <a-button @click="onPublish" :loading="loading">保存并发布</a-button>
@@ -49,6 +64,20 @@
       </a-form-item>
     </a-form>
   </a-card>
+      </a-tab-pane>
+      <a-tab-pane key="batch" tab="批量导入">
+        <a-card :bordered="true">
+          <div
+            style="border:1px dashed #d9d9d9;border-radius:8px;padding:32px;text-align:center;cursor:pointer"
+            @click="triggerBatchUpload">
+            <plus-outlined style="font-size: 32px; color: #999" />
+            <p style="margin-top: 12px; color: #8a91a5">点击或拖拽 ZIP 压缩包到此处批量导入</p>
+          </div>
+          <input ref="batchInput" type="file" accept=".zip" style="display:none" @change="onBatchFile" />
+          <div class="aq-tip" style="margin-top: 12px">ZIP 内每张图片将自动创建为一条草稿资料</div>
+        </a-card>
+      </a-tab-pane>
+    </a-tabs>
   </div>
 </template>
 
@@ -64,6 +93,23 @@ const cities = ref<any[]>([]);
 const channels = ref<any[]>([]);
 const showList = ref<any[]>([]);
 const verifyList = ref<any[]>([]);
+const showInput = ref<HTMLInputElement | null>(null);
+const batchInput = ref<HTMLInputElement | null>(null);
+
+function triggerShowUpload() { showInput.value?.click(); }
+function onShowFiles(e: Event) {
+  const files = (e.target as HTMLInputElement).files;
+  if (!files) return;
+  for (const f of Array.from(files)) {
+    showList.value.push({ uid: `${Date.now()}-${f.name}`, name: f.name, originFileObj: f, status: 'done' });
+  }
+}
+function triggerBatchUpload() { batchInput.value?.click(); }
+async function onBatchFile(e: Event) {
+  const files = (e.target as HTMLInputElement).files;
+  if (!files?.length) return;
+  message.info(`已选择 ${files[0].name}，批量导入功能开发中`);
+}
 const form = reactive({
   title: '', body: '', tags: [] as string[], city: [] as number[],
   channel_ids: [] as number[], scheduled_at: null as any, service_remark: '',

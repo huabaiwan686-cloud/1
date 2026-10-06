@@ -203,6 +203,15 @@ export const metaApi = {
     request.post('/api/tag/create', null, { params: { name } }),
   cityTree: () => request.get('/api/city/tree'),
   taskLogs: (params: any) => request.get('/api/task/logs', { params }),
+  clearTaskLogs: () => request.delete('/api/task/logs/clear'),
+};
+
+export const forwardApi = {
+  rules: () => request.get('/api/forward/rules'),
+  create: (data: any) => request.post('/api/forward/rules', data),
+  toggle: (id: number, enabled: boolean) =>
+    request.put(`/api/forward/rules/${id}/enabled`, null, { params: { enabled } }),
+  remove: (id: number) => request.delete(`/api/forward/rules/${id}`),
 };
 
 export const announceApi = {

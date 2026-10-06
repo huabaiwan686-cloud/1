@@ -106,11 +106,11 @@ const MEIREN_MENUS = [
     children: [
       { path: '/admin/dashboard', title: '首页' },
       { path: '/admin/users', title: '用户管理' },
-      { path: '/admin/channels-up', title: '上架频道' },
-      { path: '/admin/channels-down', title: '下架频道' },
-      { path: '/admin/accounts/protocol', title: '协议号' },
+      { path: '/admin/channels/up', title: '上架频道' },
+      { path: '/admin/channels/down', title: '下架频道' },
+      { path: '/admin/tg', title: '协议号' },
       { path: '/admin/relay', title: '自动转发' },
-      { path: '/admin/logs', title: '发送记录' },
+      { path: '/admin/records', title: '发送记录' },
     ],
   },
   {

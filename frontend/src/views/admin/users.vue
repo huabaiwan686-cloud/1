@@ -1,62 +1,63 @@
 <template>
-  <div class="page">
-    <div class="page-title">用户管理</div>
-    <div class="page-subtitle">管理所有会员与用户账号</div>
-    <a-card title="超级管理员 · 用户管控" class="page-card" style="margin-top: 16px">
-      <div class="desc-text">可管理所有会员/用户账号：新增、删除、开关管理员权限、禁用/启用、重置密码</div>
-    </a-card>
-    <a-card title="邀请码" class="page-card">
-      <a-space class="mb-12">
-        <a-button type="primary" @click="genCode">生成邀请码</a-button>
-        <span class="desc-text">把邀请码发给会员，他在登录页点"注册"即可自助注册账号密码</span>
-      </a-space>
-      <a-table :columns="codeColumns" :data-source="codes" row-key="code" size="small" :pagination="{ pageSize: 8 }">
-        <template #bodyCell="{ column, record }">
-          <a v-if="column.key === 'copy'" @click="copyCode(record.code)">复制</a>
-        </template>
-      </a-table>
-    </a-card>
-    <a-button type="primary" @click="openEditor" class="mb-16">新增账号</a-button>
-    <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
+  <a-card title="用户管理" :bordered="true">
+    <template #extra>
+      <a-button type="primary" @click="openEditor">添加子账号</a-button>
+    </template>
+    <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading"
+      :scroll="{ x: 'max-content' }">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'admin'">
-          <a-tag :color="record.isAdmin ? 'blue' : 'default'">{{ record.isAdmin ? '管理员' : '普通' }}</a-tag>
+        <template v-if="column.key === 'password'">
+          <span style="color: rgba(0,0,0,.45)">••••••</span>
         </template>
-        <template v-else-if="column.key === 'active'">
-          <a-tag :color="record.isActive ? 'green' : 'red'">{{ record.isActive ? '正常' : '已禁用' }}</a-tag>
+        <template v-else-if="column.key === 'role'">
+          <a-tag v-if="record.isAdmin" color="blue">管理员</a-tag>
+          <a-tag v-else-if="record.isMember" color="gold">会员</a-tag>
+          <a-tag v-else color="default">普通</a-tag>
         </template>
-        <template v-else-if="column.key === 'member'">
-          <a-tag :color="record.isMember ? 'gold' : 'default'">{{ record.isMember ? '会员' : '普通' }}</a-tag>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="record.isActive ? 'green' : 'default'">{{ record.isActive ? '正常' : '已禁用' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space class="table-actions">
+          <a-space>
+            <a @click="resetAndCopy(record)">重置并复制密码</a>
             <a @click="toggleAdmin(record)">{{ record.isAdmin ? '取消管理员' : '设为管理员' }}</a>
-            <a @click="toggleMember(record)">{{ record.isMember ? '取消会员' : '设为会员' }}</a>
             <a @click="toggleActive(record)">{{ record.isActive ? '禁用' : '启用' }}</a>
-            <a @click="openReset(record)">重置密码</a>
             <a-popconfirm title="确认删除该账号？不可恢复" @confirm="remove(record.id)">
-              <a style="color: #ff4d4f">删除</a>
+              <a>删除</a>
             </a-popconfirm>
           </a-space>
         </template>
       </template>
     </a-table>
-    <a-modal class="modal-form" v-model:open="visible" title="新增账号" @ok="save">
-      <a-form :model="form" layout="vertical">
-        <a-form-item label="登录账号"><a-input v-model:value="form.username" placeholder="登录用用户名" /></a-form-item>
-        <a-form-item label="账号名称"><a-input v-model:value="form.display_name" placeholder="显示名称（可选）" /></a-form-item>
-        <a-form-item label="密码"><a-input-password v-model:value="form.password" placeholder="至少 6 位" /></a-form-item>
-        <a-form-item><a-checkbox v-model:checked="form.is_admin">设为管理员（无限制使用所有功能）</a-checkbox></a-form-item>
-      </a-form>
-    </a-modal>
-    <a-modal class="modal-form" v-model:open="resetVisible" title="重置密码" @ok="doReset">
-      <a-form layout="vertical">
-        <a-form-item :label="`账号：${resetTarget.username}`">
-          <a-input-password v-model:value="resetPassword" placeholder="新密码，至少 6 位" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-  </div>
+  </a-card>
+
+  <a-card title="邀请码" :bordered="true" style="margin-top: 16px">
+    <template #extra>
+      <a-button type="primary" @click="genCode">生成邀请码</a-button>
+    </template>
+    <div class="desc-text" style="margin-bottom: 12px">把邀请码发给会员，他在登录页点"注册"即可自助注册账号密码</div>
+    <a-table :columns="codeColumns" :data-source="codes" row-key="code" size="small" :pagination="{ pageSize: 8 }">
+      <template #bodyCell="{ column, record }">
+        <a v-if="column.key === 'copy'" @click="copyCode(record.code)">复制</a>
+      </template>
+    </a-table>
+  </a-card>
+
+  <a-modal class="modal-form" v-model:open="visible" title="添加子账号" @ok="save" :width="520">
+    <a-form :model="form" layout="vertical">
+      <a-form-item label="登录账号" required><a-input v-model:value="form.username" placeholder="登录用用户名" /></a-form-item>
+      <a-form-item label="昵称"><a-input v-model:value="form.display_name" placeholder="显示名称（可选）" /></a-form-item>
+      <a-form-item label="密码" required><a-input-password v-model:value="form.password" placeholder="至少 6 位" /></a-form-item>
+      <a-form-item><a-checkbox v-model:checked="form.is_admin">设为管理员（无限制使用所有功能）</a-checkbox></a-form-item>
+    </a-form>
+  </a-modal>
+  <a-modal class="modal-form" v-model:open="resetVisible" title="重置密码" @ok="doReset" :width="520">
+    <a-form layout="vertical">
+      <a-form-item :label="`账号：${resetTarget.username}`" required>
+        <a-input-password v-model:value="resetPassword" placeholder="新密码，至少 6 位" />
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -65,14 +66,13 @@ import { message } from 'ant-design-vue';
 import { userApi, inviteApi } from '@/api';
 
 const columns = [
-  { title: 'ID', dataIndex: 'id', width: 60 },
-  { title: '账号', dataIndex: 'username' },
-  { title: '名称', dataIndex: 'displayName' },
-  { title: '角色', key: 'admin', width: 100 },
-  { title: '会员', key: 'member', width: 100 },
-  { title: '状态', key: 'active', width: 100 },
-  { title: '注册时间', dataIndex: 'createdAt', width: 180 },
-  { title: '操作', key: 'action', width: 380 },
+  { title: 'ID', dataIndex: 'id', width: 70 },
+  { title: '用户名', dataIndex: 'username' },
+  { title: '密码', key: 'password', width: 120 },
+  { title: '昵称', dataIndex: 'displayName' },
+  { title: '角色', key: 'role', width: 100 },
+  { title: '创建时间', dataIndex: 'createdAt', width: 180 },
+  { title: '操作', key: 'action', width: 320 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
 const visible = ref(false);
@@ -102,16 +102,22 @@ async function toggleAdmin(r: any) {
     message.success(r.isAdmin ? '已取消管理员' : '已设为管理员'); load();
   } catch (e: any) { message.error(e.message); }
 }
-async function toggleMember(r: any) {
-  try {
-    await userApi.update(r.id, { is_member: !r.isMember });
-    message.success(r.isMember ? '已取消会员' : '已设为会员'); load();
-  } catch (e: any) { message.error(e.message); }
-}
 async function toggleActive(r: any) {
   try {
     await userApi.update(r.id, { is_active: !r.isActive });
     message.success(r.isActive ? '已禁用' : '已启用'); load();
+  } catch (e: any) { message.error(e.message); }
+}
+// 重置并复制密码：生成随机密码 → 重置 → 复制到剪贴板
+async function resetAndCopy(r: any) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  try {
+    await userApi.update(r.id, { password: pwd });
+    message.success('密码已重置');
+    try { await navigator.clipboard.writeText(pwd); message.success('新密码已复制：' + pwd); }
+    catch { message.info('新密码：' + pwd); }
   } catch (e: any) { message.error(e.message); }
 }
 function openReset(r: any) {
@@ -130,7 +136,7 @@ async function remove(id: number) {
 }
 const codeColumns = [
   { title: '邀请码', dataIndex: 'code' },
-  { title: '状态', dataIndex: 'used', width: 120,
+  { title: '状态', dataIndex: 'used', width: 160,
     customRender: ({ text, record }: any) => text ? `已使用(${record.usedBy})` : '未使用' },
   { title: '操作', key: 'copy', width: 80 },
 ];
