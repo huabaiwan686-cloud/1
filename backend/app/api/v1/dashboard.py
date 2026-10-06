@@ -1,5 +1,5 @@
 """运营看板：/api/dashboard/stats（真实聚合）。"""
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
@@ -11,7 +11,7 @@ from app.api.v1.vip import _get_or_create_quota
 from app.core.database import get_db
 from app.models.account import BotToken, TgAccount
 from app.models.billing import VipSubscription
-from app.models.content import Note, TaskLog
+from app.models.content import Note, TaskLog, CollectChannel, City
 from app.models.distribution import Channel
 from app.models.user import User
 
@@ -39,13 +39,37 @@ def stats(user: User = Depends(require_member), db: Session = Depends(get_db)):
                 TaskLog.created_at >= day_start)
         .scalar()
     )
+    # 24h 失败（工作台 meiren 布局用）
+    publish_failed_24h = (
+        db.query(func.count(TaskLog.id))
+        .filter(TaskLog.action == "publish", TaskLog.result == "fail",
+                TaskLog.created_at >= datetime.utcnow() - timedelta(hours=24))
+        .scalar()
+    )
+    tg_online = (
+        db.query(func.count(TgAccount.id))
+        .filter(TgAccount.status == "online")
+        .scalar()
+    )
+    collect_sources = db.query(func.count(CollectChannel.id)).scalar()
+    city_rows = (
+        db.query(City.name, func.count(Note.id))
+        .join(Note, Note.city_id == City.id)
+        .group_by(City.name)
+        .all()
+    )
+    notes_by_city = {name: cnt for name, cnt in city_rows}
     return ok({
         "notesTotal": db.query(func.count(Note.id)).scalar(),
         "notesByStatus": by_status,
+        "notesByCity": notes_by_city,
         "todayPublishes": today_publishes or 0,
         "publishFailed": publish_failed or 0,
+        "publishFailed24h": publish_failed_24h or 0,
         "channelsActive": db.query(func.count(Channel.id)).filter(Channel.is_active.is_(True)).scalar(),
         "tgAccounts": db.query(func.count(TgAccount.id)).scalar(),
+        "tgOnline": tg_online or 0,
+        "collectSources": collect_sources or 0,
         "botTokens": db.query(func.count(BotToken.id)).scalar(),
         "quotaLeft": max(q.monthly_quota - q.monthly_used, 0) + max(q.extra_quota - q.extra_used, 0),
         "vipPlan": sub.plan if active else "starter",

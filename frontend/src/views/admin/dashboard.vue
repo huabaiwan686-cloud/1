@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div>
     <!-- 3 张统计卡片 -->
     <a-row :gutter="16">
       <a-col :span="8">
@@ -26,7 +26,7 @@
           <a-statistic title="在线协议号" :value="stats.tgOnline || 0" />
         </a-col>
         <a-col :span="6">
-          <a-statistic title="今日推送" :value="stats.todayPublishes || 0" />
+          <a-statistic title="今日推送" :value="todayPushText" />
         </a-col>
         <a-col :span="6">
           <a-statistic title="今日成功率" :value="successRate" />
@@ -35,34 +35,53 @@
           <a-statistic title="24h 失败" :value="stats.publishFailed24h || 0" value-style="color: #0ca678" />
         </a-col>
       </a-row>
-      <a-divider orientation="left" style="margin: 12px 0">近 7 天推送趋势</a-divider>
-      <div class="trend-bars">
-        <div v-for="(d, i) in trend7" :key="i" class="trend-bar-item">
-          <div class="trend-bar-value">{{ d.value }}</div>
-          <div class="trend-bar" :style="{ height: barHeight(d.value) + 'px' }"></div>
-          <div class="trend-bar-date">{{ d.date }}</div>
+      <a-divider style="margin: 12px 0">近 7 天推送趋势</a-divider>
+      <div style="display: flex; align-items: flex-end; gap: 8px; height: 90px">
+        <div
+          v-for="(d, i) in trend7"
+          :key="i"
+          style="display: flex; flex-direction: column; align-items: center; flex: 1"
+        >
+          <div style="font-size: 11px; color: #5a6276">{{ d.value }}</div>
+          <div
+            :style="{
+              width: '22px',
+              background: '#2f55e0',
+              borderRadius: '4px 4px 0 0',
+              height: barHeight(d.value) + 'px',
+            }"
+          ></div>
+          <div style="font-size: 10px; color: #9aa1ad; margin-top: 4px">{{ d.date }}</div>
         </div>
       </div>
     </a-card>
 
-    <!-- 客服卡片 -->
-    <a-card :bordered="true" style="margin-top: 16px">
-      <div class="service-row">
-        <span class="service-icon">!</span>
-        <span class="service-text">遇到问题？联系客服获取帮助</span>
-        <a-button type="primary" @click="contactService">联系客服</a-button>
-      </div>
+    <!-- 客服卡片（无边框） -->
+    <a-card :bordered="false" style="margin-top: 16px">
+      <a-result
+        status="info"
+        title="有任何问题或需要开通 VIP，请联系客服 TG：@lingjuli"
+        sub-title="客服工作时间 9:00-23:00（北京时间）"
+      >
+        <template #extra>
+          <a-button type="primary" href="https://t.me/lingjuli" target="_blank">
+            联系客服 @lingjuli
+          </a-button>
+        </template>
+      </a-result>
     </a-card>
 
     <!-- 按省市分布 -->
-    <a-collapse style="margin-top: 16px">
-      <a-collapse-panel key="1" header="按省市分布">
-        <div class="tag-group">
-          <a-tag v-for="(v, k) in stats.notesByCity" :key="k" color="blue">{{ k }}: {{ v }}</a-tag>
-          <span v-if="!stats.notesByCity || Object.keys(stats.notesByCity).length === 0" class="empty-text">暂无数据</span>
-        </div>
-      </a-collapse-panel>
-    </a-collapse>
+    <a-card :bordered="true" style="margin-top: 16px">
+      <a-collapse ghost>
+        <a-collapse-panel key="1" :header="`📊 按省市分布（${cityTotal} 条资料，点击展开）`">
+          <div class="tag-group">
+            <a-tag v-for="(v, k) in stats.notesByCity" :key="k" color="blue">{{ k }}：{{ v }}</a-tag>
+            <span v-if="!cityTotal" class="empty-text">暂无数据</span>
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
+    </a-card>
   </div>
 </template>
 
@@ -73,11 +92,23 @@ import request from '@/utils/request';
 const stats = ref<any>({ notesByCity: {} });
 const trend7 = ref<{ date: string; value: number }[]>([]);
 
+const todayPushText = computed(() => {
+  const total = stats.value.todayPublishes || 0;
+  const failed = stats.value.publishFailed24h || 0;
+  const okCount = Math.max(0, total - failed);
+  return `${okCount}/${total}`;
+});
+
 const successRate = computed(() => {
   const total = stats.value.todayPublishes || 0;
   const failed = stats.value.publishFailed24h || 0;
   if (total <= 0) return '0%';
   return Math.round(((total - failed) / total) * 100) + '%';
+});
+
+const cityTotal = computed(() => {
+  const m = stats.value.notesByCity || {};
+  return Object.values(m).reduce((a: number, b: any) => a + (b || 0), 0);
 });
 
 const maxTrend = computed(() => {
@@ -87,10 +118,6 @@ const maxTrend = computed(() => {
 });
 function barHeight(v: number) {
   return Math.max(4, Math.round((v / maxTrend.value) * 90));
-}
-
-function contactService() {
-  window.open('https://t.me/lingjuli', '_blank');
 }
 
 onMounted(async () => {
@@ -103,7 +130,6 @@ onMounted(async () => {
       params: { days: 7 },
     });
     const data = r.data || r;
-    // 兼容：取发布成功系列或第一条系列
     const dates: string[] = data.dates || [];
     let series: number[] = [];
     const ss: any[] = data.series || [];
@@ -118,52 +144,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.trend-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  height: 90px;
+/* 统计数值 28px / 字重 600（对标 meiren） */
+:deep(.ant-statistic-content-value) {
+  font-size: 28px;
+  font-weight: 600;
 }
-.trend-bar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-}
-.trend-bar-value {
-  font-size: 11px;
-  color: #5a6276;
-}
-.trend-bar {
-  width: 22px;
-  background: #2f55e0;
-  border-radius: 4px 4px 0 0;
-  margin-top: 2px;
-}
-.trend-bar-date {
-  font-size: 10px;
-  color: #9aa1ad;
-  margin-top: 4px;
-}
-.service-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.service-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #1677ff;
-  color: #fff;
-  font-weight: 700;
-  font-size: 16px;
-}
-.service-text { flex: 1; font-size: 14px; }
 .tag-group { display: flex; flex-wrap: wrap; gap: 8px; }
 .empty-text { color: #8a91a5; font-size: 14px; }
 </style>
