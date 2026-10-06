@@ -157,11 +157,14 @@ async function load() {
   try {
     list.value = await listenApi.plans();
     tgAccounts.value = await tgApi.accounts();
-  } finally { loading.value = false; }
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
 async function loadHits() {
   hitsLoading.value = true;
-  try { hits.value = await listenApi.hits(); } finally { hitsLoading.value = false; }
+  try { hits.value = await listenApi.hits(); }
+  catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { hitsLoading.value = false; }
 }
 function openEditor() {
   Object.assign(editing, { name: '', account_id: null, targets_str: '', keywords_str: '', map_str: '' });
@@ -181,21 +184,28 @@ function parseMap(str: string): Record<string, string> {
 async function save() {
   if (!editing.account_id) { message.error('请选择监听协议号，否则计划不会执行'); return; }
   if (!editing.name) { message.error('请填写计划名称'); return; }
-  await listenApi.create({
-    name: editing.name,
-    account_id: editing.account_id,
-    targets: editing.targets_str.split(',').map((s: string) => s.trim()).filter(Boolean),
-    keywords: editing.keywords_str.split(',').map((s: string) => s.trim()).filter(Boolean),
-    keyword_city_map: parseMap(editing.map_str),
-  });
-  message.success('监听计划已创建，worker 将自动开始监听');
-  visible.value = false; load();
+  try {
+    await listenApi.create({
+      name: editing.name,
+      account_id: editing.account_id,
+      targets: editing.targets_str.split(',').map((s: string) => s.trim()).filter(Boolean),
+      keywords: editing.keywords_str.split(',').map((s: string) => s.trim()).filter(Boolean),
+      keyword_city_map: parseMap(editing.map_str),
+    });
+    message.success('监听计划已创建，worker 将自动开始监听');
+    visible.value = false; load();
+  } catch (e: any) { message.error(e.message || '保存失败'); }
 }
-async function remove(id: number) { await listenApi.remove(id); message.success('已删除'); load(); }
+async function remove(id: number) {
+  try { await listenApi.remove(id); message.success('已删除'); load(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
+}
 async function togglePlan(id: number, enabled: boolean) {
-  await listenApi.toggle(id, enabled);
-  message.success(enabled ? '监听已启用' : '监听已停用');
-  load();
+  try {
+    await listenApi.toggle(id, enabled);
+    message.success(enabled ? '监听已启用' : '监听已停用');
+    load();
+  } catch (e: any) { message.error(e.message || '操作失败'); }
 }
 
 onMounted(() => { refreshKwList(); load(); loadHits(); });

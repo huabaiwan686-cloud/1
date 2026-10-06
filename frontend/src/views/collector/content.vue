@@ -98,7 +98,8 @@ async function load() {
       mediaCount: (n.media || []).length,
     }));
     total.value = r.total || 0;
-  } finally { loading.value = false; }
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
 function onPage(p: number) { page.value = p; load(); }
 function viewDetail(record: any) { detail.value = record; detailVisible.value = true; }

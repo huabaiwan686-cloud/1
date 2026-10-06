@@ -36,11 +36,11 @@
             block
             ghost
             :type="p.id === sub.plan ? 'default' : 'primary'"
-            :disabled="p.id === sub.plan"
             class="ant-btn-background-ghost ant-btn-block"
+            :disabled="p.id === sub.plan && sub.isActive"
             @click="buyPlan(p)"
           >
-            {{ p.id === sub.plan ? '当前套餐' : '立即开通' }}
+            {{ p.id === sub.plan && sub.isActive ? '当前套餐' : '立即开通' }}
           </a-button>
         </a-card>
       </a-col>

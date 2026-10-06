@@ -14,9 +14,6 @@
           <a-tag v-else-if="record.isMember" color="gold">会员</a-tag>
           <a-tag v-else color="default">普通</a-tag>
         </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="record.isActive ? 'green' : 'default'">{{ record.isActive ? '正常' : '已禁用' }}</a-tag>
-        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a @click="resetAndCopy(record)">重置并复制密码</a>
@@ -51,13 +48,6 @@
       <a-form-item><a-checkbox v-model:checked="form.is_admin">设为管理员（无限制使用所有功能）</a-checkbox></a-form-item>
     </a-form>
   </a-modal>
-  <a-modal class="modal-form" v-model:open="resetVisible" title="重置密码" @ok="doReset" :width="520">
-    <a-form layout="vertical">
-      <a-form-item :label="`账号：${resetTarget.username}`" required>
-        <a-input-password v-model:value="resetPassword" placeholder="新密码，至少 6 位" />
-      </a-form-item>
-    </a-form>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -77,9 +67,6 @@ const columns = [
 const list = ref<any[]>([]); const loading = ref(false);
 const visible = ref(false);
 const form = reactive({ username: '', display_name: '', password: '', is_admin: false });
-const resetVisible = ref(false);
-const resetTarget = ref<any>({});
-const resetPassword = ref('');
 
 async function load() {
   loading.value = true;
@@ -118,16 +105,6 @@ async function resetAndCopy(r: any) {
     message.success('密码已重置');
     try { await navigator.clipboard.writeText(pwd); message.success('新密码已复制：' + pwd); }
     catch { message.info('新密码：' + pwd); }
-  } catch (e: any) { message.error(e.message); }
-}
-function openReset(r: any) {
-  resetTarget.value = r; resetPassword.value = ''; resetVisible.value = true;
-}
-async function doReset() {
-  if (!resetPassword.value || resetPassword.value.length < 6) { message.error('密码至少 6 位'); return; }
-  try {
-    await userApi.update(resetTarget.value.id, { password: resetPassword.value });
-    message.success('密码已重置'); resetVisible.value = false;
   } catch (e: any) { message.error(e.message); }
 }
 async function remove(id: number) {

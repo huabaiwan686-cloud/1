@@ -107,16 +107,19 @@ async function load() {
     templates.value = await messageApi.templates();
     plans.value = await messageApi.plans();
     tgAccounts.value = await tgApi.accounts();
-  } finally { loading.value = false; }
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
 async function loadDialogs() {
   dlgOptions.value = []; dlgCachedAt.value = '';
   if (!planEditing.account_id) return;
-  const r: any = await messageApi.dialogs(planEditing.account_id);
-  dlgOptions.value = r.list.map((d: any) => ({
-    value: d.chatId, label: `${d.title}${d.username ? ' (@' + d.username + ')' : ''} [${d.kind}]`,
-  }));
-  dlgCachedAt.value = r.cachedAt ? r.cachedAt.slice(0, 16).replace('T', ' ') : '';
+  try {
+    const r: any = await messageApi.dialogs(planEditing.account_id);
+    dlgOptions.value = (r.list || []).map((d: any) => ({
+      value: d.chatId, label: `${d.title}${d.username ? ' (@' + d.username + ')' : ''} [${d.kind}]`,
+    }));
+    dlgCachedAt.value = r.cachedAt ? r.cachedAt.slice(0, 16).replace('T', ' ') : '';
+  } catch (e: any) { message.error(e.message || '加载会话失败'); }
 }
 async function refreshDialogs() {
   if (!planEditing.account_id) { message.error('请先选择执行协议号'); return; }
@@ -131,39 +134,52 @@ function openTpl() { Object.assign(tplEditing, { name: '', content: '' }); tplMe
 const tplMediaList = ref<any[]>([]);
 async function saveTpl() {
   const media: any[] = [];
-  for (const f of tplMediaList.value.slice(0, 10)) {
-    let url = f.url;
-    if (!url && f.originFileObj) {
-      const res: any = await mediaApi.uploadMaterial(f.originFileObj, 'template');
-      url = res.url; f.url = url;
+  try {
+    for (const f of tplMediaList.value.slice(0, 10)) {
+      let url = f.url;
+      if (!url && f.originFileObj) {
+        const res: any = await mediaApi.uploadMaterial(f.originFileObj, 'template');
+        url = res.url; f.url = url;
+      }
+      if (url) {
+        const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(f.name || url);
+        media.push({ url, type: isVideo ? 'video' : 'image' });
+      }
     }
-    if (url) {
-      const isVideo = /\.(mp4|mov|avi|mkv)$/i.test(f.name || url);
-      media.push({ url, type: isVideo ? 'video' : 'image' });
-    }
-  }
-  await messageApi.createTemplate({ name: tplEditing.name, content: tplEditing.content, media });
-  message.success('已创建'); tplVisible.value = false; load();
+    await messageApi.createTemplate({ name: tplEditing.name, content: tplEditing.content, media });
+    message.success('已创建'); tplVisible.value = false; load();
+  } catch (e: any) { message.error(e.message || '保存失败'); }
 }
-async function delTpl(id: number) { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }
-async function pushTpl(id: number) { const r: any = await messageApi.pushTemplate(id); message.success(r.msg || '推送完成'); }
+async function delTpl(id: number) {
+  try { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
+}
+async function pushTpl(id: number) {
+  try { const r: any = await messageApi.pushTemplate(id); message.success(r.msg || '推送完成'); }
+  catch (e: any) { message.error(e.message || '推送失败'); }
+}
 function openPlan() {
   Object.assign(planEditing, { template_id: null, account_id: null, target_groups: [], interval_days: 1, interval_hours: 0, multi_interval_seconds: 0, times_str: '' });
   dlgOptions.value = []; dlgCachedAt.value = '';
   planVisible.value = true;
 }
 async function savePlan() {
-  await messageApi.createPlan({
-    account_id: planEditing.account_id,
-    template_id: planEditing.template_id,
-    target_groups: planEditing.target_groups || [],
-    interval_days: planEditing.interval_days,
-    interval_hours: planEditing.interval_hours || 0,
-    multi_interval_seconds: planEditing.multi_interval_seconds || 0,
-    times: planEditing.times_str.split(',').map((s: string) => s.trim()).filter(Boolean),
-  });
-  message.success('已创建'); planVisible.value = false; load();
+  try {
+    await messageApi.createPlan({
+      account_id: planEditing.account_id,
+      template_id: planEditing.template_id,
+      target_groups: planEditing.target_groups || [],
+      interval_days: planEditing.interval_days,
+      interval_hours: planEditing.interval_hours || 0,
+      multi_interval_seconds: planEditing.multi_interval_seconds || 0,
+      times: planEditing.times_str.split(',').map((s: string) => s.trim()).filter(Boolean),
+    });
+    message.success('已创建'); planVisible.value = false; load();
+  } catch (e: any) { message.error(e.message || '保存失败'); }
 }
-async function delPlan(id: number) { await messageApi.deletePlan(id); message.success('已删除'); load(); }
+async function delPlan(id: number) {
+  try { await messageApi.deletePlan(id); message.success('已删除'); load(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
+}
 onMounted(load);
 </script>

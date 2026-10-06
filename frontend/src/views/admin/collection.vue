@@ -215,9 +215,10 @@ function parseLines(s: string): string[] {
   return (s || '').split('\n').map(x => x.trim()).filter(Boolean);
 }
 async function save() {
+  if (!editing.name?.trim()) { message.warning('请输入规则名称'); return; }
   const payload = {
-    name: editing.name,
-    target_channels: editing.target_channels_str.split(',').map((s: string) => parseInt(s.trim())).filter(Boolean),
+    name: editing.name.trim(),
+    target_channels: editing.target_channels_str.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => Number.isFinite(n)),
     global_apply: editing.global_apply, need_review: editing.need_review,
     prefix_enabled: editing.prefix_enabled, prefix_text: editing.prefix_text,
     suffix_enabled: editing.suffix_enabled, suffix_text: editing.suffix_text,
@@ -242,7 +243,8 @@ async function save() {
   } catch (e: any) { message.error(e.message); }
 }
 async function remove(id: number) {
-  await collectApi.deleteRule(id); message.success('已删除'); load();
+  try { await collectApi.deleteRule(id); message.success('已删除'); load(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
 }
 
 // 采集频道
@@ -291,9 +293,14 @@ async function addChannel() {
   } catch (e: any) { message.error(e.message); }
 }
 async function removeChannel(id: number) {
-  await collectApi.deleteChannel(id); message.success('已删除'); loadChannels();
+  try { await collectApi.deleteChannel(id); message.success('已删除'); loadChannels(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
 }
-onMounted(async () => { await load(); tgAccounts.value = await tgApi.accounts(); loadChannels(); });
+onMounted(async () => {
+  await load();
+  try { tgAccounts.value = await tgApi.accounts(); } catch (e: any) { message.error(e.message || '加载协议号失败'); }
+  loadChannels();
+});
 </script>
 
 <style scoped>

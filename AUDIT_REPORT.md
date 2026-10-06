@@ -48,7 +48,7 @@
 - 弹窗/下拉/开关/日期选择
 - 路由跳转
 
-### 修复：18 项 P0/P1 缺陷
+### 修复：18 项 P0/P1 缺陷 → 26 项
 
 **P0 功能缺陷（7项）**：
 1. ✅ `noteApi.remove` 不存在 → 资料库删除必报错 → 新增 `noteApi.remove`（走 batch delete）
@@ -59,18 +59,16 @@
 6. ✅ VIP 下单不带套餐参数 → 后端 `POST /api/vip/orders` 支持 `plan_id`
 7. ✅ 上下架频道 stale `editing.id` → 新建时重置 `id: 0`
 
-**P1 错误处理缺失（11项）**：
-8. ✅ tg.vue `startPhone`/`verifyCode` 加 try/catch
-9. ✅ records.vue `load` 加 catch + 空列显示 '—'
-10. ✅ upload.vue 响应形状防御 + try/catch
-11. ✅ distribution.vue `load`/`removeRule` 加错误处理
-12. ✅ group-listen-manage.vue `togglePlan`/`remove` 加 try/catch
-13. ✅ bots.vue 删除死代码分支 + `remove` 加 try/catch
-14. ✅ tags.vue `create` 加 try/catch
-15. ✅ content.vue `removeNote` 加 try/catch
-16. ✅ vip.vue `buy` 加 try/catch
-17. ✅ two-way.vue `save` 加 try/catch
-18. ✅ collection.vue 多处加错误处理
+**P1 错误处理缺失（19项）**：
+8-18. ✅ tg.vue、records.vue、upload.vue、distribution.vue、group-listen-manage.vue、bots.vue、tags.vue、content.vue、vip.vue、two-way.vue、collection.vue 等 11 处加 try/catch
+19. ✅ collection-review.vue 重复提示（approve/reject 双重 message）
+20. ✅ message-push.vue 6 处加 try/catch（saveTpl/delTpl/pushTpl/savePlan/delPlan/loadDialogs）
+21. ✅ users.vue 删除死代码（status 模板分支 + reset modal 约 30 行）
+22. ✅ collection.vue parseInt 加 radix + 名称校验
+23. ✅ vip.vue 套餐按钮逻辑（`sub.plan === p.id && sub.isActive`）
+24. ✅ group-listen.vue save/remove/toggle 加 try/catch
+25. ✅ content.vue load() 加 catch
+26. ✅ vip.vue 修复 duplicate attribute 构建错误
 
 ### 已知未修复（功能缺口，非 bug）：
 - 关键词监控/代理采集/防去重的"保存配置"为假保存（后端无对应接口）
