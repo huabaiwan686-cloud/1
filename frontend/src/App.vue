@@ -75,16 +75,20 @@ function logout() {
 
 watch(() => route.path, (p) => { selected.value = [p]; }, { immediate: true });
 
-onMounted(async () => {
+// 登录后从 /login 进入后台时需加载菜单（onMounted 在登录页已执行过）
+async function loadUserState() {
   if (isLoginPage.value) return;
   if (!localStorage.getItem('access_token')) return;
+  if (menus.value.length) return;
   try {
     menus.value = await authApi.menu();
     const me: any = await authApi.current();
     username.value = me.username;
     loadAnnouncements();
   } catch { /* 401 由 request 拦截器跳登录 */ }
-});
+}
+watch(() => route.path, () => { loadUserState(); });
+onMounted(() => { loadUserState(); });
 </script>
 
 <style scoped>
