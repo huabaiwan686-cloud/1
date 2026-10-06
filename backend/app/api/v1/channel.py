@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.distribution import Channel
@@ -34,7 +35,7 @@ def _out(c: Channel) -> dict:
 
 
 @router.get("/list")
-def list_channels(is_active: bool | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_channels(is_active: bool | None = None, user: User = Depends(require_member), db: Session = Depends(get_db)):
     q = db.query(Channel)
     if is_active is not None:
         q = q.filter(Channel.is_active == is_active)
@@ -42,7 +43,7 @@ def list_channels(is_active: bool | None = None, user: User = Depends(get_curren
 
 
 @router.post("/create")
-def create_channel(body: ChannelIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_channel(body: ChannelIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     c = Channel(**body.model_dump())
     db.add(c)
     db.commit()
@@ -50,7 +51,7 @@ def create_channel(body: ChannelIn, user: User = Depends(get_current_user), db: 
 
 
 @router.put("/{channel_id}")
-def update_channel(channel_id: int, body: ChannelIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_channel(channel_id: int, body: ChannelIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     c = db.query(Channel).filter(Channel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
@@ -61,7 +62,7 @@ def update_channel(channel_id: int, body: ChannelIn, user: User = Depends(get_cu
 
 
 @router.delete("/{channel_id}")
-def delete_channel(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_channel(channel_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     c = db.query(Channel).filter(Channel.id == channel_id).first()
@@ -73,7 +74,7 @@ def delete_channel(channel_id: int, user: User = Depends(get_current_user), db: 
 
 
 @router.post("/{channel_id}/check")
-def check_channel(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def check_channel(channel_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """连通性检测：经绑定的 Bot 调 getChat + getChatMember，确认 Bot 为频道管理员。"""
     import httpx
     from app.api.v1.bots import _dec
@@ -111,7 +112,7 @@ def check_channel(channel_id: int, user: User = Depends(get_current_user), db: S
 
 
 @router.post("/{channel_id}/push_all")
-def push_all(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def push_all(channel_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """全量推送：把所有已上架笔记逐个真实发送到该频道（一组=文字+媒体打包，紧跟验证视频）。
 
     跳过定时未到（scheduled_at 在未来且未发送）的笔记；单条失败不影响其他。
@@ -151,7 +152,7 @@ def push_all(channel_id: int, user: User = Depends(get_current_user), db: Sessio
 
 
 @router.post("/{channel_id}/clear_queue")
-def clear_queue(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def clear_queue(channel_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """清空该频道的待发送队列：把定时未到且含该频道的笔记移出目标（不删笔记本身）。"""
     from datetime import datetime
     from app.models.content import Note
@@ -199,14 +200,14 @@ def _rule_out(r) -> dict:
 
 
 @router.get("/publish-rules")
-def list_publish_rules(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_publish_rules(user: User = Depends(require_member), db: Session = Depends(get_db)):
     from app.models.distribution import PublishRule
     rules = db.query(PublishRule).order_by(PublishRule.id.desc()).all()
     return ok([_rule_out(r) for r in rules])
 
 
 @router.post("/publish-rules")
-def create_publish_rule(body: PublishRuleIn, user: User = Depends(get_current_user),
+def create_publish_rule(body: PublishRuleIn, user: User = Depends(require_member),
                         db: Session = Depends(get_db)):
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -220,7 +221,7 @@ def create_publish_rule(body: PublishRuleIn, user: User = Depends(get_current_us
 
 
 @router.delete("/publish-rules/{rule_id}")
-def delete_publish_rule(rule_id: int, user: User = Depends(get_current_user),
+def delete_publish_rule(rule_id: int, user: User = Depends(require_member),
                          db: Session = Depends(get_db)):
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -270,7 +271,7 @@ def _rule_matches(rule, title: str, body: str, tags: list) -> bool:
 
 
 @router.get("/publish-recommend/{note_id}")
-def recommend_channels(note_id: int, user: User = Depends(get_current_user),
+def recommend_channels(note_id: int, user: User = Depends(require_member),
                        db: Session = Depends(get_db)):
     """智能推荐频道：按规则匹配，无命中时回退默认频道。"""
     from app.models.distribution import PublishRule
@@ -294,7 +295,7 @@ def recommend_channels(note_id: int, user: User = Depends(get_current_user),
 
 
 @router.post("/publish-recommend/preview")
-def recommend_channels_preview(body: dict, user: User = Depends(get_current_user),
+def recommend_channels_preview(body: dict, user: User = Depends(require_member),
                                db: Session = Depends(get_db)):
     """智能推荐频道（预览版）：上传页填写标题/正文/标签后直接推荐，无需先建笔记。"""
     from app.models.distribution import PublishRule

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.billing import InviteCode, InviteRecord, VipSubscription
@@ -33,12 +34,12 @@ def _info(db: Session) -> dict:
 
 
 @router.get("/info")
-def info(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def info(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok(_info(db))
 
 
 @router.get("/list")
-def list_codes(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_codes(user: User = Depends(require_member), db: Session = Depends(get_db)):
     codes = db.query(InviteCode).order_by(InviteCode.id.desc()).all()
     recs = db.query(InviteRecord).order_by(InviteRecord.id.desc()).limit(100).all()
     return ok({
@@ -49,7 +50,7 @@ def list_codes(user: User = Depends(get_current_user), db: Session = Depends(get
 
 
 @router.post("/generate")
-def generate(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def generate(user: User = Depends(require_member), db: Session = Depends(get_db)):
     code = secrets.token_hex(4).upper()
     db.add(InviteCode(code=code))
     db.commit()

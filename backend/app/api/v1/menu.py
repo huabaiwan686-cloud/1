@@ -51,19 +51,10 @@ MENU_TREE = [
 def menu_all(user: User = Depends(get_current_user)):
     if user.is_admin:
         return ok(MENU_TREE)
-    # 采集员：只看采集端 + 发布端
+    if user.is_member:
+        # 会员：除账号管理外的全部功能
+        return ok([m for m in MENU_TREE if m["path"] != "/admin/users"])
+    # 普通用户：仅上下架（笔记列表的发布/下架）
     return ok([
-        {"name": "Dashboard", "path": "/admin/dashboard", "title": "工作台"},
-        {
-            "name": "Collector",
-            "path": "/collector",
-            "title": "采集端",
-            "children": [
-                {"name": "CollectorUpload", "path": "/collector/upload", "title": "上传资料"},
-                {"name": "CollectorContent", "path": "/collector/content", "title": "我的内容"},
-                {"name": "CollectorRecords", "path": "/collector/records", "title": "采集记录"},
-            ],
-        },
-        {"name": "PublishMessagePush", "path": "/publish/message-push", "title": "群聊推送"},
-        {"name": "PublishGroupListen", "path": "/publish/group-listen", "title": "关键字推送"},
+        {"name": "AdminNotes", "path": "/admin/notes", "title": "上下架"},
     ])

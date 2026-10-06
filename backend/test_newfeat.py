@@ -28,6 +28,7 @@ with TestClient(app) as c:
     HU = {"Authorization": f"Bearer {r.json()['data']['accessToken']}"}
     me = c.get("/api/account/current", headers=HU).json()["data"]
     uid_user1 = me["id"]
+    c.patch(f"/api/account/{uid_user1}", headers=HA, json={"is_member": True})
 
     # ---- 公告 ----
     r = c.post("/api/announce/create", headers=HU, json={"title": "t", "content": "c"})

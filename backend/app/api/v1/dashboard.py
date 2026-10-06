@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.api.v1.vip import _get_or_create_quota
 from app.core.database import get_db
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/stats")
-def stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def stats(user: User = Depends(require_member), db: Session = Depends(get_db)):
     from app.core.timezone import today_local_start_utc
     day_start = today_local_start_utc()  # 本地今天 0 点（UTC naive）
     by_status = dict(

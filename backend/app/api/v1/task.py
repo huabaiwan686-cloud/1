@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.content import TaskLog
@@ -17,7 +18,7 @@ def list_logs(
     keyword: str = "",
     page: int = 1,
     page_size: int = 20,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_member),
     db: Session = Depends(get_db),
 ):
     q = db.query(TaskLog)
@@ -43,7 +44,7 @@ def list_logs(
 
 
 @router.delete("/logs/clear")
-def clear_logs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def clear_logs(user: User = Depends(require_member), db: Session = Depends(get_db)):
     if not user.is_admin:
         from fastapi import HTTPException, status
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")

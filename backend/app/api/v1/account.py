@@ -28,6 +28,7 @@ def _user_out(u: User) -> dict:
         "displayName": u.display_name,
         "isAdmin": u.is_admin,
         "isActive": u.is_active,
+        "isMember": u.is_member,
         "remark": u.remark,
         "createdAt": u.created_at.isoformat() if u.created_at else None,
     }
@@ -96,6 +97,7 @@ def create_user(body: UserCreateIn, user: User = Depends(get_current_user), db: 
 class UserUpdateIn(BaseModel):
     is_admin: bool | None = None
     is_active: bool | None = None
+    is_member: bool | None = None  # 会员开关
     password: str | None = None  # 重置密码（至少6位）
     display_name: str | None = None
 
@@ -122,6 +124,8 @@ def update_user(user_id: int, body: UserUpdateIn, user: User = Depends(get_curre
         target.is_admin = body.is_admin
     if body.is_active is not None:
         target.is_active = body.is_active
+    if body.is_member is not None:
+        target.is_member = body.is_member
     if body.password:
         if len(body.password) < 6:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "密码至少 6 位")

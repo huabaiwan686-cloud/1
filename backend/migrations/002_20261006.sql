@@ -103,3 +103,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_listen_hit_claimed
 
 -- 循环重发变体开关
 ALTER TABLE channels ADD COLUMN IF NOT EXISTS variation_enabled BOOLEAN DEFAULT 1;
+
+-- 会员标识
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_member BOOLEAN DEFAULT 0;

@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.content import Note, TaskLog
@@ -14,7 +15,7 @@ STATUS_TEXT = {"draft": "草稿", "pending": "待审核", "published": "已上�
 
 @router.get("/notes")
 def my_notes(status: str | None = None, page: int = 1, page_size: int = 20,
-             user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+             user: User = Depends(require_member), db: Session = Depends(get_db)):
     """我提交的资料（内容页）。"""
     q = db.query(Note).filter(Note.created_by == user.id)
     if status:
@@ -32,7 +33,7 @@ def my_notes(status: str | None = None, page: int = 1, page_size: int = 20,
 
 @router.get("/records")
 def my_records(page: int = 1, page_size: int = 20,
-               user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+               user: User = Depends(require_member), db: Session = Depends(get_db)):
     """我的采集记录（我经手资料的任务日志）。"""
     my_ids = db.query(Note.id).filter(Note.created_by == user.id).subquery()
     q = db.query(TaskLog).filter(TaskLog.note_id.in_(my_ids))

@@ -17,6 +17,7 @@ from PIL import Image as PILImage
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.api.v1.vip import consume_quota, quota_available
 from app.core.database import get_db
@@ -66,7 +67,7 @@ async def upload_material(
     file: UploadFile = File(...),
     name: str = Form("未命名素材"),
     category: str = Form("default"),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_member),
     db: Session = Depends(get_db),
 ):
     # 分块读取 + 大小上限（200MB），防超大文件打爆内存
@@ -91,13 +92,13 @@ async def upload_material(
 
 
 @router.get("/materials")
-def list_materials(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_materials(user: User = Depends(require_member), db: Session = Depends(get_db)):
     ms = db.query(BackgroundMaterial).order_by(BackgroundMaterial.id.desc()).all()
     return ok([{"id": m.id, "name": m.name, "url": m.url, "category": m.category} for m in ms])
 
 
 @router.delete("/materials/{material_id}")
-def delete_material(material_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_material(material_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     m = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == material_id).first()
     if not m:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "素材不存在")
@@ -120,7 +121,7 @@ async def process_image(
     mode: str = Form("light_perturb"),  # replace_bg/blur_bg/light_perturb/original
     background_id: int | None = Form(None),
     blur_radius: float = Form(12),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_member),
     db: Session = Depends(get_db),
 ):
     if mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
@@ -233,7 +234,7 @@ async def process_image(
 
 
 @router.get("/jobs")
-def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_jobs(user: User = Depends(require_member), db: Session = Depends(get_db)):
     jobs = db.query(ImageJob).order_by(ImageJob.id.desc()).limit(100).all()
     return ok([{
         "id": j.id, "mode": j.mode, "status": j.status,
@@ -317,7 +318,7 @@ def _media_bytes_local(url: str) -> tuple[str, bytes]:
 
 
 @router.get("/matting-global")
-def get_matting_global_ep(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_matting_global_ep(user: User = Depends(require_member), db: Session = Depends(get_db)):
     enabled = _get_setting(db, "matting_global_enabled") == "1"
     try:
         bg_id = int(_get_setting(db, "matting_global_background_id") or 0) or None
@@ -330,7 +331,7 @@ def get_matting_global_ep(user: User = Depends(get_current_user), db: Session = 
 
 
 @router.post("/matting-global")
-def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(get_current_user),
+def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(require_member),
                           db: Session = Depends(get_db)):
     if body.enabled:
         if not body.background_id:

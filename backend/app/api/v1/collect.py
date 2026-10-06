@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok, require_vip
 from app.core.database import get_db
 from app.models.content import CollectChannel, CollectRule
@@ -62,7 +63,7 @@ def _rule_out(r: CollectRule) -> dict:
 
 
 @router.get("/rules")
-def list_rules(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_rules(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok([_rule_out(r) for r in db.query(CollectRule).order_by(CollectRule.id.desc()).all()])
 
 
@@ -86,7 +87,7 @@ def update_rule(rule_id: int, body: RuleIn, user: User = Depends(require_vip), d
 
 
 @router.delete("/rules/{rule_id}")
-def delete_rule(rule_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_rule(rule_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     r = db.query(CollectRule).filter(CollectRule.id == rule_id).first()
     if not r:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "规则不存在")
@@ -106,7 +107,7 @@ def _channel_out(c: CollectChannel) -> dict:
 
 @router.get("/channels")
 def list_channels(
-    source_type: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    source_type: str = "", user: User = Depends(require_member), db: Session = Depends(get_db)
 ):
     q = db.query(CollectChannel)
     if source_type:
@@ -123,7 +124,7 @@ def create_channel(body: ChannelIn, user: User = Depends(require_vip), db: Sessi
 
 
 @router.delete("/channels/{channel_id}")
-def delete_channel(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_channel(channel_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     c = db.query(CollectChannel).filter(CollectChannel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "采集频道不存在")

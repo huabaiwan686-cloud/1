@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import TgAccount, TgDialog
@@ -54,7 +55,7 @@ def _out(a: TgAccount, db: Session | None = None, mask_phone: bool = False) -> d
 
 
 @router.get("/tg/accounts")
-def list_accounts(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_accounts(user: User = Depends(require_member), db: Session = Depends(get_db)):
     mask = not user.is_admin
     return ok([_out(a, db, mask_phone=mask) for a in db.query(TgAccount).order_by(TgAccount.id.desc()).all()])
 
@@ -65,7 +66,7 @@ class TransferIn(BaseModel):
 
 @router.post("/tg/accounts/{account_id}/transfer")
 def transfer_account(account_id: int, body: TransferIn,
-                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+                     user: User = Depends(require_member), db: Session = Depends(get_db)):
     """账号转移：把协议号的所属人转给目标用户（空=转回公共池）。仅管理员。"""
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -86,7 +87,7 @@ def transfer_account(account_id: int, body: TransferIn,
 
 
 @router.delete("/tg/accounts/{account_id}")
-def delete_account(account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_account(account_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     a = db.query(TgAccount).filter(TgAccount.id == account_id).first()
@@ -105,7 +106,7 @@ def delete_account(account_id: int, user: User = Depends(get_current_user), db: 
 
 
 @router.post("/tg/accounts/{account_id}/refresh")
-async def refresh_status(account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def refresh_status(account_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     a = db.query(TgAccount).filter(TgAccount.id == account_id).first()
     if not a:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
@@ -116,7 +117,7 @@ async def refresh_status(account_id: int, user: User = Depends(get_current_user)
 
 
 @router.post("/youban-bot/bot/login/start")
-async def login_start(body: PhoneStartIn, user: User = Depends(get_current_user)):
+async def login_start(body: PhoneStartIn, user: User = Depends(require_member)):
     """开始登录：手机号登录返回 session_key；扫码登录由前端轮询 qr_token。"""
     # 未配置 TG_API_ID/HASH 时直接拒绝，不建假会话误导用户走验证码流程
     if not tg_configured():
@@ -142,7 +143,7 @@ async def login_start(body: PhoneStartIn, user: User = Depends(get_current_user)
 
 
 @router.get("/youban-bot/bot/login/status")
-def login_status(session_key: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def login_status(session_key: str, user: User = Depends(require_member), db: Session = Depends(get_db)):
     s = _login_sessions.get(session_key)
     if not s or s["expires"] < datetime.utcnow():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "会话已过期，请重新开始")
@@ -150,7 +151,7 @@ def login_status(session_key: str, user: User = Depends(get_current_user), db: S
 
 
 @router.post("/youban-bot/bot/login/verify")
-async def login_verify(body: CodeIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def login_verify(body: CodeIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     s = _login_sessions.get(body.session_key)
     if not s or s["expires"] < datetime.utcnow():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "会话已过期，请重新开始")

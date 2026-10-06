@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import BotToken, TgAccount, TgDialog
@@ -43,7 +44,7 @@ def _tpl_out(t: MessageTemplate) -> dict:
 
 
 @router.get("/templates")
-def list_templates(keyword: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_templates(keyword: str = "", user: User = Depends(require_member), db: Session = Depends(get_db)):
     q = db.query(MessageTemplate)
     if keyword:
         q = q.filter(MessageTemplate.name.contains(keyword) | MessageTemplate.content.contains(keyword))
@@ -51,7 +52,7 @@ def list_templates(keyword: str = "", user: User = Depends(get_current_user), db
 
 
 @router.post("/templates")
-def create_template(body: TemplateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_template(body: TemplateIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     t = MessageTemplate(code=f"TPL-{secrets.token_hex(4).upper()}", **body.model_dump())
     db.add(t)
     db.commit()
@@ -59,7 +60,7 @@ def create_template(body: TemplateIn, user: User = Depends(get_current_user), db
 
 
 @router.delete("/templates/{tpl_id}")
-def delete_template(tpl_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_template(tpl_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     t = db.query(MessageTemplate).filter(MessageTemplate.id == tpl_id).first()
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "模板不存在")
@@ -74,7 +75,7 @@ class TemplatePushIn(BaseModel):
 
 @router.post("/templates/{tpl_id}/push")
 def push_template(tpl_id: int, body: TemplatePushIn | None = None,
-                  user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+                  user: User = Depends(require_member), db: Session = Depends(get_db)):
     """模板推送：把模板文案+媒体经频道绑定的 Bot 真实发送到目标频道。"""
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -129,7 +130,7 @@ def _uploads_local_path(url: str) -> str | None:
 
 @router.post("/templates/{tpl_id}/quick-push")
 async def quick_push(tpl_id: int, body: QuickPushIn,
-                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+                     user: User = Depends(require_member), db: Session = Depends(get_db)):
     """快速推送：把模板文案+媒体经协议号真实发送到全部快速推送目标群组。"""
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -205,12 +206,12 @@ def _plan_out(p: PushPlan) -> dict:
 
 
 @router.get("/plans")
-def list_plans(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_plans(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok([_plan_out(p) for p in db.query(PushPlan).order_by(PushPlan.id.desc()).all()])
 
 
 @router.post("/plans")
-def create_plan(body: PlanIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_plan(body: PlanIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     p = PushPlan(**body.model_dump())
     db.add(p)
     db.commit()
@@ -218,7 +219,7 @@ def create_plan(body: PlanIn, user: User = Depends(get_current_user), db: Sessio
 
 
 @router.delete("/plans/{plan_id}")
-def delete_plan(plan_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_plan(plan_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     p = db.query(PushPlan).filter(PushPlan.id == plan_id).first()
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "计划不存在")
@@ -228,7 +229,7 @@ def delete_plan(plan_id: int, user: User = Depends(get_current_user), db: Sessio
 
 
 @router.get("/quick_targets")
-def list_quick_targets(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_quick_targets(user: User = Depends(require_member), db: Session = Depends(get_db)):
     ts = db.query(QuickPushTarget).order_by(QuickPushTarget.id.desc()).all()
     return ok([{"id": t.id, "name": t.name, "target": t.target} for t in ts])
 
@@ -239,7 +240,7 @@ class QuickTargetIn(BaseModel):
 
 
 @router.post("/quick_targets")
-def create_quick_target(body: QuickTargetIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_quick_target(body: QuickTargetIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     t = QuickPushTarget(name=body.name, target=body.target)
     db.add(t)
     db.commit()
@@ -247,7 +248,7 @@ def create_quick_target(body: QuickTargetIn, user: User = Depends(get_current_us
 
 
 @router.delete("/quick_targets/{target_id}")
-def delete_quick_target(target_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_quick_target(target_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     t = db.query(QuickPushTarget).filter(QuickPushTarget.id == target_id).first()
     if not t:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "目标不存在")
@@ -266,7 +267,7 @@ def _dialog_out(d: TgDialog) -> dict:
 
 
 @router.get("/dialogs")
-def list_dialogs(account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_dialogs(account_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """推送目标群组缓存：按协议号取上次刷新的会话列表（含缓存时间）。"""
     ds = db.query(TgDialog).filter(TgDialog.account_id == account_id).order_by(TgDialog.title).all()
     cached_at = max((d.cached_at for d in ds if d.cached_at), default=None)
@@ -275,7 +276,7 @@ def list_dialogs(account_id: int, user: User = Depends(get_current_user), db: Se
 
 
 @router.post("/dialogs/refresh")
-async def refresh_dialogs_ep(body: DialogRefreshIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def refresh_dialogs_ep(body: DialogRefreshIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """刷新缓存：经协议号从 TG 拉取最新会话列表并全量替换缓存。"""
     a = db.query(TgAccount).filter(TgAccount.id == body.account_id).first()
     if not a or not a.phone:

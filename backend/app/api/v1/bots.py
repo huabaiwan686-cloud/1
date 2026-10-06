@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import BotToken, TgAccount
@@ -77,12 +78,12 @@ def _out(b: BotToken) -> dict:
 
 
 @router.get("/bot/tokens")
-def list_tokens(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_tokens(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok([_out(b) for b in db.query(BotToken).order_by(BotToken.id.desc()).all()])
 
 
 @router.post("/bot/tokens")
-def create_token(body: BotCreateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_token(body: BotCreateIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """手动录入 Token。自动创建请走 POST /bot/tokens/auto-create。"""
     b = BotToken(
         name=body.name, username=body.username,
@@ -94,7 +95,7 @@ def create_token(body: BotCreateIn, user: User = Depends(get_current_user), db: 
 
 
 @router.post("/bot/tokens/{token_id}/verify")
-def verify_token(token_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def verify_token(token_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     b = db.query(BotToken).filter(BotToken.id == token_id).first()
     if not b:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Token 不存在")
@@ -111,7 +112,7 @@ class SendTestIn(BaseModel):
 
 
 @router.post("/bot/tokens/{token_id}/send-test")
-def send_test(token_id: int, body: SendTestIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def send_test(token_id: int, body: SendTestIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """真实发一条测试消息（填你自己的 TG user id 或群组 id）。"""
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
@@ -123,7 +124,7 @@ def send_test(token_id: int, body: SendTestIn, user: User = Depends(get_current_
 
 
 @router.delete("/bot/tokens/{token_id}")
-def delete_token(token_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_token(token_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
     b = db.query(BotToken).filter(BotToken.id == token_id).first()
@@ -144,7 +145,7 @@ class AutoCreateIn(BaseModel):
 
 
 @router.post("/bot/tokens/auto-create")
-async def auto_create(body: AutoCreateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def auto_create(body: AutoCreateIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """自动创建机器人：经所选协议号与 @BotFather 对话完成 /newbot，全程约 10~20 秒。"""
     if not body.username.lower().endswith("bot"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Bot 用户名需以 bot 结尾")
@@ -171,5 +172,5 @@ async def auto_create(body: AutoCreateIn, user: User = Depends(get_current_user)
 
 
 @router.get("/youban-bot/bot/bind/info")
-def bind_info(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def bind_info(user: User = Depends(require_member), db: Session = Depends(get_db)):
     return ok({"total": db.query(BotToken).count()})

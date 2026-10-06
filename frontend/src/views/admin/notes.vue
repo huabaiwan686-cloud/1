@@ -14,13 +14,15 @@
         <a-radio-button value="gallery">画廊</a-radio-button>
         <a-radio-button value="table">表格</a-radio-button>
       </a-radio-group>
-      <a-select v-model:value="batchOp" placeholder="批量操作 (VIP)" style="width: 190px">
+      <a-select v-model:value="batchOp" :placeholder="canFull ? '批量操作' : '批量上下架'" style="width: 190px">
         <a-select-option value="publish">上架</a-select-option>
         <a-select-option value="unpublish">下架</a-select-option>
+        <template v-if="canFull">
         <a-select-option value="delete">删除</a-select-option>
         <a-select-option value="strip_number_title">删除编号和标题</a-select-option>
         <a-select-option value="find_duplicates">查找重复资料</a-select-option>
         <a-select-option value="clear_channels">清空频道选择</a-select-option>
+        </template>
         <a-select-option value="text_replace">文本替换</a-select-option>
         <a-select-option value="remove_suffix">删除后缀</a-select-option>
         <a-select-option value="add_suffix">添加后缀</a-select-option>
@@ -108,7 +110,7 @@
       <a-space style="margin-top: 12px">
         <a-button type="primary" v-if="previewItem.status !== 'published'" @click="quickOp(previewItem.id, 'publish'); previewVisible = false">上架</a-button>
         <a-button v-if="previewItem.status === 'published'" @click="quickOp(previewItem.id, 'unpublish'); previewVisible = false">下架</a-button>
-        <a-popconfirm title="确认删除？" @confirm="quickOp(previewItem.id, 'delete'); previewVisible = false">
+        <a-popconfirm v-if="canFull" title="确认删除？" @confirm="quickOp(previewItem.id, 'delete'); previewVisible = false">
           <a-button danger>删除</a-button>
         </a-popconfirm>
       </a-space>
@@ -120,7 +122,7 @@
 import { onMounted, ref } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { InboxOutlined } from '@ant-design/icons-vue';
-import { noteApi } from '@/api';
+import { noteApi, authApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 70 },
@@ -235,7 +237,14 @@ async function doBatch(params: any) {
   });
 }
 
-onMounted(load);
+const canFull = ref(false);
+onMounted(async () => {
+  try {
+    const me: any = await authApi.current();
+    canFull.value = !!(me.isAdmin || me.isMember);
+  } catch {}
+  load();
+});
 </script>
 
 <style scoped>

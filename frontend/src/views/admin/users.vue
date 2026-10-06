@@ -12,9 +12,13 @@
         <template v-else-if="column.key === 'active'">
           <a-tag :color="record.isActive ? 'green' : 'red'">{{ record.isActive ? '正常' : '已禁用' }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'member'">
+          <a-tag :color="record.isMember ? 'gold' : 'default'">{{ record.isMember ? '会员' : '普通' }}</a-tag>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a @click="toggleAdmin(record)">{{ record.isAdmin ? '取消管理员' : '设为管理员' }}</a>
+            <a @click="toggleMember(record)">{{ record.isMember ? '取消会员' : '设为会员' }}</a>
             <a @click="toggleActive(record)">{{ record.isActive ? '禁用' : '启用' }}</a>
             <a @click="openReset(record)">重置密码</a>
             <a-popconfirm title="确认删除该账号？不可恢复" @confirm="remove(record.id)">
@@ -52,9 +56,10 @@ const columns = [
   { title: '账号', dataIndex: 'username' },
   { title: '名称', dataIndex: 'displayName' },
   { title: '角色', key: 'admin', width: 100 },
+  { title: '会员', key: 'member', width: 100 },
   { title: '状态', key: 'active', width: 100 },
   { title: '注册时间', dataIndex: 'createdAt', width: 180 },
-  { title: '操作', key: 'action', width: 320 },
+  { title: '操作', key: 'action', width: 380 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
 const visible = ref(false);
@@ -82,6 +87,12 @@ async function toggleAdmin(r: any) {
   try {
     await userApi.update(r.id, { is_admin: !r.isAdmin });
     message.success(r.isAdmin ? '已取消管理员' : '已设为管理员'); load();
+  } catch (e: any) { message.error(e.message); }
+}
+async function toggleMember(r: any) {
+  try {
+    await userApi.update(r.id, { is_member: !r.isMember });
+    message.success(r.isMember ? '已取消会员' : '已设为会员'); load();
   } catch (e: any) { message.error(e.message); }
 }
 async function toggleActive(r: any) {

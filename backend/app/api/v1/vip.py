@@ -170,12 +170,9 @@ def quota(user: User = Depends(get_current_user), db: Session = Depends(get_db))
 
 
 def quota_available(db: Session, n: int = 1, user=None) -> bool:
-    """额度预检：只查不扣。用于抠图前判断，不够则直接降级轻扰动。
-    管理员无限制，直接返回 True。"""
-    if user is not None and getattr(user, "is_admin", False):
-        return True
-    q = _get_or_create_quota(db)
-    return (q.monthly_quota - q.monthly_used) >= n or (q.extra_quota - q.extra_used) >= n
+    """额度预检：会员/管理员免费无限制，直接 True。
+    （额度系统已取消，仅保留接口兼容）"""
+    return True
 
 
 def consume_quota(db: Session, n: int = 1, user=None) -> tuple[bool, str]:
@@ -183,11 +180,10 @@ def consume_quota(db: Session, n: int = 1, user=None) -> tuple[bool, str]:
 
     注意：只做 flush 不 commit，与调用方的 ImageJob 写同一事务提交，
     避免「额度已扣、业务回滚」导致下次重试重复扣费。
-    管理员无限制：不扣减直接返回成功。
+    会员/管理员免费：不扣减直接返回成功。
+    （额度系统已取消，仅保留接口兼容）
     """
-    if user is not None and getattr(user, "is_admin", False):
-        return True, "admin_unlimited"
-    q = _get_or_create_quota(db)
+    return True, "free"
     monthly_left = q.monthly_quota - q.monthly_used
     if monthly_left >= n:
         q.monthly_used += n

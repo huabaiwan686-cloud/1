@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import (
@@ -37,7 +38,7 @@ class CoopConfigIn(BaseModel):
 
 # ---- 双向机器人 ----
 @router.get("/two_way_bots")
-def list_two_way(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_two_way(user: User = Depends(require_member), db: Session = Depends(get_db)):
     bs = db.query(TwoWayBot).order_by(TwoWayBot.id.desc()).all()
     return ok([{"id": b.id, "botTokenId": b.bot_token_id, "tgAccountId": b.tg_account_id,
                 "groupId": b.group_id, "groupName": b.group_name,
@@ -45,7 +46,7 @@ def list_two_way(user: User = Depends(get_current_user), db: Session = Depends(g
 
 
 @router.post("/two_way_bots")
-async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_two_way(body: TwoWayIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """双向机器人：经协议号真实创建管理群并拉入 Bot，返回群 ID 与邀请链接。
 
     group_id 留空 → 自动创建「<Bot用户名> 双向通知群」；
@@ -116,7 +117,7 @@ async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user),
 
 # ---- 好友关注 ----
 @router.get("/friends")
-def list_friends(direction: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_friends(direction: str = "", user: User = Depends(require_member), db: Session = Depends(get_db)):
     q = db.query(FriendRelation)
     if direction:
         q = q.filter(FriendRelation.direction == direction)
@@ -125,7 +126,7 @@ def list_friends(direction: str = "", user: User = Depends(get_current_user), db
 
 
 @router.post("/friends/apply")
-def apply_friend(body: FriendApplyIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def apply_friend(body: FriendApplyIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """好友关注：记录关注关系（应用层概念，TG 无原生好友申请接口）。"""
     from app.models.content import TaskLog
     exists = db.query(FriendRelation).filter(
@@ -143,7 +144,7 @@ def apply_friend(body: FriendApplyIn, user: User = Depends(get_current_user), db
 
 # ---- 平台绑定 ----
 @router.get("/bindings")
-def list_bindings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_bindings(user: User = Depends(require_member), db: Session = Depends(get_db)):
     bs = db.query(PlatformBinding).order_by(PlatformBinding.id.desc()).all()
     return ok([{"id": b.id, "bindCode": b.bind_code, "platformName": b.platform_name, "status": b.status} for b in bs])
 
@@ -153,7 +154,7 @@ class BindingIn(BaseModel):
 
 
 @router.post("/bindings")
-def create_binding(body: BindingIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_binding(body: BindingIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     b = PlatformBinding(bind_code=body.bind_code, status="submitted")
     db.add(b)
     db.commit()
@@ -162,7 +163,7 @@ def create_binding(body: BindingIn, user: User = Depends(get_current_user), db: 
 
 # ---- 平台合作 ----
 @router.get("/cooperations")
-def list_coops(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_coops(user: User = Depends(require_member), db: Session = Depends(get_db)):
     cs = db.query(CooperationApplication).order_by(CooperationApplication.id.desc()).all()
     return ok([{"id": c.id, "applicant": c.applicant, "botUsername": c.bot_username,
                 "reviewStatus": c.review_status, "joinStatus": c.join_status,
@@ -170,7 +171,7 @@ def list_coops(user: User = Depends(get_current_user), db: Session = Depends(get
 
 
 @router.post("/cooperations/import")
-def import_coops(usernames: list[str], user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def import_coops(usernames: list[str], user: User = Depends(require_member), db: Session = Depends(get_db)):
     """批量导入机器人用户名（每行一个 @xxxbot）。"""
     n = 0
     for u in usernames:
@@ -184,7 +185,7 @@ def import_coops(usernames: list[str], user: User = Depends(get_current_user), d
 
 
 @router.post("/cooperations/{coop_id}/review")
-def review_coop(coop_id: int, approve: bool = True, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def review_coop(coop_id: int, approve: bool = True, user: User = Depends(require_member), db: Session = Depends(get_db)):
     from app.models.content import TaskLog
     c = db.query(CooperationApplication).filter(CooperationApplication.id == coop_id).first()
     if not c:
@@ -198,7 +199,7 @@ def review_coop(coop_id: int, approve: bool = True, user: User = Depends(get_cur
 
 
 @router.post("/cooperation_config")
-def save_coop_config(body: CoopConfigIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def save_coop_config(body: CoopConfigIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     # 单行配置 upsert：已有则更新，避免每点一次保存多一行
     cfg = db.query(CooperationConfig).order_by(CooperationConfig.id.desc()).first()
     if cfg:

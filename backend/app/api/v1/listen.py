@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_member
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.distribution import ListenPlan
@@ -32,7 +33,7 @@ def _out(p: ListenPlan) -> dict:
 
 
 @router.get("/plans")
-def list_plans(keyword: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_plans(keyword: str = "", user: User = Depends(require_member), db: Session = Depends(get_db)):
     q = db.query(ListenPlan)
     if keyword:
         q = q.filter(ListenPlan.name.contains(keyword))
@@ -40,7 +41,7 @@ def list_plans(keyword: str = "", user: User = Depends(get_current_user), db: Se
 
 
 @router.post("/plans")
-def create_plan(body: ListenPlanIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_plan(body: ListenPlanIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     # 8 位绑定 ID（对齐原站：发给官方机器人）
     p = ListenPlan(**body.model_dump(), bind_id=secrets.token_hex(4).upper())
     db.add(p)
@@ -49,7 +50,7 @@ def create_plan(body: ListenPlanIn, user: User = Depends(get_current_user), db: 
 
 
 @router.delete("/plans/{plan_id}")
-def delete_plan(plan_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_plan(plan_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     p = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "计划不存在")
@@ -64,7 +65,7 @@ class PlanToggleIn(BaseModel):
 
 @router.put("/plans/{plan_id}/enabled")
 def toggle_plan(plan_id: int, body: PlanToggleIn,
-                user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+                user: User = Depends(require_member), db: Session = Depends(get_db)):
     p = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
     if not p:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "计划不存在")
@@ -75,7 +76,7 @@ def toggle_plan(plan_id: int, body: PlanToggleIn,
 
 @router.get("/hits")
 def list_hits(plan_id: int = 0, limit: int = 50,
-              user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+              user: User = Depends(require_member), db: Session = Depends(get_db)):
     """监听命中记录（触发去重冷却、发送结果都在这里）。"""
     from app.models.distribution import ListenHit
     q = db.query(ListenHit)

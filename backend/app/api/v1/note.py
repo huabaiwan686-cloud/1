@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.timezone import local_to_utc_naive, utc_naive_to_local
 
 from app.api.deps import get_current_user, ok, require_vip
+from app.core.permissions import require_member
 from app.core.database import get_db
 from app.models.account import BotToken
 from app.models.content import Note, NoteMedia, TaskLog
@@ -122,7 +123,7 @@ def get_note(note_id: int, user: User = Depends(get_current_user), db: Session =
 
 
 @router.post("/create")
-def create_note(body: NoteIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_note(body: NoteIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     n = Note(
         title=body.title,
         body=body.body,
@@ -330,7 +331,7 @@ def _review_note(note_id: int, approve: bool, user: User, db: Session):
 
 
 @router.post("/{note_id}/approve")
-def approve_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def approve_note(note_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     return _review_note(note_id, True, user, db)
 
 
@@ -411,7 +412,10 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
 
 
 @router.post("/batch")
-def batch_op(body: BatchIn, user: User = Depends(require_vip), db: Session = Depends(get_db)):
+def batch_op(body: BatchIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 普通用户仅允许批量上下架，其他批量操作需要会员
+    if body.op not in ("publish", "unpublish") and not (user.is_admin or user.is_member):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "该功能仅会员可用，请先开通会员")
     notes = db.query(Note).filter(Note.id.in_(body.ids)).all()
     result = _apply_batch_op(notes, body.op, body.params, db, user)
     db.add(

@@ -37,11 +37,23 @@ router.beforeEach(async (to) => {
   if (to.path !== '/login' && !localStorage.getItem('access_token')) {
     return '/login';
   }
-  // 非管理员禁止进入管理端页面（菜单已按角色过滤，这里防直接输 URL）
-  if (to.path.startsWith('/admin/') && to.path !== '/admin/dashboard') {
+  // 三级权限：普通用户仅允许 /admin/notes（上下架），会员不允许 /admin/users，超管全部
+  if (to.path.startsWith('/admin/')) {
     try {
       const me: any = await authApi.current();
-      if (!me.isAdmin) return '/collector/upload';
+      if (me.isAdmin) { /* 全部放行 */ }
+      else if (me.isMember) {
+        if (to.path === '/admin/users') return '/admin/dashboard';
+      } else {
+        if (to.path !== '/admin/notes') return '/admin/notes';
+      }
+    } catch { return '/login'; }
+  }
+  // 非会员禁止进入采集/发布端页面
+  if (to.path.startsWith('/collector/') || to.path.startsWith('/publish/')) {
+    try {
+      const me: any = await authApi.current();
+      if (!me.isAdmin && !me.isMember) return '/admin/notes';
     } catch { return '/login'; }
   }
 });
