@@ -45,7 +45,8 @@ class FakeClient:
 
 def setup_db():
     db = SessionLocal()
-    city = City(name="北京", level=2); db.add(city); db.flush()
+    city = db.query(City).filter(City.name == "北京市").first()  # 用种子预置的省份
+    assert city is not None
     acc = TgAccount(name="测试号", phone="+8617667418392", status="online"); db.add(acc); db.flush()
     plan = ListenPlan(name="地区监听", account_id=acc.id, targets=["@testgroup"],
                       keywords=["北京", "上海"], enabled=True)
@@ -55,8 +56,7 @@ def setup_db():
         db.add(n); db.flush()
         db.add(NoteMedia(note_id=n.id, url="https://example.com/a.jpg", media_type="image", kind="show"))
         db.add(NoteMedia(note_id=n.id, url="https://example.com/v.mp4", media_type="video", kind="verify"))
-    # 上海城市无笔记
-    db.add(City(name="上海", level=2))
+    # 上海（种子已有城市）无笔记
     db.commit()
     return db, plan.id, city.id
 
@@ -87,7 +87,7 @@ with TestClient(app):
     check("命中后发出2组素材(4次send_file)", len(file_calls) == 4)
     check("相册带caption", any(c[3] for c in file_calls))
     hits = db.query(ListenHit).all()
-    check("命中记录写入", len(hits) == 1 and hits[0].notes_sent == 2 and hits[0].city_name == "北京")
+    check("命中记录写入", len(hits) == 1 and hits[0].notes_sent == 2 and hits[0].city_name == "北京市")
     pub._media_bytes = pub_orig
 
     # 3) 冷却：同一用户短期内再次触发被跳过
@@ -117,6 +117,21 @@ with TestClient(app):
     client4 = FakeClient()
     asyncio.run(L.handle_message(client4, db, plan2, FakeEvent3()))
     check("城市无素材时不发送", len(client4.calls) == 0)
+
+    # 6) 自定义关键词映射
+    check("自定义映射 京妞→北京",
+          L._city_for_keyword(db, "京妞", {"京妞": "北京"}).name == "北京市")
+    check("无映射时未知词仍为None",
+          L._city_for_keyword(db, "京妞", {}) is None)
+
+    # 7) 冷却窗口为 1 小时：2 小时前的命中不再拦截
+    old_hit = db.query(ListenHit).filter(ListenHit.result == "success").first()
+    old_hit.created_at = datetime.utcnow() - timedelta(hours=2)
+    db.commit()
+    check("2小时前命中不拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is True)
+    old_hit.created_at = datetime.utcnow() - timedelta(minutes=30)
+    db.commit()
+    check("30分钟前命中仍拦截", L._cooldown_ok(db, plan_id, 777001, city_id) is False)
 
     db.close()
 

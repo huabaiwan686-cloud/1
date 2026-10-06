@@ -78,6 +78,7 @@ class ListenPlan(Base):
     keywords: Mapped[list] = mapped_column(JSON, default=list)  # 关键词
     bind_id: Mapped[str] = mapped_column(String(16), default="")  # 8 位绑定 ID
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    keyword_city_map: Mapped[dict] = mapped_column(JSON, default=dict)  # 自定义关键词→城市，如 {"京妞": "北京"}
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

@@ -16,6 +16,9 @@
         <a-form-item label="计划名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="监听目标（逗号分隔）"><a-input v-model:value="editing.targets_str" placeholder="@group1,@channel1" /></a-form-item>
         <a-form-item label="关键词（逗号分隔，地区词如：北京,上海）"><a-input v-model:value="editing.keywords_str" placeholder="北京,上海" /></a-form-item>
+        <a-form-item label="自定义关键词→城市（每行一组）">
+          <a-textarea v-model:value="editing.map_str" :rows="3" placeholder="京妞=北京&#10;魔都=上海" />
+        </a-form-item>
         <a-alert type="info" show-icon message="有人在监听群里发地区关键词，系统自动私聊他该地区全部已上架素材（文字+媒体+验证视频）" />
       </a-form>
     </a-modal>
@@ -65,14 +68,26 @@ async function loadHits() {
   try { hits.value = await listenApi.hits(); } finally { hitsLoading.value = false; }
 }
 function openEditor() {
-  Object.assign(editing, { name: '', targets_str: '', keywords_str: '' });
+  Object.assign(editing, { name: '', targets_str: '', keywords_str: '', map_str: '' });
   visible.value = true;
+}
+function parseMap(str: string): Record<string, string> {
+  const m: Record<string, string> = {};
+  (str || '').split('\n').forEach(line => {
+    const i = line.indexOf('=');
+    if (i > 0) {
+      const k = line.slice(0, i).trim(), v = line.slice(i + 1).trim();
+      if (k && v) m[k] = v;
+    }
+  });
+  return m;
 }
 async function save() {
   await listenApi.create({
     name: editing.name,
     targets: editing.targets_str.split(',').map((s: string) => s.trim()).filter(Boolean),
     keywords: editing.keywords_str.split(',').map((s: string) => s.trim()).filter(Boolean),
+    keyword_city_map: parseMap(editing.map_str),
   });
   message.success('已创建，请将 8 位绑定 ID 发给官方机器人完成绑定');
   visible.value = false; load();

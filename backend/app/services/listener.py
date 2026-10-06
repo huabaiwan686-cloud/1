@@ -7,7 +7,7 @@
   → 每组按「文字+媒体相册，紧跟验证视频」DM 发给发消息的人
 
 去重：同一用户 + 同一城市 cooldown 小时内只触发一次
-      （GlobalSetting listen_cooldown_hours，默认 24）。
+      （GlobalSetting listen_cooldown_hours，默认 1）。
 上限：单次触发最多发 listen_max_notes 组（默认 10），组间 sleep 防 flood。
 """
 import asyncio
@@ -27,12 +27,21 @@ def _setting(db, key: str, default: str) -> str:
     return r.value if r and r.value else default
 
 
-def _city_for_keyword(db, keyword: str):
-    """关键词 → 城市：城市名包含关键词，或关键词包含城市名。"""
+def _city_for_keyword(db, keyword: str, city_map: dict | None = None):
+    """关键词 → 城市：先查自定义映射（京妞→北京），再按城市名包含匹配。"""
     from app.models.content import City
     kw = (keyword or "").strip()
     if not kw:
         return None
+    if city_map:
+        mapped = (city_map.get(kw) or "").strip()
+        if mapped:
+            c = db.query(City).filter(City.name == mapped).first()
+            if c:
+                return c
+            c = db.query(City).filter(City.name.contains(mapped)).first()
+            if c:
+                return c
     cities = db.query(City).all()
     for c in cities:
         name = (c.name or "").strip()
@@ -119,7 +128,7 @@ async def _send_note_dm(client, sender, note, db) -> bool:
 
 def _cooldown_ok(db, plan_id: int, tg_user_id: int, city_id: int) -> bool:
     from app.models.distribution import ListenHit
-    hours = float(_setting(db, COOLDOWN_KEY, "24") or 24)
+    hours = float(_setting(db, COOLDOWN_KEY, "1") or 1)
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     hit = (
         db.query(ListenHit)
@@ -167,7 +176,7 @@ async def handle_message(client, db, plan, event) -> None:
     if not hit_kw:
         return
 
-    city = await asyncio.to_thread(_city_for_keyword, db, hit_kw)
+    city = await asyncio.to_thread(_city_for_keyword, db, hit_kw, plan.keyword_city_map or {})
     tg_uid = sender.id
     username = getattr(sender, "username", "") or ""
     chat = await event.get_chat()

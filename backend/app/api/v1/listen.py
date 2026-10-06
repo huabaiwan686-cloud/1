@@ -18,6 +18,7 @@ class ListenPlanIn(BaseModel):
     account_id: int | None = None
     targets: list[str] = []
     keywords: list[str] = []
+    keyword_city_map: dict[str, str] = {}
     enabled: bool = True
 
 
@@ -25,6 +26,7 @@ def _out(p: ListenPlan) -> dict:
     return {
         "id": p.id, "name": p.name, "accountId": p.account_id,
         "targets": p.targets, "keywords": p.keywords,
+        "keywordCityMap": p.keyword_city_map or {},
         "bindId": p.bind_id, "enabled": p.enabled,
     }
 

@@ -63,3 +63,6 @@ CREATE TABLE IF NOT EXISTS listen_hits (
 CREATE INDEX IF NOT EXISTS ix_listen_hits_plan_id ON listen_hits (plan_id);
 CREATE INDEX IF NOT EXISTS ix_listen_hits_tg_user_id ON listen_hits (tg_user_id);
 CREATE INDEX IF NOT EXISTS ix_listen_hits_created_at ON listen_hits (created_at);
+
+-- 10) 监听计划自定义关键词→城市映射
+ALTER TABLE listen_plans ADD COLUMN IF NOT EXISTS keyword_city_map JSON DEFAULT '{}';
