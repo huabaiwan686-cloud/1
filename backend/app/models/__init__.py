@@ -30,4 +30,5 @@ from app.models.distribution import (  # noqa: F401
     PushPlan,
     QuickPushTarget,
 )
+from app.models.media import BackgroundMaterial, ImageJob  # noqa: F401
 from app.models.user import User  # noqa: F401

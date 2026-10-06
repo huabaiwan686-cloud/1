@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import account, auth, bots, channel, collect, invite, listen, menu, message, meta, note, social, task, tg, vip
+from app.api.v1 import account, auth, bots, channel, collect, invite, listen, media, menu, message, meta, note, social, task, tg, vip
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -27,7 +27,8 @@ app.add_middleware(
 
 for r in (auth.router, account.router, menu.router, note.router, collect.router, task.router,
          meta.tag_router, meta.city_router, channel.router, message.router, listen.router,
-         tg.router, bots.router, social.router, vip.router, invite.router, invite.legacy):
+         tg.router, bots.router, social.router, vip.router, invite.router, invite.legacy,
+         media.router):
     app.include_router(r, prefix=settings.API_PREFIX)
 
 
