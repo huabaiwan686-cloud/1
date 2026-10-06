@@ -243,16 +243,10 @@ async def refresh_dialogs(phone: str) -> list[dict]:
 
     要求：该手机号的协议号已登录。调用方将结果写入 TgDialog 缓存表。
     """
-    from telethon import TelegramClient
     from telethon.tl.types import Channel, Chat, User
 
-    api_id, api_hash = _require_config()
-    key = f"dlg_{phone}"
-    client = _clients.get(key)
-    if client is None:
-        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
-        await client.connect()
-        _clients[key] = client
+    # 使用共享客户端，避免与主连接争用 SQLite session 文件（database is locked）
+    client = await get_shared_client(phone)
     if not await client.is_user_authorized():
         raise TgNotConfigured("所选 TG 账号不在线，请先登录")
     out: list[dict] = []
