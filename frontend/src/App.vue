@@ -36,9 +36,7 @@
           <menu-outlined v-if="collapsed" />
           <menu-fold-outlined v-else />
         </span>
-        <a-breadcrumb class="pro-breadcrumb">
-          <a-breadcrumb-item v-for="b in breadcrumb" :key="b">{{ b }}</a-breadcrumb-item>
-        </a-breadcrumb>
+        <span class="pro-app-title">小灰机 · 商家后台</span>
         <div class="pro-header-right">
           <span class="pro-username">
             <span class="pro-avatar">{{ username ? username.slice(0, 1).toUpperCase() : 'U' }}</span>
@@ -50,11 +48,11 @@
       <a-layout-content class="pro-content">
         <router-view />
       </a-layout-content>
-      <!-- 移动端底部导航 -->
+      <!-- 移动端底部导航（App 风 5 Tab） -->
       <div v-if="isMobile" class="mobile-tabbar">
         <div
           v-for="t in tabItems" :key="t.path"
-          class="tab-item" :class="{ active: selected.includes(t.path) }"
+          class="tab-item" :class="{ active: isTabActive(t.path) }"
           @click="router.push(t.path)"
         >
           <div class="tab-icon"><component :is="t.icon" /></div>
@@ -71,7 +69,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MenuOutlined, MenuFoldOutlined, HomeOutlined, UploadOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons-vue';
+import {
+  MenuOutlined, MenuFoldOutlined,
+  HomeOutlined, UploadOutlined, FileTextOutlined,
+  BellOutlined, UserOutlined,
+} from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
 
 const route = useRoute();
@@ -79,11 +81,12 @@ const router = useRouter();
 // 移动端默认收起侧边栏，桌面端默认展开
 const collapsed = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
 const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
-// 底部导航：工作台 / 上传 / 笔记 / 我的
+// 底部导航 5 Tab：工作台 / 上传 / 笔记 / 消息 / 我的
 const tabItems = [
   { path: '/admin/dashboard', title: '工作台', icon: HomeOutlined },
   { path: '/collector/upload', title: '上传', icon: UploadOutlined },
   { path: '/admin/notes', title: '笔记', icon: FileTextOutlined },
+  { path: '/admin/announcements', title: '消息', icon: BellOutlined },
   { path: '/admin/vip', title: '我的', icon: UserOutlined },
 ];
 const menus = ref<any[]>([]);
@@ -93,18 +96,13 @@ const annQueue = ref<any[]>([]);
 const annCurrent = ref<any>({});
 const annVisible = ref(false);
 
-// 面包屑：根据当前路由在菜单树中定位
-const breadcrumb = computed(() => {
+function isTabActive(path: string) {
   const p = route.path;
-  for (const m of menus.value) {
-    if (m.path === p) return [m.title];
-    if (m.children) {
-      const c = (m.children as any[]).find((x: any) => x.path === p);
-      if (c) return [m.title, c.title];
-    }
-  }
-  return [];
-});
+  if (p === path) return true;
+  // 子路由也算选中（如 /admin/announcements/xxx）
+  if (path !== '/admin/dashboard' && p.startsWith(path + '/')) return true;
+  return false;
+}
 
 function onResize() {
   const mobile = window.innerWidth < 768;
@@ -172,32 +170,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* TabBar 基础样式（颜色由 theme.css 深色主题接管） */
 .mobile-tabbar {
   display: none;
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-  background: #fff; border-top: 1px solid #f0f0f0;
-  padding-bottom: env(safe-area-inset-bottom);
 }
-.tab-item {
-  flex: 1; text-align: center; padding: 8px 0 6px;
-  color: #999; font-size: 12px; cursor: pointer;
-}
-.tab-item.active { color: #1890ff; }
-.tab-icon { font-size: 20px; margin-bottom: 2px; }
 @media (max-width: 768px) {
-  .mobile-tabbar { display: flex; }
-  .ant-layout-sider {
-    position: fixed !important; z-index: 1001; height: 100vh;
-    width: 220px !important; max-width: 220px !important; min-width: 220px !important;
-    flex: 0 0 220px !important;
-  }
-  .ant-layout-sider-collapsed {
-    width: 0 !important; max-width: 0 !important; min-width: 0 !important;
-    flex: 0 0 0 !important; overflow: hidden;
-  }
-  .mobile-sider-mask {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.45); z-index: 1000;
+  .mobile-tabbar {
+    display: flex;
   }
 }
 </style>
