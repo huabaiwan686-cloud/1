@@ -19,13 +19,14 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("/stats")
 def stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    today = datetime.utcnow().date()
+    from app.core.timezone import today_local_start_utc
+    day_start = today_local_start_utc()  # 本地今天 0 点（UTC naive）
     by_status = dict(
         db.query(Note.status, func.count(Note.id)).group_by(Note.status).all()
     )
     today_publishes = (
         db.query(func.count(TaskLog.id))
-        .filter(TaskLog.action == "publish", func.date(TaskLog.created_at) == today)
+        .filter(TaskLog.action == "publish", TaskLog.created_at >= day_start)
         .scalar()
     )
     q = _get_or_create_quota(db)

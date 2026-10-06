@@ -72,8 +72,13 @@ def _bot_post(token: str, method: str, data: dict | None = None,
 def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = "",
                      tags: list | None = None, show_media: list | None = None,
                      verify_media: list | None = None,
-                     anti_scan_mode: str = "original") -> dict:
+                     anti_scan_mode: str = "original",
+                     resume: dict | None = None,
+                     on_step=None) -> dict:
     """发送一组上架内容。返回 {"media_group_id"/"message_id", "video_message_id"}。
+
+    分步幂等：resume={"album": True} 时跳过已成功的相册，只发验证视频；
+    每步成功后调用 on_step("album") / on_step("video")，由调用方持久化进度。
 
     show_media: [{"url":...}] 展示图（混合媒体），最多取 10 张（TG 相册上限）
     verify_media: [{"url":...}] 验证视频，取第 1 个单独发送
@@ -89,7 +94,8 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     result: dict = {}
 
     # ---- 第 1 条：文字 + 混合媒体打包 ----
-    if show_media:
+    resume = resume or {}
+    if show_media and not resume.get("album"):
         media, files = [], {}
         for i, m in enumerate(show_media[:10]):
             if isinstance(m, dict) and "data" in m:
@@ -115,19 +121,23 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                         files=files)
         result["media_group_id"] = res[0].get("media_group_id") if res else None
         result["message_ids"] = [m.get("message_id") for m in res]
+        if on_step:
+            on_step("album")
     else:
         res = _bot_post(bot_token, "sendMessage",
                         data={"chat_id": chat_id, "text": caption or "(无内容)"})
         result["message_id"] = res.get("message_id")
 
     # ---- 第 2 条：单独验证视频，紧跟其后 ----
-    if verify_media:
+    if verify_media and not resume.get("video"):
         v = verify_media[0]
         fname, data = _media_bytes(v["url"] if isinstance(v, dict) else v.url)
         res = _bot_post(bot_token, "sendVideo",
                         data={"chat_id": chat_id},
                         files={"video": (fname, data)})
         result["video_message_id"] = res.get("message_id")
+        if on_step:
+            on_step("video")
 
     return result
 

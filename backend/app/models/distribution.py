@@ -1,7 +1,7 @@
 """分发数据模型：频道 / 消息模板 / 推送计划 / 快速推送 / 关键字监听。"""
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -98,6 +98,15 @@ class ListenHit(Base):
     keyword: Mapped[str] = mapped_column(String(64), default="")  # 命中的关键词
     chat_title: Mapped[str] = mapped_column(String(255), default="")  # 触发群
     notes_sent: Mapped[int] = mapped_column(Integer, default=0)  # 发出的素材组数
-    result: Mapped[str] = mapped_column(String(16), default="success")  # success/failed/skipped
+    result: Mapped[str] = mapped_column(String(16), default="success")  # success/failed/skipped/claimed(发送中占位)
     detail: Mapped[str] = mapped_column(String(512), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+    # 同一键同一时间只允许一个 claimed 占位（防并发重复 DM）；
+    # 完成后更新为 success/failed/skipped 即释放名额
+    __table_args__ = (
+        Index("uq_listen_hit_claimed", "plan_id", "tg_user_id", "city_id",
+              unique=True,
+              sqlite_where=(result == "claimed"),
+              postgresql_where=(result == "claimed")),
+    )

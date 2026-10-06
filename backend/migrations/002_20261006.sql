@@ -84,3 +84,19 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS invited_by_code VARCHAR(16) DEFAULT '
 -- 防一笔链上转账开两单：pay_txid 非空时唯一（部分唯一索引）
 CREATE UNIQUE INDEX IF NOT EXISTS uq_vip_orders_pay_txid
     ON vip_orders (pay_txid) WHERE pay_txid IS NOT NULL AND pay_txid <> '';
+
+-- 发布分步幂等：记录每频道相册/视频发送进度
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS send_progress TEXT DEFAULT '{}';
+-- 采集硬去重：笔记加来源频道/消息 id，(来源频道, 消息) 唯一（相册取首条消息 id）
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS source_channel_id INTEGER;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS source_msg_id INTEGER;
+CREATE INDEX IF NOT EXISTS ix_notes_source_channel_id ON notes (source_channel_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notes_collect_src ON notes (source_channel_id, source_msg_id);
+
+-- 订单归属：防蹭别人的打款
+ALTER TABLE vip_orders ADD COLUMN IF NOT EXISTS user_id INTEGER;
+CREATE INDEX IF NOT EXISTS ix_vip_orders_user_id ON vip_orders (user_id);
+
+-- 监听占位防重：同一键同一时间只允许一个 claimed 占位行
+CREATE UNIQUE INDEX IF NOT EXISTS uq_listen_hit_claimed
+    ON listen_hits (plan_id, tg_user_id, city_id) WHERE result = 'claimed';

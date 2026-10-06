@@ -68,7 +68,10 @@ def subscription(user: User = Depends(get_current_user), db: Session = Depends(g
 
 @router.get("/orders")
 def list_orders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    orders = db.query(VipOrder).order_by(VipOrder.id.desc()).all()
+    q = db.query(VipOrder).order_by(VipOrder.id.desc())
+    if not user.is_admin:
+        q = q.filter(VipOrder.user_id == user.id)  # 普通用户只看自己的订单
+    orders = q.all()
     return ok([{
         "id": o.id, "orderNo": o.order_no, "plan": o.plan,
         "amountUsdt": float(o.amount_usdt), "days": o.days, "status": o.status,
@@ -80,7 +83,8 @@ def list_orders(user: User = Depends(get_current_user), db: Session = Depends(ge
 def create_order(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     from app.services.tron_watch import pay_address, pay_configured
     order_no = f"VIP{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
-    o = VipOrder(order_no=order_no, plan="pro", amount_usdt=PRO_PRICE_USDT, days=PRO_DAYS)
+    o = VipOrder(order_no=order_no, plan="pro", amount_usdt=PRO_PRICE_USDT, days=PRO_DAYS,
+                 user_id=user.id)
     db.add(o)
     db.commit()
     return ok({"id": o.id, "orderNo": o.order_no, "amountUsdt": PRO_PRICE_USDT,

@@ -19,6 +19,8 @@ log = logging.getLogger("listener")
 
 COOLDOWN_KEY = "listen_cooldown_hours"
 MAX_NOTES_KEY = "listen_max_notes"
+# claimed 占位行的存活期：发送中若进程崩溃，超过此时长视为过期，不再拦截
+CLAIMED_TTL_MINUTES = 30
 
 
 def _setting(db, key: str, default: str) -> str:
@@ -127,21 +129,82 @@ async def _send_note_dm(client, sender, note, db) -> bool:
 
 
 def _cooldown_ok(db, plan_id: int, tg_user_id: int, city_id: int) -> bool:
+    from sqlalchemy import and_, or_
     from app.models.distribution import ListenHit
     hours = float(_setting(db, COOLDOWN_KEY, "3") or 3)
     cutoff = datetime.utcnow() - timedelta(hours=hours)
+    # claimed 占位（发送中）同样计入冷却；超过 TTL 的陈旧 claimed 视为已失效
+    claimed_cutoff = datetime.utcnow() - timedelta(minutes=CLAIMED_TTL_MINUTES)
     hit = (
         db.query(ListenHit)
         .filter(
             ListenHit.plan_id == plan_id,
             ListenHit.tg_user_id == tg_user_id,
             ListenHit.city_id == city_id,
-            ListenHit.created_at >= cutoff,
-            ListenHit.result == "success",
+            or_(
+                and_(ListenHit.result == "success", ListenHit.created_at >= cutoff),
+                and_(ListenHit.result == "claimed", ListenHit.created_at >= claimed_cutoff),
+            ),
         )
         .first()
     )
     return hit is None
+
+
+def _claim_hit(db, **kw):
+    """插入 claimed 占位行并提交（防并发重复触发）。
+    发送完成后再由 _finalize_hit 更新为最终结果。
+    并发撞上唯一索引时返回 None（视为已被占位）。"""
+    from sqlalchemy.exc import IntegrityError
+    from app.models.distribution import ListenHit
+    hit = ListenHit(**{k: v for k, v in kw.items() if k != "log_detail"})
+    hit.result = "claimed"
+    db.add(hit)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return None
+    return hit
+
+
+def _check_and_claim(db, plan_id: int, tg_user_id: int, city_id: int, **kw):
+    """原子操作：冷却检查通过则立即插入 claimed 占位行并提交，返回 (True, hit)；
+    未通过返回 (False, None)。检查与占位在同一线程内连续执行，
+    占位行提交后其他并发触发即被冷却拦截，防重复 DM。
+    跨连接的残留竞态由 uq_listen_hit_claimed 唯一索引兜底（撞上视为被占位）。"""
+    from app.models.distribution import ListenHit
+    # 先清理崩溃残留的过期占位，避免永久占住唯一索引名额
+    stale = datetime.utcnow() - timedelta(minutes=CLAIMED_TTL_MINUTES)
+    db.query(ListenHit).filter(
+        ListenHit.plan_id == plan_id,
+        ListenHit.tg_user_id == tg_user_id,
+        ListenHit.city_id == city_id,
+        ListenHit.result == "claimed",
+        ListenHit.created_at < stale,
+    ).delete(synchronize_session=False)
+    db.commit()
+    if not _cooldown_ok(db, plan_id, tg_user_id, city_id):
+        return False, None
+    hit = _claim_hit(db, plan_id=plan_id, tg_user_id=tg_user_id,
+                     city_id=city_id, **kw)
+    if hit is None:
+        return False, None  # 并发占位冲突，视为冷却中
+    return True, hit
+
+
+def _finalize_hit(db, hit, notes_sent: int, result: str, log_detail: str = ""):
+    """占位行更新为最终结果，并写 TaskLog。"""
+    from app.models.content import TaskLog
+    hit.notes_sent = notes_sent
+    hit.result = result
+    db.add(TaskLog(
+        action="listen_hit",
+        executor="listener",
+        result=result,
+        detail=log_detail,
+    ))
+    db.commit()
 
 
 def _log_hit(db, **kw):
@@ -187,7 +250,12 @@ async def handle_message(client, db, plan, event) -> None:
         _log_hit(db, **base, city_id=None, city_name="", notes_sent=0,
                  result="skipped", log_detail=f"关键词[{hit_kw}]未匹配到城市")
         return
-    if not await asyncio.to_thread(_cooldown_ok, db, plan.id, tg_uid, city.id):
+    # 检查+占位原子操作：通过后立即提交 claimed 行，再开始耗时发送
+    ok_claim, claim = await asyncio.to_thread(
+        _check_and_claim, db, plan.id, tg_uid, city.id,
+        tg_username=username, keyword=hit_kw, chat_title=chat_title,
+        city_name=city.name)
+    if not ok_claim:
         _log_hit(db, **base, city_id=city.id, city_name=city.name, notes_sent=0,
                  result="skipped", log_detail=f"冷却中：{username or tg_uid} / {city.name}")
         return
@@ -201,8 +269,8 @@ async def handle_message(client, db, plan, event) -> None:
     max_notes = int(_setting(db, MAX_NOTES_KEY, "10") or 10)
     notes = notes[:max_notes]
     if not notes:
-        _log_hit(db, **base, city_id=city.id, city_name=city.name, notes_sent=0,
-                 result="skipped", log_detail=f"{city.name}暂无已上架素材")
+        await asyncio.to_thread(
+            _finalize_hit, db, claim, 0, "skipped", f"{city.name}暂无已上架素材")
         return
 
     sent = 0
@@ -210,17 +278,21 @@ async def handle_message(client, db, plan, event) -> None:
         if await _send_note_dm(client, sender, n, db):
             sent += 1
         await asyncio.sleep(2)  # 组间间隔，防 flood
-    _log_hit(db, **base, city_id=city.id, city_name=city.name, notes_sent=sent,
-             result="success" if sent else "failed",
-             log_detail=f"监听触发：{username or tg_uid} 在[{chat_title}]发[{hit_kw}]→{city.name}，发出 {sent}/{len(notes)} 组")
+    await asyncio.to_thread(
+        _finalize_hit, db, claim, sent, "success" if sent else "failed",
+        f"监听触发：{username or tg_uid} 在[{chat_title}]发[{hit_kw}]→{city.name}，发出 {sent}/{len(notes)} 组")
 
 
 async def _run_phone(phone: str, plan_ids: list[int]):
-    """同一手机号的所有监听计划共享一个长连接（避免多计划抢 session 文件）。"""
+    """同一手机号的所有监听计划共享一个长连接（避免多计划抢 session 文件）。
+
+    断线后指数退避重连（5s→60s），永不静默死亡；单号内部异常不向外传播。
+    """
     from telethon import events
     from app.core.database import SessionLocal
     from app.models.distribution import ListenPlan
-    from app.services.tg_client import get_shared_client, TgNotConfigured
+    from app.services.tg_client import (
+        get_shared_client, drop_shared_client, TgNotConfigured)
 
     db = SessionLocal()
     try:
@@ -230,40 +302,67 @@ async def _run_phone(phone: str, plan_ids: list[int]):
         db.close()
     if not plans:
         return
-    try:
-        client = await get_shared_client(phone)
-    except TgNotConfigured as e:
-        log.warning("监听: %s", e)
-        return
-    for plan in plans:
-        targets = []
-        for t in plan.targets or []:
-            try:
-                targets.append(await client.get_entity(t))
-            except Exception as e:  # noqa: BLE001
-                log.warning("listen plan %s: 目标 %s 解析失败: %s", plan.id, t, e)
-        if not targets:
-            log.warning("listen plan %s: 无有效监听目标", plan.id)
+
+    registered_on: int | None = None  # 已注册 handler 的 client 对象 id，防重连重复注册
+    backoff = 5
+    while True:
+        try:
+            client = await get_shared_client(phone)
+        except TgNotConfigured as e:
+            log.warning("监听: %s", e)
+            return
+        except Exception as e:  # noqa: BLE001  连接失败也重连
+            log.warning("监听 %s: 建连失败（%s），%ss 后重试", phone, e, backoff)
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 60)
             continue
+        try:
+            if id(client) != registered_on:
+                for plan in plans:
+                    targets = []
+                    for t in plan.targets or []:
+                        try:
+                            targets.append(await client.get_entity(t))
+                        except Exception as e:  # noqa: BLE001
+                            log.warning("listen plan %s: 目标 %s 解析失败: %s", plan.id, t, e)
+                    if not targets:
+                        log.warning("listen plan %s: 无有效监听目标", plan.id)
+                        continue
 
-        @client.on(events.NewMessage(chats=targets))
-        async def _on_msg(event, _pid=plan.id):
-            sdb = SessionLocal()
+                    @client.on(events.NewMessage(chats=targets))
+                    async def _on_msg(event, _pid=plan.id):
+                        sdb = SessionLocal()
+                        try:
+                            p = sdb.query(ListenPlan).filter(ListenPlan.id == _pid).first()
+                            if p and p.enabled:
+                                await handle_message(client, sdb, p, event)
+                        except Exception as e:  # noqa: BLE001
+                            log.warning("listen handle error: %s", e)
+                        finally:
+                            sdb.close()
+
+                    log.info("listen plan %s started: %s targets", plan.id, len(targets))
+                registered_on = id(client)
+            log.info("监听 %s 长连接已建立", phone)
+            await client.run_until_disconnected()
+            log.warning("监听 %s 断线，%ss 后重连", phone, backoff)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001  单号异常内部消化，不拖死其他号
+            log.exception("监听 %s 运行异常: %s", phone, e)
+        finally:
+            # 丢弃旧连接，下次循环 get_shared_client 会新建
             try:
-                p = sdb.query(ListenPlan).filter(ListenPlan.id == _pid).first()
-                if p and p.enabled:
-                    await handle_message(client, sdb, p, event)
-            except Exception as e:  # noqa: BLE001
-                log.warning("listen handle error: %s", e)
-            finally:
-                sdb.close()
-
-        log.info("listen plan %s started: %s targets", plan.id, len(targets))
-    await client.run_until_disconnected()
+                await drop_shared_client(phone)
+            except Exception:  # noqa: BLE001
+                pass
+            registered_on = None
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, 60)
 
 
-async def run_listeners():
-    """worker 入口：按手机号分组，每个号一个长连接监听其名下所有启用计划。"""
+def _load_plans_by_phone() -> dict[str, list[int]]:
+    """加载启用的监听计划，按手机号分组。"""
     from app.core.database import SessionLocal
     from app.models.account import TgAccount
     from app.models.distribution import ListenPlan
@@ -277,9 +376,62 @@ async def run_listeners():
                 by_phone.setdefault(acc.phone, []).append(p.id)
             else:
                 log.warning("listen plan %s: 未绑定协议号", p.id)
+        return by_phone
     finally:
         db.close()
-    if not by_phone:
-        log.info("listener: 无启用的监听计划")
-        return
-    await asyncio.gather(*[_run_phone(phone, ids) for phone, ids in by_phone.items()])
+
+
+async def run_listeners():
+    """worker 入口：supervisor 模式，定时 diff 增量启停监听。
+
+    - 新手机号/新计划 → 启动 _run_phone
+    - 计划禁用/删除/换号 → 取消对应任务
+    - 同号计划列表变化 → 重启该号监听（_run_phone 启动时加载计划）
+    无需重启 worker 即可生效。
+    """
+    tasks: dict[str, asyncio.Task] = {}
+    plan_ids: dict[str, tuple] = {}
+    while True:
+        try:
+            by_phone = await asyncio.to_thread(_load_plans_by_phone)
+            # 启动新增
+            for phone, ids in by_phone.items():
+                ids_t = tuple(sorted(ids))
+                if phone not in tasks or tasks[phone].done():
+                    if phone in tasks:
+                        tasks.pop(phone)
+                    tasks[phone] = asyncio.create_task(_run_phone(phone, ids))
+                    plan_ids[phone] = ids_t
+                    log.info("监听启动：%s（%d 个计划）", phone, len(ids))
+                elif plan_ids.get(phone) != ids_t:
+                    # 同号计划变化 → 重启
+                    tasks[phone].cancel()
+                    try:
+                        await tasks[phone]
+                    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                        pass
+                    tasks[phone] = asyncio.create_task(_run_phone(phone, ids))
+                    plan_ids[phone] = ids_t
+                    log.info("监听重启：%s（计划变化）", phone)
+            # 停止移除
+            for phone in list(tasks):
+                if phone not in by_phone:
+                    tasks[phone].cancel()
+                    try:
+                        await tasks[phone]
+                    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                        pass
+                    tasks.pop(phone, None)
+                    plan_ids.pop(phone, None)
+                    log.info("监听停止：%s（无启用计划）", phone)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:  # noqa: BLE001
+            log.exception("监听 supervisor 异常：%s", e)
+        await asyncio.sleep(60)
+    # supervisor 退出时清理所有监听任务
+    for phone, t in tasks.items():
+        t.cancel()
+    if tasks:
+        await asyncio.gather(*tasks.values(), return_exceptions=True)
+    log.info("监听 supervisor 已退出")

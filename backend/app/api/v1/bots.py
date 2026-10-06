@@ -25,8 +25,7 @@ class BotCreateIn(BaseModel):
 
 
 def _fernet():
-    """TOKEN_FERNET_KEY 环境变量（`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成）。
-    未配置时退回 base64（仅开发调试用，生产必须配置）。"""
+    """TOKEN_FERNET_KEY 环境变量（`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成）。"""
     from cryptography.fernet import Fernet
     key = os.environ.get("TOKEN_FERNET_KEY", "")
     return Fernet(key.encode()) if key else None
@@ -35,6 +34,13 @@ def _fernet():
 def _enc(s: str) -> str:
     f = _fernet()
     if f is None:
+        import logging
+        # 生产环境拒绝明文/base64 落库 Bot Token（拿到 DB 即泄露全部 Token）；
+        # 开发/测试环境允许降级（打警告），方便本地跑通
+        if os.environ.get("APP_ENV", "dev").lower() in ("prod", "production"):
+            logging.getLogger(__name__).error("TOKEN_FERNET_KEY 未配置，拒绝写入 Bot Token")
+            raise RuntimeError("TOKEN_FERNET_KEY 未配置，无法安全保存 Bot Token。请在服务器环境变量中配置后再试")
+        logging.getLogger(__name__).warning("TOKEN_FERNET_KEY 未配置，Bot Token 以 base64 暂存（仅限开发环境）")
         return "b64:" + base64.b64encode(s.encode()).decode()
     return "fernet:" + f.encrypt(s.encode()).decode()
 

@@ -1,7 +1,7 @@
 """内容流数据模型：标签 / 城市 / 笔记 / 媒体 / 采集规则 / 采集频道 / 任务日志。"""
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -49,10 +49,18 @@ class Note(Base):
     fee_text: Mapped[str] = mapped_column(String(255), default="")  # 介绍费文案
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 定时上架
     scheduled_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # 定时已由 worker 发送（幂等）
+    send_progress: Mapped[dict] = mapped_column(JSON, default=dict)  # 分步幂等：{channel_id: {"album": true, "video": false}}
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     collect_rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("collect_rules.id"), nullable=True)
+    source_channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # 采集来源频道 id（仅采集笔记）
+    source_msg_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 来源消息 id（相册取首条消息 id）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 采集硬去重：同一来源频道 + 同一消息只入库一次（NULL 互不冲突，手动笔记不受影响）
+    __table_args__ = (
+        UniqueConstraint("source_channel_id", "source_msg_id", name="uq_notes_collect_src"),
+    )
 
 
 class NoteMedia(Base):

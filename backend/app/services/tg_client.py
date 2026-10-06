@@ -60,6 +60,17 @@ async def get_shared_client(phone: str):
         return client
 
 
+async def drop_shared_client(phone: str):
+    """丢弃该手机号的共享连接（断线重建前调用），下次 get_shared_client 会新建连接。"""
+    async with _shared_guard:
+        client = _shared.pop(phone, None)
+    if client is not None:
+        try:
+            await client.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 class TgNotConfigured(Exception):
     pass
 
@@ -224,7 +235,9 @@ async def auto_create_bot_via_botfather(phone: str, bot_name: str, username: str
                         raise RuntimeError("BotFather 已创建但未解析到 token")
                     return {"token": m.group(1), "username": candidate}
                 if "taken" in low or "username is invalid" in low:
-                    candidate = f"{username}_{_secrets.token_hex(2)}"
+                    # 后缀必须插在结尾 bot 之前，保证仍以 bot 结尾（TG 硬性要求）
+                    base = username[:-3] if username.lower().endswith("bot") else username
+                    candidate = f"{base}_{_secrets.token_hex(2)}bot"
                     continue
                 raise RuntimeError(f"BotFather 返回异常: {raw[:200]}")
             raise RuntimeError("用户名多次被占用，请换一个用户名")

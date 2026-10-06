@@ -145,6 +145,19 @@ async def run() -> None:
                 log.info("采集：%s", cr)
         except Exception:  # noqa: BLE001
             log.exception("采集轮询异常")
+        # USDT 到账监听：每轮顺带扫一次（内部有未配置门控），用户付款后自动开通
+        try:
+            from app.services.tron_watch import match_and_activate
+            from app.core.database import SessionLocal as _SL
+            _wdb = _SL()
+            try:
+                hits = await asyncio.to_thread(match_and_activate, _wdb)
+                if hits:
+                    log.info("USDT 到账开通：%s", hits)
+            finally:
+                _wdb.close()
+        except Exception:  # noqa: BLE001
+            log.exception("pay/watch 轮询异常")
     listen_task.cancel()
     log.info("worker 退出")
 

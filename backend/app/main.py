@@ -19,9 +19,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
+# CORS：默认只放行同源；生产通过 CORS_ORIGINS 配置前端域名（逗号分隔）
+# allow_origins="*" + allow_credentials=True 是安全漏洞（任意钓鱼站可带凭证跨域调用）
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins or ["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

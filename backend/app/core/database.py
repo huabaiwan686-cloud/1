@@ -1,6 +1,9 @@
 """数据库会话。"""
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+import logging
+
+log = logging.getLogger(__name__)
 
 from app.core.config import settings
 
@@ -38,15 +41,19 @@ PROVINCES = [
 
 
 def _seed_provinces() -> None:
-    """幂等：cities 为空时预置省级地区库。"""
+    """幂等：逐个补齐 34 省级地区（旧库有部分数据时也不漏种）。"""
     from app.models.content import City
 
     db = SessionLocal()
     try:
-        if db.query(City).count() > 0:
-            return
+        existing = {r[0] for r in db.query(City.name).all()}
+        added = 0
         for name in PROVINCES:
-            db.add(City(name=name, level=1))
-        db.commit()
+            if name not in existing:
+                db.add(City(name=name, level=1))
+                added += 1
+        if added:
+            db.commit()
+            log.info("补种省级地区 %d 个", added)
     finally:
         db.close()

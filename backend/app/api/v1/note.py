@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.timezone import local_to_utc_naive, utc_naive_to_local
+
 from app.api.deps import get_current_user, ok, require_vip
 from app.core.database import get_db
 from app.models.account import BotToken
@@ -51,7 +53,7 @@ def _note_out(n: Note, media: list[NoteMedia] | None = None, db: Session | None 
         "serviceRemark": n.service_remark,
         "numberCode": n.number_code,
         "feeText": n.fee_text,
-        "scheduledAt": n.scheduled_at.isoformat() if n.scheduled_at else None,
+        "scheduledAt": utc_naive_to_local(n.scheduled_at).isoformat() if n.scheduled_at else None,
         "publishedAt": n.published_at.isoformat() if n.published_at else None,
         "createdAt": n.created_at.isoformat() if n.created_at else None,
         "media": [
@@ -129,7 +131,8 @@ def create_note(body: NoteIn, user: User = Depends(get_current_user), db: Sessio
         account_id=body.account_id,
         channel_ids=body.channel_ids,
         service_remark=body.service_remark,
-        scheduled_at=body.scheduled_at,
+        # 用户填的是本地时间（Asia/Shanghai），转 UTC 入库
+        scheduled_at=local_to_utc_naive(body.scheduled_at) if body.scheduled_at else None,
         source="manual",
         status="draft",
         created_by=user.id,
@@ -220,6 +223,16 @@ def _send_to_channels(n: Note, user: User, db: Session,
         if not bot:
             failed.append(f"{ch.name}：推送 Bot 不存在")
             continue
+        # 分步幂等：读已有进度，断点续发（相册成功/视频失败时只重发视频）
+        progress = dict(n.send_progress or {})
+        ch_progress = dict(progress.get(str(cid), {}))
+
+        def _mark_step(step: str):
+            ch_progress[step] = True
+            progress[str(cid)] = ch_progress
+            n.send_progress = dict(progress)
+            db.flush()  # 每步成功立即持久化，崩溃后可续
+
         try:
             res = send_listing_set(
                 _dec(bot.token_secret), chat,
@@ -227,6 +240,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 show_media=show, verify_media=verify,
                 # 全局抠图已处理则不再叠加频道防扫图
                 anti_scan_mode="original" if gm else (ch.anti_scan_mode or "original"),
+                resume=ch_progress, on_step=_mark_step,
             )
             detail = f"已发送到 {ch.name}（{chat}）：{res}"
             db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
@@ -237,6 +251,9 @@ def _send_to_channels(n: Note, user: User, db: Session,
             db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
                            result="failed", detail=detail))
             failed.append(detail)
+    if not failed:
+        n.send_progress = {}  # 全部频道发送完成，清空断点进度
+        db.flush()
     return sent, failed
 
 

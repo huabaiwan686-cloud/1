@@ -4,7 +4,11 @@ CollectChannel（来源频道/群，绑定协议号）→ 拉取 last_msg_id 之
 → 按 CollectRule 做屏蔽/文案处理 → 生成 Note(source="collect")。
 need_review=True → pending（进采集审核队列）；False → 直接 published。
 
-去重：channel 级 last_msg_id 水位 + 规则级文本去重（dedup_days 窗口）。
+去重三层：
+1. channel 级 last_msg_id 水位（逐组提交，崩溃不丢进度）；
+2. (source_channel_id, source_msg_id) 唯一约束硬去重（相册取首条消息 id），纯媒体消息也防重；
+3. 规则级文本去重（dedup_days 窗口）。
+相册：相同 grouped_id 的消息合并为一条 Note（媒体按 id 排序，文案合并）。
 媒体：经 Telethon 下载原图/视频，存 uploads/collect/，NoteMedia 引用本地路径。
 """
 import asyncio
@@ -13,9 +17,12 @@ import os
 import re
 from datetime import datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
+
 log = logging.getLogger("collector")
 
 UPLOAD_SUBDIR = "collect"
+PAGE_SIZE = 100
 
 
 def _blocked(text: str, has_media: bool, rule) -> str | None:
@@ -99,6 +106,40 @@ def _save_media(data: bytes, ext: str, channel_id: int, msg_id: int) -> str:
     return f"/uploads/{UPLOAD_SUBDIR}/{name}"
 
 
+async def _fetch_new_messages(client, entity, min_id: int) -> list:
+    """P1-7 分页拉全：offset_id 往旧翻页，直到某页不足 PAGE_SIZE。
+
+    旧实现单次 limit=100 后直接把水位跳到最大 id，两次轮询间新增超 100 条
+    时中间的消息永久丢失。这里翻页取尽后再推进水位。
+    """
+    all_msgs = []
+    offset_id = 0
+    while True:
+        batch = [m async for m in client.iter_messages(
+            entity, min_id=min_id, offset_id=offset_id, limit=PAGE_SIZE)]
+        if not batch:
+            break
+        all_msgs.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            break
+        offset_id = min(m.id for m in batch)
+    all_msgs.sort(key=lambda m: m.id)
+    return all_msgs
+
+
+def _group_albums(msgs: list) -> list[list]:
+    """P2-17 相册合并：相同 grouped_id 的消息合成一组（组内按 id 排序），
+    无 grouped_id 的单条自成一组；组与组之间按首条消息 id 排序。"""
+    buckets: dict = {}
+    for m in msgs:
+        gid = getattr(m, "grouped_id", None)
+        key = ("album", gid) if gid is not None else ("single", m.id)
+        buckets.setdefault(key, []).append(m)
+    groups = [sorted(g, key=lambda m: m.id) for g in buckets.values()]
+    groups.sort(key=lambda g: g[0].id)
+    return groups
+
+
 async def _collect_channel(db, ch) -> dict:
     """采集单个来源。返回 {"notes": n, "skipped": m}。"""
     from app.models.account import TgAccount
@@ -117,21 +158,31 @@ async def _collect_channel(db, ch) -> dict:
         entity = await client.get_entity(ch.source_target)
     except Exception as e:  # noqa: BLE001
         return {"notes": 0, "skipped": 0, "error": f"来源解析失败: {e}"}
+
     min_id = ch.last_msg_id or 0
-    msgs = [m async for m in client.iter_messages(entity, min_id=min_id, limit=100)]
-    msgs.sort(key=lambda m: m.id)
+    groups = _group_albums(await _fetch_new_messages(client, entity, min_id))
     notes, skipped = 0, 0
-    max_id = min_id
-    for m in msgs:
-        max_id = max(max_id, m.id)
-        text = (m.text or "").strip()
-        has_media = bool(m.photo or m.video or m.document)
+    for group in groups:
+        lead_id = group[0].id   # 组内已按 id 排序；相册用首条消息 id 做去重键
+        top_id = group[-1].id
+        # P2-19 硬去重：同一来源频道 + 同一消息只入库一次（纯媒体消息也防重）
+        dup = db.query(Note).filter(
+            Note.source == "collect",
+            Note.source_channel_id == ch.id,
+            Note.source_msg_id == lead_id,
+        ).first() is not None
+        text = "\n".join(t for t in ((m.text or "").strip() for m in group) if t)
+        has_media = any(bool(m.photo or m.video or m.document) for m in group)
         reason = _blocked(text, has_media, rule)
-        if reason:
+        if dup or reason:
             skipped += 1
+            ch.last_msg_id = max(ch.last_msg_id or 0, top_id)
+            db.commit()
             continue
         media_urls = []
-        if has_media:
+        for m in group:
+            if not (m.photo or m.video or m.document):
+                continue
             try:
                 data = await client.download_media(m, file=bytes)
             except Exception as e:  # noqa: BLE001
@@ -144,21 +195,32 @@ async def _collect_channel(db, ch) -> dict:
         body = _process_text(text, rule)
         if not body and not media_urls:
             skipped += 1
+            ch.last_msg_id = max(ch.last_msg_id or 0, top_id)
+            db.commit()
             continue
         if _text_duplicate(db, body, rule):
             skipped += 1
+            ch.last_msg_id = max(ch.last_msg_id or 0, top_id)
+            db.commit()
             continue
         title = (body.split("\n")[0] if body else "采集素材")[:30] or "采集素材"
-        note = Note(title=title, body=body,
-                    status="pending" if (rule is None or rule.need_review) else "published",
-                    source="collect", collect_rule_id=rule.id if rule else None)
-        db.add(note)
-        db.flush()
-        for url, mtype in media_urls:
-            db.add(NoteMedia(note_id=note.id, url=url, media_type=mtype, kind="show"))
-        db.commit()
-        notes += 1
-    ch.last_msg_id = max_id
+        try:
+            note = Note(title=title, body=body,
+                        status="pending" if (rule is None or rule.need_review) else "published",
+                        source="collect", collect_rule_id=rule.id if rule else None,
+                        source_channel_id=ch.id, source_msg_id=lead_id)
+            db.add(note)
+            db.flush()
+            for url, mtype in media_urls:
+                db.add(NoteMedia(note_id=note.id, url=url, media_type=mtype, kind="show"))
+            # P2-19 逐组推进水位并提交：循环中途异常不丢已处理进度
+            ch.last_msg_id = max(ch.last_msg_id or 0, top_id)
+            db.commit()
+            notes += 1
+        except IntegrityError:  # 并发双 worker 抢同一条 → 回滚跳过
+            db.rollback()
+            skipped += 1
+            log.warning("collect duplicate skipped ch=%s msg=%s", ch.id, lead_id)
     db.add(TaskLog(action="collect", executor="worker",
                    detail=f"采集[{ch.name}]：新增 {notes} 条，跳过 {skipped} 条"))
     db.commit()

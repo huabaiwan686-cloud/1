@@ -28,19 +28,22 @@ def _parse_times(times: list) -> list:
 
 
 def is_due(plan, now: datetime | None = None) -> bool:
-    """判断推送计划此刻是否到点。"""
-    now = now or datetime.utcnow()
+    """判断推送计划此刻是否到点。时间点按 Asia/Shanghai 本地时间解释。"""
+    from app.core.timezone import LOCAL_TZ, now_utc, utc_naive_to_local
+    now = now_utc() if now is None else now
+    # 转本地时间做"每天几点"的判断
+    local_now = utc_naive_to_local(now)
     last = plan.last_run_at
     times = _parse_times(plan.times)
 
     if times:
         # 每天在指定时间点执行；X 天间隔控制哪些日期执行
-        days = (now.date() - plan.created_at.date()).days if plan.created_at else 0
+        days = (local_now.date() - utc_naive_to_local(plan.created_at).date()).days if plan.created_at else 0
         if (plan.interval_days or 1) > 1 and days % (plan.interval_days or 1) != 0:
             return False
         for h, m in times:
-            cand = now.replace(hour=h, minute=m, second=0, microsecond=0)
-            if cand <= now and (last is None or last < cand):
+            cand = local_now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if cand <= local_now and (last is None or utc_naive_to_local(last) < cand):
                 return True
         return False
 

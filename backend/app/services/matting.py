@@ -4,16 +4,23 @@
 - 无模型文件 → StubMattingProvider：抛错，上层自动降级轻量扰动
 - is_table_image：表格/自评表等截图本地识别，直接跳过抠图（对齐原站）
 """
+import logging
 import os
+import threading
+
+log = logging.getLogger(__name__)
 
 import numpy as np
 from PIL import Image, ImageFilter
 
 def _resolve_model_path() -> str:
+    # 基于文件位置解析，不依赖 cwd（换目录启动也能找到）
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(os.path.dirname(here))  # backend/app/services → backend → repo
     candidates = [
         os.environ.get("RMBG_MODEL_PATH", ""),
+        os.path.join(repo_root, "..", "models", "rmbg-1.4.onnx"),
         os.path.join(os.getcwd(), "models", "rmbg-1.4.onnx"),
-        os.path.join(os.getcwd(), "..", "models", "rmbg-1.4.onnx"),  # cwd=backend/ 时
         "/srv/models/rmbg-1.4.onnx",  # docker
     ]
     for p in candidates:
@@ -72,14 +79,29 @@ class RmbgMattingProvider(MattingProvider):
         return Image.fromarray(mask, mode="L").resize((w, h), Image.BILINEAR)
 
 
+_provider_cache: MattingProvider | None = None
+_provider_lock = threading.Lock()
+
+
 def get_default_provider() -> MattingProvider:
-    """有模型用自建 RMBG，无模型用占位（上层降级）。"""
-    if os.path.exists(MODEL_PATH):
-        try:
-            return RmbgMattingProvider(MODEL_PATH)
-        except Exception:
-            pass
-    return StubMattingProvider()
+    """有模型用自建 RMBG，无模型用占位（上层降级）。
+
+    模块级单例：RMBG 模型约 170MB，每次请求重建会导致内存暴涨/OOM。
+    InferenceSession 非线程安全，用锁保护。
+    """
+    global _provider_cache
+    if _provider_cache is None:
+        with _provider_lock:
+            if _provider_cache is None:
+                if os.path.exists(MODEL_PATH):
+                    try:
+                        _provider_cache = RmbgMattingProvider(MODEL_PATH)
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("RMBG 模型加载失败，降级为占位：%s", e)
+                        _provider_cache = StubMattingProvider()
+                else:
+                    _provider_cache = StubMattingProvider()
+    return _provider_cache
 
 
 def is_table_image(img: Image.Image) -> bool:
