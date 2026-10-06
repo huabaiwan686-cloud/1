@@ -1,16 +1,17 @@
 <template>
+  <div class="page">
   <a-tabs>
     <a-tab-pane key="tpl" tab="消息模板">
-      <a-button type="primary" @click="openTpl()" style="margin-bottom: 16px">新建模板</a-button>
+      <a-button type="primary" @click="openTpl()" class="mb-16">新建模板</a-button>
       <a-table :columns="tplCols" :data-source="templates" row-key="id" :loading="loading">
         <template #bodyCell="{ column, record }">
-          <a-space v-if="column.key === 'action'">
+          <a-space v-if="column.key === 'action'" class="table-actions">
             <a @click="pushTpl(record.id)">推送</a>
             <a-popconfirm title="确认删除？" @confirm="delTpl(record.id)"><a>删除</a></a-popconfirm>
           </a-space>
         </template>
       </a-table>
-      <a-modal v-model:open="tplVisible" title="消息模板" @ok="saveTpl">
+      <a-modal class="modal-form" v-model:open="tplVisible" title="消息模板" @ok="saveTpl">
         <a-form :model="tplEditing" layout="vertical">
           <a-form-item label="名称"><a-input v-model:value="tplEditing.name" /></a-form-item>
           <a-form-item label="内容"><a-textarea v-model:value="tplEditing.content" :rows="4" /></a-form-item>
@@ -23,7 +24,7 @@
       </a-modal>
     </a-tab-pane>
     <a-tab-pane key="plan" tab="推送计划">
-      <a-button type="primary" @click="openPlan()" style="margin-bottom: 16px">新建计划</a-button>
+      <a-button type="primary" @click="openPlan()" class="mb-16">新建计划</a-button>
       <a-table :columns="planCols" :data-source="plans" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'tpl'">{{ tplName(record.templateId) }}</template>
@@ -32,8 +33,8 @@
           </a-popconfirm>
         </template>
       </a-table>
-      <a-modal v-model:open="planVisible" title="推送计划" @ok="savePlan">
-        <a-alert type="error" show-icon style="margin-bottom: 16px"
+      <a-modal class="modal-form" v-model:open="planVisible" title="推送计划" @ok="savePlan">
+        <a-alert type="error" show-icon class="mb-16"
           message="风险提示：请勿使用上架账号进行群发，频繁群发可能导致账号受限" />
         <a-form :model="planEditing" layout="vertical">
           <a-form-item label="模板">
@@ -47,9 +48,9 @@
             </a-select>
           </a-form-item>
           <a-form-item label="目标群组">
-            <a-space style="margin-bottom: 8px">
+            <a-space class="mb-8">
               <a-button size="small" @click="refreshDialogs" :loading="dlgLoading">刷新缓存</a-button>
-              <span style="color: #999; font-size: 12px">{{ dlgCachedAt ? '缓存时间：' + dlgCachedAt : '尚未缓存，请点刷新' }}</span>
+              <span class="hint">{{ dlgCachedAt ? '缓存时间：' + dlgCachedAt : '尚未缓存，请点刷新' }}</span>
             </a-space>
             <a-select v-model:value="planEditing.target_groups" mode="multiple" placeholder="从缓存的会话中选择"
               style="width: 100%" :options="dlgOptions" />
@@ -62,6 +63,7 @@
       </a-modal>
     </a-tab-pane>
   </a-tabs>
+  </div>
 </template>
 
 <script setup lang="ts">

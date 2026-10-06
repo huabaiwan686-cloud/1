@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <a-button type="primary" @click="openEditor()" style="margin-bottom: 16px">新建监听计划</a-button>
+  <div class="page">
+    <a-button type="primary" @click="openEditor()" class="mb-16">新建监听计划</a-button>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'enabled'">
@@ -14,7 +14,7 @@
         </template>
       </template>
     </a-table>
-    <a-modal v-model:open="visible" title="关键字监听" @ok="save">
+    <a-modal class="modal-form" v-model:open="visible" title="关键字监听" @ok="save">
       <a-form :model="editing" layout="vertical">
         <a-form-item label="计划名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="监听协议号（必填，否则计划不会执行）">
@@ -31,7 +31,7 @@
       </a-form>
     </a-modal>
 
-    <h3 style="margin: 24px 0 12px">命中记录</h3>
+    <h3 class="section-title">命中记录</h3>
     <a-table :columns="hitColumns" :data-source="hits" row-key="id" :loading="hitsLoading" :pagination="{ pageSize: 20 }">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'result'">

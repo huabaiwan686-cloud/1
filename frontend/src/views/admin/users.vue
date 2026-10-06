@@ -1,12 +1,12 @@
 <template>
-  <div>
-    <a-card title="超级管理员 · 用户管控" style="margin-bottom: 16px">
-      <div style="color: #666">可管理所有会员/用户账号：新增、删除、开关管理员权限、禁用/启用、重置密码</div>
+  <div class="page">
+    <a-card title="超级管理员 · 用户管控" class="page-card">
+      <div class="desc-text">可管理所有会员/用户账号：新增、删除、开关管理员权限、禁用/启用、重置密码</div>
     </a-card>
-    <a-card title="邀请码" style="margin-bottom: 16px">
-      <a-space style="margin-bottom: 12px">
+    <a-card title="邀请码" class="page-card">
+      <a-space class="mb-12">
         <a-button type="primary" @click="genCode">生成邀请码</a-button>
-        <span style="color: #666">把邀请码发给会员，他在登录页点"注册"即可自助注册账号密码</span>
+        <span class="desc-text">把邀请码发给会员，他在登录页点"注册"即可自助注册账号密码</span>
       </a-space>
       <a-table :columns="codeColumns" :data-source="codes" row-key="code" size="small" :pagination="{ pageSize: 8 }">
         <template #bodyCell="{ column, record }">
@@ -14,7 +14,7 @@
         </template>
       </a-table>
     </a-card>
-    <a-button type="primary" @click="openEditor" style="margin-bottom: 16px">新增账号</a-button>
+    <a-button type="primary" @click="openEditor" class="mb-16">新增账号</a-button>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'admin'">
@@ -27,7 +27,7 @@
           <a-tag :color="record.isMember ? 'gold' : 'default'">{{ record.isMember ? '会员' : '普通' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
+          <a-space class="table-actions">
             <a @click="toggleAdmin(record)">{{ record.isAdmin ? '取消管理员' : '设为管理员' }}</a>
             <a @click="toggleMember(record)">{{ record.isMember ? '取消会员' : '设为会员' }}</a>
             <a @click="toggleActive(record)">{{ record.isActive ? '禁用' : '启用' }}</a>
@@ -39,7 +39,7 @@
         </template>
       </template>
     </a-table>
-    <a-modal v-model:open="visible" title="新增账号" @ok="save">
+    <a-modal class="modal-form" v-model:open="visible" title="新增账号" @ok="save">
       <a-form :model="form" layout="vertical">
         <a-form-item label="登录账号"><a-input v-model:value="form.username" placeholder="登录用用户名" /></a-form-item>
         <a-form-item label="账号名称"><a-input v-model:value="form.display_name" placeholder="显示名称（可选）" /></a-form-item>
@@ -47,7 +47,7 @@
         <a-form-item><a-checkbox v-model:checked="form.is_admin">设为管理员（无限制使用所有功能）</a-checkbox></a-form-item>
       </a-form>
     </a-modal>
-    <a-modal v-model:open="resetVisible" title="重置密码" @ok="doReset">
+    <a-modal class="modal-form" v-model:open="resetVisible" title="重置密码" @ok="doReset">
       <a-form layout="vertical">
         <a-form-item :label="`账号：${resetTarget.username}`">
           <a-input-password v-model:value="resetPassword" placeholder="新密码，至少 6 位" />

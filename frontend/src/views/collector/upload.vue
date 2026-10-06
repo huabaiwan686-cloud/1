@@ -1,6 +1,7 @@
 <template>
-  <a-card title="上传资料">
-    <a-form :model="form" layout="vertical" @finish="onSubmit">
+  <div class="page">
+  <a-card title="上传资料" class="page-card">
+    <a-form :model="form" layout="vertical" @finish="onSubmit" class="narrow-form">
       <a-form-item label="标题" name="title" :rules="[{ required: true, message: '请输入标题' }]">
         <a-input v-model:value="form.title" placeholder="资料标题" />
       </a-form-item>
@@ -29,8 +30,10 @@
         <a-select v-model:value="form.channel_ids" mode="multiple" placeholder="选择频道" style="width: 100%">
           <a-select-option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
         </a-select>
-        <a-button type="link" @click="smartRecommend" style="padding: 0">智能推荐</a-button>
-        <span style="color: #999; margin-left: 8px">按关键词/标签/城市/省份/价格自动匹配</span>
+        <div class="mt-8">
+          <a-button type="link" @click="smartRecommend" style="padding: 0">智能推荐</a-button>
+          <span class="hint" style="margin-left: 8px">按关键词/标签/城市/省份/价格自动匹配</span>
+        </div>
       </a-form-item>
       <a-form-item label="定时上架">
         <a-date-picker v-model:value="form.scheduled_at" show-time placeholder="留空=立即草稿" style="width: 100%" />
@@ -46,6 +49,7 @@
       </a-form-item>
     </a-form>
   </a-card>
+  </div>
 </template>
 
 <script setup lang="ts">

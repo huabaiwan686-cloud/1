@@ -1,14 +1,14 @@
 <template>
-  <div>
+  <div class="page">
     <a-row :gutter="16">
       <a-col :span="6" v-for="s in statCards" :key="s.label">
-        <a-card><a-statistic :title="s.label" :value="s.value" /></a-card>
+        <a-card class="stat-card"><a-statistic :title="s.label" :value="s.value" /></a-card>
       </a-col>
     </a-row>
-    <a-card title="资料状态分布" style="margin-top: 16px">
-      <a-space>
+    <a-card title="资料状态分布" class="mt-16">
+      <div class="tag-group">
         <a-tag v-for="(v, k) in stats.notesByStatus" :key="k" color="blue">{{ k }}: {{ v }}</a-tag>
-      </a-space>
+      </div>
     </a-card>
   </div>
 </template>

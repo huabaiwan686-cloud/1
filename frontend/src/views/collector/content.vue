@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div class="page">
     <a-card title="我的内容">
-      <a-space style="margin-bottom: 16px">
+      <a-space class="mb-16">
         <a-radio-group v-model:value="status" @change="load">
           <a-radio-button value="">全部</a-radio-button>
           <a-radio-button value="draft">草稿</a-radio-button>

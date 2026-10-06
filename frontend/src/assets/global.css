@@ -1,0 +1,140 @@
+/* ============================================================
+ * 全站 UI 统一规范：不拥挤、清爽、统一
+ * 原则：纯加法 class，不覆盖 antd 默认行为，功能零改动
+ * ============================================================ */
+
+/* ---------- 页面结构 ---------- */
+
+/* 页面根容器：统一内边距（App.vue .content 已有 16px，此处兜底） */
+.page {
+  padding: 4px;
+}
+
+/* 顶部工具栏：按钮/筛选控件横向排列，统一间距 */
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+/* 卡片统一间距 */
+.page-card {
+  margin-bottom: 16px;
+}
+
+/* ---------- 间距工具 ---------- */
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+
+/* ---------- 文本 ---------- */
+
+/* 页面内分节小标题 */
+.section-title {
+  margin: 24px 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+.section-title:first-child {
+  margin-top: 0;
+}
+
+/* 说明 / 描述文字 */
+.desc-text {
+  color: #666;
+  line-height: 1.7;
+}
+
+/* 提示文字 */
+.hint {
+  color: #999;
+  font-size: 12px;
+}
+
+/* ---------- 表单 ---------- */
+
+/* 表单行：左标签 + 右控件，替代 a-space 硬拼 */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.form-row:last-child {
+  margin-bottom: 0;
+}
+.form-row .form-label {
+  width: 78px;
+  flex-shrink: 0;
+  color: #333;
+}
+
+/* 表单区块小标题（替代裸 div / divider 混用） */
+.form-section-title {
+  font-weight: 600;
+  color: #1f1f1f;
+  margin: 20px 0 12px;
+  font-size: 14px;
+}
+.form-section-title:first-child {
+  margin-top: 0;
+}
+
+/* 表单控件之间留白 */
+.field-gap {
+  margin-bottom: 12px;
+}
+
+/* 弹窗内表单项稍紧凑 */
+.modal-form .ant-form-item {
+  margin-bottom: 16px;
+}
+
+/* 内联表单行：控件组横向排列，统一间距 */
+.form-inline-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.form-inline-row .ant-form-item {
+  margin-right: 0;
+  margin-bottom: 12px;
+}
+
+/* ---------- 表格 ---------- */
+
+/* 表格操作列链接组 */
+.table-actions {
+  display: inline-flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ---------- 其他 ---------- */
+
+/* 上传/长表单页：限制表单宽度，阅读更舒服 */
+.narrow-form {
+  max-width: 780px;
+}
+
+/* 统计卡片数值区留白 */
+.stat-card .ant-card-body {
+  padding: 20px 24px;
+}
+
+/* 标签组 */
+.tag-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

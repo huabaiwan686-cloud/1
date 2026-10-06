@@ -1,23 +1,23 @@
 <template>
-  <div>
-    <a-row :gutter="16" style="margin-bottom: 16px">
+  <div class="page">
+    <a-row :gutter="16" class="mb-16">
       <a-col :span="12" v-for="p in plans" :key="p.id">
         <a-card :title="p.name">
           <p>价格：{{ p.price }} USDT / {{ p.days }} 天</p>
-          <ul><li v-for="f in p.features" :key="f">{{ f }}</li></ul>
+          <ul class="mb-12" style="padding-left: 20px; line-height: 1.8"><li v-for="f in p.features" :key="f">{{ f }}</li></ul>
           <a-button v-if="p.id === 'pro'" type="primary" @click="buy">开通 PRO</a-button>
           <a-tag v-else color="green">当前：{{ sub.plan }}</a-tag>
         </a-card>
       </a-col>
     </a-row>
-    <a-card title="我的订阅">
+    <a-card title="我的订阅" class="page-card">
       <p>套餐：{{ sub.plan }} ｜ 有效期至：{{ sub.activeUntil || '—' }} ｜
         <a-tag :color="sub.isActive ? 'green' : 'default'">{{ sub.isActive ? '生效中' : '未生效' }}</a-tag>
       </p>
-      <p>本月图片额度剩余：{{ quota.totalLeft }}</p>
+      <p style="margin-bottom: 0">本月图片额度剩余：{{ quota.totalLeft }}</p>
     </a-card>
-    <a-divider>邀请奖励</a-divider>
-    <a-space style="margin-bottom: 16px">
+    <div class="section-title">邀请奖励</div>
+    <a-space class="mb-16">
       <a-button @click="genCode">生成邀请码</a-button>
       <span v-if="inviteCode">邀请码：<a-tag color="blue">{{ inviteCode }}</a-tag></span>
     </a-space>

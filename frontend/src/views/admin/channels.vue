@@ -1,37 +1,37 @@
 <template>
-  <div>
-    <a-card title="全局抠图模式" style="margin-bottom: 16px">
+  <div class="page">
+    <a-card title="全局抠图模式" class="page-card">
       <a-space>
         <a-switch v-model:checked="gm.enabled" @change="saveGm" />
-        <span style="color: #666">开启后，所有发往频道的资料按所选背景自动抠图后发送；服务器只保留原图，处理图不留存，每次循环重新处理</span>
+        <span class="desc-text">开启后，所有发往频道的资料按所选背景自动抠图后发送；服务器只保留原图，处理图不留存，每次循环重新处理</span>
       </a-space>
-      <div style="margin-top: 12px">
+      <div class="mt-12">
         <a-select v-model:value="gm.background_id" placeholder="选择抠图背景素材（先选背景再开开关）" style="width: 320px" @change="saveGm">
           <a-select-option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}</a-select-option>
         </a-select>
-        <span style="color: #999; margin-left: 12px">每次上架/循环推送时实时处理，按次扣额度（重复图不重复扣）</span>
+        <span class="hint" style="margin-left: 12px">每次上架/循环推送时实时处理，按次扣额度（重复图不重复扣）</span>
       </div>
     </a-card>
-    <a-card title="个人水印设置" style="margin-bottom: 16px">
-      <div style="color: #666; margin-bottom: 12px">开启后，你发布的每张图片都会自动叠加水印（视频不加）。这是你个人的设置，只影响你自己发布的内容。</div>
-      <a-space direction="vertical" style="width: 100%" :size="12">
-        <a-space>
+    <a-card title="个人水印设置" class="page-card">
+      <div class="desc-text mb-12">开启后，你发布的每张图片都会自动叠加水印（视频不加）。这是你个人的设置，只影响你自己发布的内容。</div>
+      <div>
+        <div class="form-row">
           <a-switch v-model:checked="wm.enabled" />
           <span>启用水印</span>
-        </a-space>
-        <a-space>
-          <span style="width: 70px">水印类型</span>
+        </div>
+        <div class="form-row">
+          <span class="form-label">水印类型</span>
           <a-radio-group v-model:value="wm.type">
             <a-radio value="text">文字水印</a-radio>
             <a-radio value="qr">二维码水印</a-radio>
           </a-radio-group>
-        </a-space>
-        <a-space style="width: 100%">
-          <span style="width: 70px">{{ wm.type === 'qr' ? '二维码内容' : '水印文字' }}</span>
+        </div>
+        <div class="form-row">
+          <span class="form-label">{{ wm.type === 'qr' ? '二维码内容' : '水印文字' }}</span>
           <a-input v-model:value="wm.content" :placeholder="wm.type === 'qr' ? '二维码数据（链接或文本）' : '例如：@我的频道'" style="width: 320px" />
-        </a-space>
-        <a-space>
-          <span style="width: 70px">水印位置</span>
+        </div>
+        <div class="form-row">
+          <span class="form-label">水印位置</span>
           <a-select v-model:value="wm.position" style="width: 160px">
             <a-select-option value="top-left">左上</a-select-option>
             <a-select-option value="top-right">右上</a-select-option>
@@ -39,30 +39,34 @@
             <a-select-option value="bottom-right">右下</a-select-option>
             <a-select-option value="center">居中</a-select-option>
           </a-select>
-          <span v-if="wm.type === 'text'" style="margin-left: 16px">不透明度</span>
-          <a-slider v-if="wm.type === 'text'" v-model:value="wm.opacity" :min="10" :max="100" style="width: 160px" />
-          <span v-if="wm.type === 'text'">{{ wm.opacity }}%</span>
-          <span v-if="wm.type === 'qr'" style="margin-left: 16px">二维码尺寸</span>
-          <a-input-number v-if="wm.type === 'qr'" v-model:value="wm.qr_size" :min="48" :max="300" style="width: 100px" />
-        </a-space>
-        <a-space>
+          <template v-if="wm.type === 'text'">
+            <span class="form-label" style="width: auto; margin-left: 16px">不透明度</span>
+            <a-slider v-model:value="wm.opacity" :min="10" :max="100" style="width: 160px" />
+            <span>{{ wm.opacity }}%</span>
+          </template>
+          <template v-else>
+            <span class="form-label" style="width: auto; margin-left: 16px">二维码尺寸</span>
+            <a-input-number v-model:value="wm.qr_size" :min="48" :max="300" style="width: 100px" />
+          </template>
+        </div>
+        <div class="form-row">
           <a-button type="primary" @click="saveWm">保存水印设置</a-button>
           <a-button @click="previewWm">预览效果</a-button>
-        </a-space>
-        <div v-if="wmPreview">
-          <div style="color: #999; margin-bottom: 6px">预览效果：</div>
+        </div>
+        <div v-if="wmPreview" class="mt-12">
+          <div class="hint mb-8">预览效果：</div>
           <img :src="wmPreview" style="max-width: 400px; border: 1px solid #eee; border-radius: 4px" />
         </div>
-      </a-space>
+      </div>
     </a-card>
-    <a-space style="margin-bottom: 16px">
+    <div class="page-toolbar">
       <a-button type="primary" @click="openEditor()">添加频道</a-button>
       <a-radio-group v-model:value="filter" @change="load">
         <a-radio-button value="all">全部</a-radio-button>
         <a-radio-button :value="true">上架中</a-radio-button>
         <a-radio-button :value="false">已下架</a-radio-button>
       </a-radio-group>
-    </a-space>
+    </div>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
@@ -72,7 +76,7 @@
           <span>{{ botName(record.botId) }}</span>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-space>
+          <a-space class="table-actions">
             <a @click="openEditor(record)">编辑</a>
             <a @click="check(record.id)">检测</a>
             <a @click="pushAll(record.id)">全量推送</a>
@@ -82,7 +86,7 @@
         </template>
       </template>
     </a-table>
-    <a-modal v-model:open="visible" title="频道配置" @ok="save">
+    <a-modal class="modal-form" v-model:open="visible" title="频道配置" @ok="save">
       <a-form :model="editing" layout="vertical">
         <a-form-item label="频道名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="用户名"><a-input v-model:value="editing.username" placeholder="@xxx（公开频道）" /></a-form-item>
@@ -109,9 +113,9 @@
       </a-form>
     </a-modal>
 
-    <a-card title="智能频道推荐规则" style="margin-top: 16px">
-      <div style="color: #666; margin-bottom: 12px">按关键词/标签/城市/省份/价格自动匹配发布频道；无命中时回退默认频道。正文标注行格式：城市：北京 / 省份：广东 / 价格：￥500</div>
-      <a-button type="primary" @click="openRuleEditor()" style="margin-bottom: 12px">添加规则</a-button>
+    <a-card title="智能频道推荐规则" class="mt-16">
+      <div class="desc-text mb-12">按关键词/标签/城市/省份/价格自动匹配发布频道；无命中时回退默认频道。正文标注行格式：城市：北京 / 省份：广东 / 价格：￥500</div>
+      <a-button type="primary" @click="openRuleEditor()" class="mb-12">添加规则</a-button>
       <a-table :columns="ruleColumns" :data-source="rules" row-key="id" :loading="ruleLoading" size="small">
         <template #bodyCell="{ column, record }">
           <a-tag v-if="column.key === 'enabled'" :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '禁用' }}</a-tag>
@@ -121,7 +125,7 @@
         </template>
       </a-table>
     </a-card>
-    <a-modal v-model:open="ruleVisible" title="推荐规则" @ok="saveRule">
+    <a-modal class="modal-form" v-model:open="ruleVisible" title="推荐规则" @ok="saveRule">
       <a-form :model="ruleForm" layout="vertical">
         <a-form-item label="规则名称"><a-input v-model:value="ruleForm.name" /></a-form-item>
         <a-form-item label="关键词（标题+正文包含）"><a-input v-model:value="ruleForm.keyword" /></a-form-item>

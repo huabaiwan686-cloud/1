@@ -1,26 +1,28 @@
 <template>
-  <div>
-    <a-button type="primary" @click="openEditor()" style="margin-bottom: 16px">新建采集规则</a-button>
+  <div class="page">
+    <a-button type="primary" @click="openEditor()" class="mb-16">新建采集规则</a-button>
     <a-table :columns="columns" :data-source="rules" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
-          <a-space>
+          <a-space class="table-actions">
             <a @click="openEditor(record)">编辑</a>
             <a-popconfirm title="确认删除？" @confirm="remove(record.id)"><a>删除</a></a-popconfirm>
           </a-space>
         </template>
         <template v-else-if="column.key === 'flags'">
-          <a-tag v-if="record.globalApply" color="blue">全局</a-tag>
-          <a-tag v-if="record.needReview" color="orange">需审核</a-tag>
-          <a-tag v-if="record.dedupEnabled" color="green">去重</a-tag>
+          <div class="tag-group">
+            <a-tag v-if="record.globalApply" color="blue">全局</a-tag>
+            <a-tag v-if="record.needReview" color="orange">需审核</a-tag>
+            <a-tag v-if="record.dedupEnabled" color="green">去重</a-tag>
+          </div>
         </template>
       </template>
     </a-table>
 
-    <a-card title="采集频道（数据源）" style="margin-top: 24px">
-      <a-alert type="info" show-icon style="margin-bottom: 16px"
+    <a-card title="采集频道（数据源）" class="mt-24">
+      <a-alert type="info" show-icon class="mb-16"
         message="worker 每 60 秒拉取这些来源的新消息，按所选规则处理后入库。来源填频道/群的 @username 或链接。" />
-      <a-form layout="inline" style="margin-bottom: 16px">
+      <a-form layout="inline" class="mb-16 form-inline-row">
         <a-form-item><a-input v-model:value="chName" placeholder="名称" style="width: 140px" /></a-form-item>
         <a-form-item><a-input v-model:value="chTarget" placeholder="来源 @xxx" style="width: 180px" /></a-form-item>
         <a-form-item>
@@ -44,7 +46,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="visible" title="采集规则" @ok="save" width="720px">
+    <a-modal class="modal-form" v-model:open="visible" title="采集规则" @ok="save" width="720px">
       <a-form :model="editing" layout="vertical">
         <a-form-item label="规则名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="目标频道 ID（逗号分隔）">
@@ -54,35 +56,33 @@
           <a-checkbox v-model:checked="editing.global_apply">全局应用</a-checkbox>
           <a-checkbox v-model:checked="editing.need_review">采集后需审核</a-checkbox>
         </a-space>
-        <a-divider>文案处理</a-divider>
+        <div class="form-section-title">文案处理</div>
         <a-checkbox v-model:checked="editing.prefix_enabled">文案前附加</a-checkbox>
-        <a-textarea v-model:value="editing.prefix_text" :rows="2" />
-        <a-checkbox v-model:checked="editing.suffix_enabled">文案后附加</a-checkbox>
-        <a-textarea v-model:value="editing.suffix_text" :rows="2" />
-        <a-checkbox v-model:checked="editing.clean_identifiers">清理编号和介绍费标识</a-checkbox>
-        <a-divider>文本替换（每行一组，格式：原文=替换后）</a-divider>
+        <a-textarea v-model:value="editing.prefix_text" :rows="2" class="mt-8" />
+        <div class="mt-12"><a-checkbox v-model:checked="editing.suffix_enabled">文案后附加</a-checkbox></div>
+        <a-textarea v-model:value="editing.suffix_text" :rows="2" class="mt-8" />
+        <div class="mt-12"><a-checkbox v-model:checked="editing.clean_identifiers">清理编号和介绍费标识</a-checkbox></div>
+        <div class="form-section-title">文本替换（每行一组，格式：原文=替换后）</div>
         <a-textarea v-model:value="editing.replace_rules_str" :rows="3" placeholder="老介绍费=新介绍费" />
-        <a-space style="margin-top: 8px">
-          <a-checkbox v-model:checked="editing.fee_suffix_enabled">介绍费后缀修改</a-checkbox>
-        </a-space>
-        <a-input v-model:value="editing.fee_suffix_text" placeholder="统一后的介绍费后缀文案" style="margin-top: 4px" />
-        <a-divider>文本删除（每行一条）</a-divider>
+        <div class="mt-12"><a-checkbox v-model:checked="editing.fee_suffix_enabled">介绍费后缀修改</a-checkbox></div>
+        <a-input v-model:value="editing.fee_suffix_text" placeholder="统一后的介绍费后缀文案" class="mt-8" />
+        <div class="form-section-title">文本删除（每行一条）</div>
         <a-textarea v-model:value="editing.delete_texts_str" :rows="2" placeholder="命中即从文案中删除的文本" />
-        <a-divider>命中删整行（每行一个关键词）</a-divider>
+        <div class="form-section-title">命中删整行（每行一个关键词）</div>
         <a-textarea v-model:value="editing.delete_line_keywords_str" :rows="2" placeholder="含该关键词则删除整行" />
-        <a-divider>去重</a-divider>
+        <div class="form-section-title">去重</div>
         <a-space>
           <a-checkbox v-model:checked="editing.dedup_enabled">图文去重</a-checkbox>
           <a-checkbox v-model:checked="editing.dedup_window_enabled">去重时间窗</a-checkbox>
           <a-input-number v-model:value="editing.dedup_days" :min="1" /> 天
         </a-space>
-        <a-divider>屏蔽</a-divider>
+        <div class="form-section-title">屏蔽</div>
         <a-space>
           <a-checkbox v-model:checked="editing.block_links">屏蔽链接</a-checkbox>
           <a-checkbox v-model:checked="editing.block_usernames">屏蔽用户名</a-checkbox>
           <a-checkbox v-model:checked="editing.block_plain_text">屏蔽纯文本</a-checkbox>
         </a-space>
-        <a-divider>屏蔽文本（每行一条，含即忽略）</a-divider>
+        <div class="form-section-title">屏蔽文本（每行一条，含即忽略）</div>
         <a-textarea v-model:value="editing.block_texts_str" :rows="2" />
       </a-form>
     </a-modal>
