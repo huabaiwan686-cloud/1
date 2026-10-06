@@ -152,9 +152,8 @@ async def login_verify(body: CodeIn, user: User = Depends(get_current_user), db:
         db.commit()
         _login_sessions.pop(body.session_key, None)
         return ok(_out(a), msg="登录成功")
-    # 未配置 api_id/api_hash：保持原有模拟流程
-    s["stage"] = "authed"
-    a = TgAccount(name=body.session_key[:8], phone=s["phone"], status="online")
-    db.add(a)
-    db.commit()
-    return ok(_out(a), msg="登录成功（待配置 TG_API_ID / TG_API_HASH）")
+    # 未配置 api_id/api_hash：拒绝伪造登录，明确提示去配置
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        "TG_API_ID / TG_API_HASH 未配置，无法真实登录。请在服务器环境变量中配置后再试",
+    )

@@ -72,11 +72,40 @@ def delete_channel(channel_id: int, user: User = Depends(get_current_user), db: 
 
 @router.post("/{channel_id}/check")
 def check_channel(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """连通性检测（TODO Phase 4：接 Telethon 真实检测）。"""
+    """连通性检测：经绑定的 Bot 调 getChat + getChatMember，确认 Bot 为频道管理员。"""
+    import httpx
+    from app.api.v1.bots import _dec
+    from app.models.account import BotToken
     c = db.query(Channel).filter(Channel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
-    return ok({"channelId": channel_id, "reachable": None, "msg": "待接入 TG 检测"}, msg="检测任务已提交")
+    chat = c.tg_channel_id or c.username
+    if not chat:
+        return ok({"channelId": channel_id, "reachable": False, "msg": "未配置频道地址"})
+    if not c.bot_id:
+        return ok({"channelId": channel_id, "reachable": False, "msg": "未绑定推送 Bot"})
+    bot = db.query(BotToken).filter(BotToken.id == c.bot_id).first()
+    if not bot:
+        return ok({"channelId": channel_id, "reachable": False, "msg": "绑定的 Bot 不存在"})
+    token = _dec(bot.token_secret)
+    try:
+        r = httpx.get(f"https://api.telegram.org/bot{token}/getChat",
+                      params={"chat_id": chat}, timeout=15).json()
+        if not r.get("ok"):
+            return ok({"channelId": channel_id, "reachable": False,
+                       "msg": f"频道不可达：{r.get('description', '')}"})
+        me = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15).json()
+        bot_id = (me.get("result") or {}).get("id")
+        m = httpx.get(f"https://api.telegram.org/bot{token}/getChatMember",
+                      params={"chat_id": chat, "user_id": bot_id}, timeout=15).json()
+        status = ((m.get("result") or {}).get("status")) if m.get("ok") else ""
+        if status in ("administrator", "creator"):
+            return ok({"channelId": channel_id, "reachable": True,
+                       "msg": f"正常：Bot 为频道{'创建者' if status == 'creator' else '管理员'}"})
+        return ok({"channelId": channel_id, "reachable": False,
+                   "msg": f"Bot 在频道中身份为[{status or '未知'}]，请设为管理员"})
+    except Exception as e:  # noqa: BLE001
+        return ok({"channelId": channel_id, "reachable": False, "msg": f"检测异常：{e}"})
 
 
 @router.post("/{channel_id}/push_all")
@@ -93,6 +122,10 @@ def push_all(channel_id: int, user: User = Depends(get_current_user), db: Sessio
     c = db.query(Channel).filter(Channel.id == channel_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
+    if not c.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "频道已下架，无法推送")
+    if not c.bot_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "频道未绑定推送 Bot，请先绑定")
     now = datetime.utcnow()
     notes = db.query(Note).filter(Note.status == "published").order_by(Note.id).all()
     ok_count, fail_count, skipped = 0, 0, 0
@@ -115,7 +148,26 @@ def push_all(channel_id: int, user: User = Depends(get_current_user), db: Sessio
 
 @router.post("/{channel_id}/clear_queue")
 def clear_queue(channel_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """清空该频道的待发送队列：把定时未到且含该频道的笔记移出目标（不删笔记本身）。"""
+    from datetime import datetime
+    from app.models.content import Note
+    c = db.query(Channel).filter(Channel.id == channel_id).first()
+    if not c:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
+    now = datetime.utcnow()
+    notes = db.query(Note).filter(
+        Note.status == "published",
+        Note.scheduled_at.isnot(None),
+        Note.scheduled_at > now,
+        Note.scheduled_sent.is_(False),
+    ).all()
+    n = 0
+    for note in notes:
+        cids = note.channel_ids or []
+        if channel_id in cids:
+            note.channel_ids = [x for x in cids if x != channel_id]  # 重新赋值以触发 JSON 脏检查
+            n += 1
     db.add(TaskLog(action="clear_queue", executor=user.username, result="success",
-                   detail=f"频道 {channel_id} 队列已清空"))
+                   detail=f"频道 {c.name} 待发送队列已清空（移出 {n} 条定时笔记）"))
     db.commit()
-    return ok(msg="队列已清空")
+    return ok(msg=f"队列已清空，共移出 {n} 条待发送")

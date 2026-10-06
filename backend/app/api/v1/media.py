@@ -91,6 +91,14 @@ def delete_material(material_id: int, user: User = Depends(get_current_user), db
     m = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == material_id).first()
     if not m:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "素材不存在")
+    # 同步删除磁盘文件，避免残留
+    try:
+        rel = (m.url or "").replace("/uploads/", "", 1).lstrip("/")
+        rp = os.path.realpath(os.path.join(UPLOAD_DIR, rel))
+        if rel and rp.startswith(os.path.realpath(UPLOAD_DIR)) and os.path.isfile(rp):
+            os.remove(rp)
+    except Exception:  # noqa: BLE001
+        pass
     db.delete(m)
     db.commit()
     return ok(msg="素材已删除")

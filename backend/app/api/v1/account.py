@@ -12,8 +12,8 @@ router = APIRouter(prefix="/account", tags=["account"])
 
 
 class ProfileSaveIn(BaseModel):
-    display_name: str = ""
-    remark: str = ""
+    display_name: str | None = None
+    remark: str | None = None
 
 
 class PasswordIn(BaseModel):
@@ -45,8 +45,10 @@ def profile_view(user: User = Depends(get_current_user)):
 
 @router.post("/profile/save")
 def profile_save(body: ProfileSaveIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    user.display_name = body.display_name
-    user.remark = body.remark
+    if body.display_name is not None:
+        user.display_name = body.display_name
+    if body.remark is not None:
+        user.remark = body.remark
     db.commit()
     return ok(_user_out(user))
 

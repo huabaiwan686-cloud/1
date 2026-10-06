@@ -14,6 +14,10 @@
   到点的 PushPlan → 经协议号把模板（文字+混合媒体）推送到目标群组。
   支持每天多时间点 / X 天间隔 / X 小时一次，群组间可设 X 秒间隔。
 
+轮询任务：采集（app/services/collector.py）。
+  启用的 CollectChannel → 经协议号拉取来源新消息 → 按 CollectRule
+  做屏蔽/文案处理 → 生成 Note(source="collect")，需审核的进 pending。
+
 启动时先扫一轮：补发宕机期间错过的定时（默认行为）。
 单次尝试后即标记已发送；失败原因记 TaskLog，管理员可手动重发。
 """
@@ -126,6 +130,14 @@ async def run() -> None:
                 log.info("推送计划：%s", pr)
         except Exception:  # noqa: BLE001
             log.exception("推送计划轮询异常")
+        # 采集：拉取来源频道新消息入库
+        try:
+            from app.services.collector import sweep_collect
+            cr = await asyncio.to_thread(sweep_collect)
+            if cr["notes"] or cr["channels"]:
+                log.info("采集：%s", cr)
+        except Exception:  # noqa: BLE001
+            log.exception("采集轮询异常")
     listen_task.cancel()
     log.info("worker 退出")
 

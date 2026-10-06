@@ -113,6 +113,8 @@ def mark_paid(order_id: int, user: User = Depends(get_current_user), db: Session
     o = db.query(VipOrder).filter(VipOrder.id == order_id).first()
     if not o:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "订单不存在")
+    if o.status == "paid":
+        return ok(msg="订单已开通，无需重复操作")  # 幂等：重复调用不延长有效期
     _activate_order(db, o)
     sub = db.query(VipSubscription).order_by(VipSubscription.id.desc()).first()
     return ok(msg=f"已开通 PRO，有效期至 {sub.active_until:%Y-%m-%d}")

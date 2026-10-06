@@ -148,9 +148,14 @@ def list_quick_targets(user: User = Depends(get_current_user), db: Session = Dep
     return ok([{"id": t.id, "name": t.name, "target": t.target} for t in ts])
 
 
+class QuickTargetIn(BaseModel):
+    name: str
+    target: str = ""
+
+
 @router.post("/quick_targets")
-def create_quick_target(name: str, target: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    t = QuickPushTarget(name=name, target=target)
+def create_quick_target(body: QuickTargetIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    t = QuickPushTarget(name=body.name, target=body.target)
     db.add(t)
     db.commit()
     return ok({"id": t.id, "name": t.name, "target": t.target}, msg="快速推送目标已创建")

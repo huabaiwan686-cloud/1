@@ -70,3 +70,10 @@ ALTER TABLE listen_plans ADD COLUMN IF NOT EXISTS keyword_city_map JSON DEFAULT 
 -- 11) 推送计划：小时级间隔 + 上次执行时间
 ALTER TABLE push_plans ADD COLUMN IF NOT EXISTS interval_hours INTEGER DEFAULT 0;
 ALTER TABLE push_plans ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP;
+
+-- 12) 订单记录链上转账 txid（防一笔转账开多单）
+ALTER TABLE vip_orders ADD COLUMN IF NOT EXISTS pay_txid VARCHAR(128) DEFAULT '';
+CREATE INDEX IF NOT EXISTS ix_vip_orders_pay_txid ON vip_orders (pay_txid);
+
+-- 13) 采集来源水位
+ALTER TABLE collect_channels ADD COLUMN IF NOT EXISTS last_msg_id INTEGER DEFAULT 0;

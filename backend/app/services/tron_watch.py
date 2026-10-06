@@ -46,7 +46,11 @@ def fetch_usdt_transfers(address: str, min_timestamp_ms: int, limit: int = 50) -
 
 
 def match_and_activate(db) -> list[str]:
-    """匹配待支付订单并开通，返回命中的订单号列表。"""
+    """匹配待支付订单并开通，返回命中的订单号列表。
+
+    一笔链上转账只开一单：按 txid 去重（跨轮），同轮内已消耗的转账不再匹配。
+    匹配规则：金额 ≥ 订单金额、到账时间 ≥ 订单创建时间 - 60s；金额最接近者优先。
+    """
     from app.api.v1.vip import _activate_order
     from app.models.billing import VipOrder
 
@@ -63,18 +67,33 @@ def match_and_activate(db) -> list[str]:
     except Exception as e:  # noqa: BLE001
         log.warning("trongrid query failed: %s", e)
         return []
+    # 历史已用 txid（防跨轮重复消耗同一笔转账）
+    used_txids = {
+        r[0] for r in db.query(VipOrder.pay_txid)
+        .filter(VipOrder.pay_txid.isnot(None), VipOrder.pay_txid != "").all()
+    }
     hit_orders: list[str] = []
-    for o in pendings:
-        need = float(o.amount_usdt)
-        o_ts = int(o.created_at.timestamp() * 1000) if o.created_at else 0
-        for t in transfers:
-            try:
-                amount = int(t.get("value", 0)) / 1_000_000
-                ts = int(t.get("block_timestamp", 0))
-            except (TypeError, ValueError):
+    for t in transfers:
+        txid = t.get("transaction_id", "") or ""
+        if not txid or txid in used_txids:
+            continue
+        try:
+            amount = int(t.get("value", 0)) / 1_000_000
+            ts = int(t.get("block_timestamp", 0))
+        except (TypeError, ValueError):
+            continue
+        best = None
+        for o in pendings:
+            if o.status != "pending":
                 continue
+            need = float(o.amount_usdt)
+            o_ts = int(o.created_at.timestamp() * 1000) if o.created_at else 0
             if amount + 1e-9 >= need and ts >= o_ts - 60000:
-                _activate_order(db, o)
-                hit_orders.append(o.order_no)
-                break
+                if best is None or abs(amount - need) < abs(amount - float(best.amount_usdt)):
+                    best = o
+        if best is not None:
+            best.pay_txid = txid
+            _activate_order(db, best)
+            hit_orders.append(best.order_no)
+            used_txids.add(txid)
     return hit_orders

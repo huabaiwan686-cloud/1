@@ -114,6 +114,7 @@ class CollectChannel(Base):
     source_target: Mapped[str] = mapped_column(String(255), default="")  # 来源频道/群
     rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("collect_rules.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_msg_id: Mapped[int] = mapped_column(Integer, default=0)  # 采集水位：已处理的最大消息 id
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

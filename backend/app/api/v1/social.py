@@ -45,16 +45,65 @@ def list_two_way(user: User = Depends(get_current_user), db: Session = Depends(g
 
 
 @router.post("/two_way_bots")
-def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # TODO: Telethon 真实建群 + Bot 拉群 + 权限检查
+async def create_two_way(body: TwoWayIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """双向机器人：经协议号真实创建管理群并拉入 Bot，返回群 ID 与邀请链接。
+
+    group_id 留空 → 自动创建「<Bot用户名> 双向通知群」；
+    传入已有群 → 跳过建群，直接绑定记录。
+    """
+    from telethon.tl.functions.messages import CreateChatRequest, ExportChatInviteRequest
+    from app.api.v1.bots import _dec
+    from app.models.account import BotToken, TgAccount, TwoWayBot
+    from app.models.content import TaskLog
+    from app.services.tg_client import _phone_session_path, _proxy_kwargs, _require_config, TgNotConfigured
+    from telethon import TelegramClient
+
+    bot = db.query(BotToken).filter(BotToken.id == body.bot_token_id).first()
+    if not bot:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Bot Token 不存在")
+    acc = db.query(TgAccount).filter(TgAccount.id == body.tg_account_id).first()
+    if not acc or not acc.phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "TG 协议号不存在或未绑定手机号")
+
+    group_id, group_name, invite_link = body.group_id, "", ""
+    if not group_id:
+        # 真实建群
+        try:
+            api_id, api_hash = _require_config()
+        except TgNotConfigured as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        client = TelegramClient(_phone_session_path(acc.phone), api_id, api_hash, **_proxy_kwargs())
+        await client.connect()
+        try:
+            if not await client.is_user_authorized():
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "所选 TG 协议号未登录")
+            bot_username = (bot.username or "").lstrip("@")
+            try:
+                bot_entity = await client.get_entity(bot_username)
+            except Exception:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                    f"找不到 @{bot_username}，请确认 Bot 用户名正确")
+            group_name = f"{bot_username} 双向通知群"
+            res = await client(CreateChatRequest(users=[bot_entity], title=group_name))
+            chat = res.chats[0]
+            group_id = str(chat.id)
+            try:
+                inv = await client(ExportChatInviteRequest(chat.id))
+                invite_link = inv.link or ""
+            except Exception:  # noqa: BLE001
+                invite_link = ""
+        finally:
+            await client.disconnect()
     b = TwoWayBot(
-        bot_token_id=body.bot_token_id, tg_account_id=body.tg_account_id,
-        group_id=body.group_id, group_name="双向通知群",
-        status="active",
+        bot_token_id=bot.id, tg_account_id=acc.id,
+        group_id=group_id, group_name=group_name or "双向通知群",
+        invite_link=invite_link, status="active",
     )
     db.add(b)
+    db.add(TaskLog(action="two_way_create", executor=user.username, result="success",
+                   detail=f"双向机器人：群[{group_name or group_id}] 已创建并绑定"))
     db.commit()
-    return ok({"id": b.id}, msg="双向机器人已创建（待接 TG 真实建群）")
+    return ok({"id": b.id, "groupId": group_id, "inviteLink": invite_link}, msg="双向机器人已创建")
 
 
 # ---- 好友关注 ----
@@ -69,11 +118,19 @@ def list_friends(direction: str = "", user: User = Depends(get_current_user), db
 
 @router.post("/friends/apply")
 def apply_friend(body: FriendApplyIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # TODO: Telethon 真实发送好友申请
+    """好友关注：记录关注关系（应用层概念，TG 无原生好友申请接口）。"""
+    from app.models.content import TaskLog
+    exists = db.query(FriendRelation).filter(
+        FriendRelation.username == body.username,
+        FriendRelation.direction == "following").first()
+    if exists:
+        return ok(msg="已在关注列表中")
     r = FriendRelation(username=body.username, direction="following")
     db.add(r)
+    db.add(TaskLog(action="friend_follow", executor=user.username, result="success",
+                   detail=f"关注 {body.username}"))
     db.commit()
-    return ok(msg="关注申请已发送（待接 TG）")
+    return ok(msg="已关注")
 
 
 # ---- 平台绑定 ----
@@ -83,12 +140,16 @@ def list_bindings(user: User = Depends(get_current_user), db: Session = Depends(
     return ok([{"id": b.id, "bindCode": b.bind_code, "platformName": b.platform_name, "status": b.status} for b in bs])
 
 
+class BindingIn(BaseModel):
+    bind_code: str
+
+
 @router.post("/bindings")
-def create_binding(bind_code: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    b = PlatformBinding(bind_code=bind_code)
+def create_binding(body: BindingIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    b = PlatformBinding(bind_code=body.bind_code, status="submitted")
     db.add(b)
     db.commit()
-    return ok({"id": b.id}, msg="绑定码已提交")
+    return ok({"id": b.id}, msg="绑定码已提交，等待平台方审核")
 
 
 # ---- 平台合作 ----
@@ -116,10 +177,14 @@ def import_coops(usernames: list[str], user: User = Depends(get_current_user), d
 
 @router.post("/cooperations/{coop_id}/review")
 def review_coop(coop_id: int, approve: bool = True, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.models.content import TaskLog
     c = db.query(CooperationApplication).filter(CooperationApplication.id == coop_id).first()
     if not c:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "申请不存在")
     c.review_status = "approved" if approve else "rejected"
+    db.add(TaskLog(action="cooperation_review", executor=user.username,
+                   result="success",
+                   detail=f"合作申请#{c.id}（{c.bot_username or ''}）审核{'通过' if approve else '拒绝'}"))
     db.commit()
     return ok(msg="已审核")
 

@@ -20,6 +20,7 @@ class VipOrder(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")  # pending/paid/cancelled
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pay_txid: Mapped[str] = mapped_column(String(128), default="", index=True)  # 匹配到的链上转账 txid（防一笔转账开多单）
 
 
 class VipSubscription(Base):

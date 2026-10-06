@@ -94,10 +94,6 @@ export const botApi = {
   verify: (id: number) => request.post(`/api/bot/tokens/${id}/verify`),
   remove: (id: number) => request.delete(`/api/bot/tokens/${id}`),
   autoCreate: (data: any) => request.post('/api/bot/tokens/auto-create', data),
-  bindStart: (bot_token_id: number) =>
-    request.post('/api/youban-bot/bot/bind/start', { bot_token_id }),
-  bindStatus: (session_key: string) =>
-    request.get('/api/youban-bot/bot/bind/status', { params: { session_key } }),
 };
 
 export const socialApi = {
