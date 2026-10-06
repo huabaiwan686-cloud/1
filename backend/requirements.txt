@@ -13,3 +13,4 @@ onnxruntime>=1.17  # RMBG-1.4 本地抠图（CPU）
 numpy>=1.26
 httpx>=0.27  # Telegram Bot API / Trongrid 调用
 telethon>=1.36  # TG 协议号真实登录/采集/推送（需 TG_API_ID / TG_API_HASH）
+python-socks>=3.1

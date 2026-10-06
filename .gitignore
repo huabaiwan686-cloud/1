@@ -3,6 +3,7 @@
 *.onnx
 
 backend/data.db
+backend/data/
 backend/uploads/
 
 # Python 虚拟环境与缓存

@@ -32,6 +32,26 @@ def _require_config() -> tuple[int, str]:
     return int(os.environ["TG_API_ID"]), os.environ["TG_API_HASH"]
 
 
+def _proxy_kwargs() -> dict:
+    """代理感知：设置了 HTTPS_PROXY/HTTP_PROXY 时 Telethon 走代理（python-socks）。
+
+    某些云主机直连 TG 会被中间设备 RST，经出口代理可通；无代理环境返回空 dict。
+    """
+    import os as _os
+    from urllib.parse import urlparse as _urlparse
+    raw = _os.environ.get("HTTPS_PROXY") or _os.environ.get("https_proxy") \
+        or _os.environ.get("HTTP_PROXY") or _os.environ.get("http_proxy")
+    if not raw:
+        return {}
+    try:
+        u = _urlparse(raw)
+        if not u.hostname or not u.port:
+            return {}
+        return {"proxy": ("http", u.hostname, u.port, True, u.username, u.password)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _session_path(key: str) -> str:
     os.makedirs(SESSION_DIR, exist_ok=True)
     safe = "".join(c for c in key if c.isalnum() or c in ("-", "_"))[:64]
@@ -54,7 +74,7 @@ async def start_login(key: str, phone: str):
     """真实发送登录验证码。返回 client（调用方存入会话）。"""
     from telethon import TelegramClient
     api_id, api_hash = _require_config()
-    client = TelegramClient(_phone_session_path(phone), api_id, api_hash)
+    client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
     await client.connect()
     if await client.is_user_authorized():
         _clients[key] = client
@@ -87,7 +107,7 @@ async def refresh_status(key: str, phone: str) -> str:
     api_id, api_hash = _require_config()
     client = _clients.get(key)
     if client is None:
-        client = TelegramClient(_phone_session_path(phone), api_id, api_hash)
+        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
         await client.connect()
         _clients[key] = client
     try:
@@ -125,7 +145,7 @@ async def auto_create_bot_via_botfather(phone: str, bot_name: str, username: str
     key = f"autobot_{phone}"
     client = _clients.get(key)
     if client is None:
-        client = TelegramClient(_phone_session_path(phone), api_id, api_hash)
+        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
         await client.connect()
         _clients[key] = client
     if not await client.is_user_authorized():
@@ -182,7 +202,7 @@ async def refresh_dialogs(phone: str) -> list[dict]:
     key = f"dlg_{phone}"
     client = _clients.get(key)
     if client is None:
-        client = TelegramClient(_phone_session_path(phone), api_id, api_hash)
+        client = TelegramClient(_phone_session_path(phone), api_id, api_hash, **_proxy_kwargs())
         await client.connect()
         _clients[key] = client
     if not await client.is_user_authorized():
