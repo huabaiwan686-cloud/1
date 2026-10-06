@@ -194,37 +194,44 @@ def apply_anti_scan_config(data: bytes, cfg: dict) -> bytes:
             pass
     if cfg.get("backgroundTextureEnabled"):
         preset = cfg.get("backgroundTexturePreset", "rabbit") or "rabbit"
-        try:
-            from app.api.v1.media import ANTI_SCAN_TEXTURES, _load_textures
-            _load_textures()
-            svg = ANTI_SCAN_TEXTURES.get(preset)
-            if svg:
-                # SVG 转小图平铺作为背景
-                import cairosvg
-                png = cairosvg.svg2png(bytestring=svg.encode(), write_to=None,
-                                      output_width=160, output_height=160)
-                tile = Image.open(io.BytesIO(png)).convert("RGB")
-                w, h = img.size
-                bg = Image.new("RGB", (w, h))
-                for y in range(0, h, 160):
-                    for x in range(0, w, 160):
-                        bg.paste(tile, (x, y))
-                # 人像区域保留：简单中心叠加原图
-                ow = max(30, min(100, int(cfg.get("originalOverlayWidth", 72))))
-                nw, nh = int(w * ow / 100), int(h * ow / 100)
-                fg = img.resize((nw, nh), Image.LANCZOS)
-                op = max(50, min(100, int(cfg.get("originalOverlayOpacity", 92)))) / 100.0
-                if op < 1.0:
-                    fg = fg.convert("RGBA")
-                    alpha = fg.split()[3] if fg.mode == "RGBA" else None
-                    white = Image.new("RGBA", fg.size, (255, 255, 255, 0))
-                    fg = Image.alpha_composite(white, fg)
-                    fg.putalpha(int(255 * op))
-                    fg = fg.convert("RGB")
-                bg.paste(fg, ((w - nw) // 2, (h - nh) // 2))
-                img = bg
-        except Exception:  # noqa: BLE001
-            pass
+        # 人物背景模糊：抠出人物，背景高斯模糊
+        if preset == "blur":
+            try:
+                blurred_bytes = blur_background(_encode(img, quality))
+                img = _open(blurred_bytes)
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            try:
+                from app.api.v1.media import ANTI_SCAN_TEXTURES, _load_textures
+                _load_textures()
+                svg = ANTI_SCAN_TEXTURES.get(preset)
+                if svg:
+                    # SVG 转小图平铺作为背景
+                    import cairosvg
+                    png = cairosvg.svg2png(bytestring=svg.encode(), write_to=None,
+                                          output_width=160, output_height=160)
+                    tile = Image.open(io.BytesIO(png)).convert("RGB")
+                    w, h = img.size
+                    bg = Image.new("RGB", (w, h))
+                    for y in range(0, h, 160):
+                        for x in range(0, w, 160):
+                            bg.paste(tile, (x, y))
+                    # 人像区域保留：简单中心叠加原图
+                    ow = max(30, min(100, int(cfg.get("originalOverlayWidth", 72))))
+                    nw, nh = int(w * ow / 100), int(h * ow / 100)
+                    fg = img.resize((nw, nh), Image.LANCZOS)
+                    op = max(50, min(100, int(cfg.get("originalOverlayOpacity", 92)))) / 100.0
+                    if op < 1.0:
+                        fg = fg.convert("RGBA")
+                        white = Image.new("RGBA", fg.size, (255, 255, 255, 0))
+                        fg = Image.alpha_composite(white, fg)
+                        fg.putalpha(int(255 * op))
+                        fg = fg.convert("RGB")
+                    bg.paste(fg, ((w - nw) // 2, (h - nh) // 2))
+                    img = bg
+            except Exception:  # noqa: BLE001
+                pass
     if cfg.get("watermarkEnabled"):
         try:
             from app.services.watermark import apply_watermark

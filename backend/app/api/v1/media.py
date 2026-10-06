@@ -657,15 +657,17 @@ def set_anti_scan(body: dict, user: User = Depends(require_admin), db: Session =
 
 @router.get("/anti-scan/textures")
 def list_anti_scan_textures(user: User = Depends(require_member)):
-    """返回 4 个内置背景纹理（data URL）。"""
+    """返回内置背景模板（含人物背景模糊）。"""
     import base64
     _load_textures()
     out = []
-    labels = {"rabbit": "粉色贴图", "heart": "爱心纹理", "dot": "点阵纹理", "grid": "网格纹理"}
+    labels = {"rabbit": "粉色贴图", "heart": "爱心纹理", "dot": "点阵纹理", "grid": "网格纹理",
+              "blur": "人物背景模糊"}
     for name, label in labels.items():
         svg = ANTI_SCAN_TEXTURES.get(name) or ""
         data_url = ""
         if svg:
             data_url = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
-        out.append({"name": name, "label": label, "preview": data_url})
+        out.append({"name": name, "label": label, "preview": data_url,
+                    "is_blur": name == "blur"})
     return ok(out)

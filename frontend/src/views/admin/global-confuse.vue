@@ -94,10 +94,12 @@
                 <div v-if="cfg.backgroundTextureEnabled" style="margin-top: 8px">
                   <a-radio-group v-model:value="cfg.backgroundTexturePreset">
                     <a-radio v-for="t in textures" :key="t.name" :value="t.name">
-                      <img :src="t.preview" style="width: 48px; height: 48px; border-radius: 4px; vertical-align: middle;" />
+                      <img v-if="t.preview" :src="t.preview" style="width: 48px; height: 48px; border-radius: 4px; vertical-align: middle;" />
+                      <span v-else class="blur-preview">模糊</span>
                       {{ t.label }}
                     </a-radio>
                   </a-radio-group>
+                  <div class="hint" style="margin-top: 4px">人物背景模糊：抠出人物主体，背景做高斯模糊处理</div>
                 </div>
               </a-form-item>
               <a-form-item label="轻水印">
@@ -183,4 +185,11 @@ onMounted(load);
 .hint { color: #999; font-size: 12px; margin-top: 4px; }
 .page { padding: 16px; }
 .page-card { max-width: 900px; margin: 0 auto; }
+.blur-preview {
+  display: inline-block; width: 48px; height: 48px; border-radius: 4px;
+  vertical-align: middle; text-align: center; line-height: 48px;
+  font-size: 12px; color: #fff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  filter: blur(1px);
+}
 </style>
