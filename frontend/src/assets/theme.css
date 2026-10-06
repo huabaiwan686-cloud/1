@@ -1,40 +1,46 @@
 /* ============================================================
- * Muse 网页版精确复刻主题
- * 背景 #212121 / 卡片 #2f2f2f / 文字 #ececec/#b4b4b4
- * 强调 #d97757（Muse 橙）/ 边框 rgba(255,255,255,0.1)
- * 纯视觉层：不改任何业务逻辑
+ * 小灰机聊手上架系统 1:1 复刻主题（原站深色）
+ * 背景 #0B0F14 / 侧边栏顶栏 #0F141A / 卡片 #151B24
+ * 主色蓝 #2E7CF6 / 文字 #FFFFFF/#8B94A1
  * ============================================================ */
 
 :root {
-  --app-bg: #212121;
-  --app-sider: #1e1e1e;
-  --app-btn-default: #3d3d3d;
-  --app-btn-default-hover: #454545;
-  --app-bg-soft: #2a2a2a;
-  --app-card: #2f2f2f;
-  --app-card-hover: #383838;
-  --app-input: #2f2f2f;
-  --app-border: rgba(255, 255, 255, 0.1);
-  --app-border-soft: rgba(255, 255, 255, 0.07);
-  --app-text: #ececec;
-  --app-text-secondary: #b4b4b4;
-  --app-text-tertiary: #8e8e8e;
-  --app-accent: #d97757;
-  --app-accent-hover: #c66545;
-  --app-accent-soft: rgba(217, 119, 87, 0.14);
+  --app-bg: #0B0F14;
+  --app-sider: #0F141A;
+  --app-topbar: #0F141A;
+  --app-btn-default: #1c2530;
+  --app-btn-default-hover: #243040;
+  --app-bg-soft: #0F141A;
+  --app-card: #151B24;
+  --app-card-hover: #1a2230;
+  --app-input: #151B24;
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-border-soft: rgba(255, 255, 255, 0.06);
+  --app-text: #FFFFFF;
+  --app-text-secondary: #8B94A1;
+  --app-text-tertiary: #5B6470;
+  --app-accent: #2E7CF6;
+  --app-accent-hover: #4a90f7;
+  --app-accent-soft: rgba(46, 124, 246, 0.14);
   --app-hover-overlay: rgba(255, 255, 255, 0.06);
   --app-radius-card: 12px;
-  --app-radius-btn: 10px;
-  --app-radius-input: 10px;
+  --app-radius-btn: 8px;
+  --app-radius-input: 8px;
   --app-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     'Helvetica Neue', Arial, sans-serif;
+  /* 状态色 */
+  --app-success: #22C55E;
+  --app-danger: #F0435A;
+  --app-warning: #F5A623;
+  --app-vip-gold: #E3B341;
 }
 
 /* ---------- 亮色主题 ---------- */
 [data-theme="light"] {
   --app-bg: #f0f2f5;
   --app-sider: #ffffff;
+  --app-topbar: #ffffff;
   --app-btn-default: #ffffff;
   --app-btn-default-hover: #f5f5f5;
   --app-bg-soft: #ffffff;
@@ -46,10 +52,14 @@
   --app-text: rgba(0, 0, 0, 0.85);
   --app-text-secondary: rgba(0, 0, 0, 0.55);
   --app-text-tertiary: rgba(0, 0, 0, 0.35);
-  --app-accent: #1890ff;
-  --app-accent-hover: #40a9ff;
+  --app-accent: #2E7CF6;
+  --app-accent-hover: #4a90f7;
   --app-hover-overlay: rgba(0, 0, 0, 0.04);
-  --app-accent-soft: rgba(24, 144, 255, 0.1);
+  --app-accent-soft: rgba(46, 124, 246, 0.1);
+  --app-success: #22C55E;
+  --app-danger: #F0435A;
+  --app-warning: #F5A623;
+  --app-vip-gold: #E3B341;
 }
 
 /* ---------- 全局 ---------- */
