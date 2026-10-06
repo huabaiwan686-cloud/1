@@ -23,4 +23,6 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/accounts/friends', component: () => import('@/views/admin/accounts/friends.vue') },
   { path: '/admin/users', component: () => import('@/views/admin/users.vue') },
   { path: '/admin/vip', component: () => import('@/views/admin/vip.vue') },
+  { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
+  { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
 ];
