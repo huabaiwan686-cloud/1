@@ -10,7 +10,16 @@ router = APIRouter(tags=["menu"])
 MENU_TREE = [
     {"name": "Dashboard", "path": "/admin/dashboard", "title": "工作台"},
     {"name": "AdminUsers", "path": "/admin/users", "title": "账号管理"},
-    {"name": "CollectorUpload", "path": "/collector/upload", "title": "上传资料"},
+    {
+        "name": "Collector",
+        "path": "/collector",
+        "title": "采集端",
+        "children": [
+            {"name": "CollectorUpload", "path": "/collector/upload", "title": "上传资料"},
+            {"name": "CollectorContent", "path": "/collector/content", "title": "我的内容"},
+            {"name": "CollectorRecords", "path": "/collector/records", "title": "采集记录"},
+        ],
+    },
     {"name": "AdminNotes", "path": "/admin/notes", "title": "笔记列表"},
     {"name": "AdminLogs", "path": "/admin/logs", "title": "任务记录"},
     {"name": "AdminChannels", "path": "/admin/channels", "title": "频道配置"},
@@ -34,6 +43,7 @@ MENU_TREE = [
     {"name": "PlatformCooperation", "path": "/admin/accounts/platform-cooperation", "title": "平台合作"},
     {"name": "Friends", "path": "/admin/accounts/friends", "title": "好友关注"},
     {"name": "Vip", "path": "/admin/vip", "title": "VIP会员"},
+    {"name": "Announcements", "path": "/admin/announcements", "title": "系统公告"},
 ]
 
 

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import account, auth, bots, channel, collect, dashboard, invite, listen, media, menu, message, meta, note, social, task, tg, vip
+from app.api.v1 import account, announce, auth, bots, channel, collect, collector, dashboard, invite, listen, media, menu, message, meta, note, social, task, tg, vip
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -35,7 +35,7 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 for r in (auth.router, account.router, menu.router, note.router, collect.router, task.router,
          meta.tag_router, meta.city_router, channel.router, message.router, listen.router,
          tg.router, bots.router, social.router, vip.router, invite.router, invite.legacy,
-         media.router, dashboard.router):
+         media.router, dashboard.router, announce.router, collector.router):
     app.include_router(r, prefix=settings.API_PREFIX)
 
 

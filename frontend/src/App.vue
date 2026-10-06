@@ -23,13 +23,16 @@
         <router-view />
       </a-layout-content>
     </a-layout>
+    <a-modal v-model:open="annVisible" :title="annCurrent.title" @ok="dismissAnn" ok-text="知道了">
+      <div style="white-space: pre-wrap">{{ annCurrent.content }}</div>
+    </a-modal>
   </a-layout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { authApi } from '@/api';
+import { authApi, announceApi } from '@/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -37,6 +40,28 @@ const collapsed = ref(false);
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
+const annQueue = ref<any[]>([]);
+const annCurrent = ref<any>({});
+const annVisible = ref(false);
+
+function dismissAnn() {
+  try { localStorage.setItem('ann_read_' + annCurrent.value.id, '1'); } catch { /* ignore */ }
+  annVisible.value = false;
+  showNextAnn();
+}
+function showNextAnn() {
+  const next = annQueue.value.shift();
+  if (next) { annCurrent.value = next; annVisible.value = true; }
+}
+async function loadAnnouncements() {
+  try {
+    const list: any[] = await announceApi.active();
+    annQueue.value = list.filter((a: any) => {
+      try { return !localStorage.getItem('ann_read_' + a.id); } catch { return true; }
+    });
+    showNextAnn();
+  } catch { /* ignore */ }
+}
 
 const isLoginPage = computed(() => route.path === '/login');
 
@@ -56,6 +81,7 @@ onMounted(async () => {
     menus.value = await authApi.menu();
     const me: any = await authApi.current();
     username.value = me.username;
+    loadAnnouncements();
   } catch { /* 401 由 request 拦截器跳登录 */ }
 });
 </script>

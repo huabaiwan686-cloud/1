@@ -4,6 +4,8 @@ export const routes: RouteRecordRaw[] = [
   { path: '/login', component: () => import('@/views/login.vue') },
   { path: '/', redirect: '/collector/upload' },
   { path: '/collector/upload', component: () => import('@/views/collector/upload.vue') },
+  { path: '/collector/content', component: () => import('@/views/collector/content.vue') },
+  { path: '/collector/records', component: () => import('@/views/collector/records.vue') },
   { path: '/admin/notes', component: () => import('@/views/admin/notes.vue') },
   { path: '/admin/collection', component: () => import('@/views/admin/collection.vue') },
   { path: '/admin/collection/review', component: () => import('@/views/admin/collection-review.vue') },
@@ -23,6 +25,7 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/accounts/friends', component: () => import('@/views/admin/accounts/friends.vue') },
   { path: '/admin/users', component: () => import('@/views/admin/users.vue') },
   { path: '/admin/vip', component: () => import('@/views/admin/vip.vue') },
+  { path: '/admin/announcements', component: () => import('@/views/admin/announcements.vue') },
   { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
   { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
 ];

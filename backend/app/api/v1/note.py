@@ -129,6 +129,7 @@ def create_note(body: NoteIn, user: User = Depends(get_current_user), db: Sessio
         scheduled_at=body.scheduled_at,
         source="manual",
         status="draft",
+        created_by=user.id,
     )
     db.add(n)
     db.flush()

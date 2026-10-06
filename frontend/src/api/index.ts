@@ -12,6 +12,10 @@ export const authApi = {
   current: () => request.get('/api/account/current'),
 };
 
+export const userApi = {
+  list: () => request.get('/api/account/list'),
+};
+
 export const noteApi = {
   list: (params: any) => request.get('/api/note/list', { params }),
   get: (id: number) => request.get(`/api/note/${id}`),
@@ -72,6 +76,8 @@ export const tgApi = {
   accounts: () => request.get('/api/tg/accounts'),
   removeAccount: (id: number) => request.delete(`/api/tg/accounts/${id}`),
   refreshAccount: (id: number) => request.post(`/api/tg/accounts/${id}/refresh`),
+  transferAccount: (id: number, target_user_id: number | null) =>
+    request.post(`/api/tg/accounts/${id}/transfer`, { target_user_id }),
   loginStart: (phone: string) =>
     request.post('/api/youban-bot/bot/login/start', { phone }),
   loginStatus: (session_key: string) =>
@@ -153,4 +159,17 @@ export const metaApi = {
     request.post('/api/tag/create', null, { params: { name } }),
   cityTree: () => request.get('/api/city/tree'),
   taskLogs: (params: any) => request.get('/api/task/logs', { params }),
+};
+
+export const announceApi = {
+  active: () => request.get('/api/announce/active'),
+  list: () => request.get('/api/announce/list'),
+  create: (data: any) => request.post('/api/announce/create', data),
+  update: (id: number, data: any) => request.put(`/api/announce/${id}`, data),
+  remove: (id: number) => request.delete(`/api/announce/${id}`),
+};
+
+export const collectorApi = {
+  myNotes: (params: any) => request.get('/api/collector/notes', { params }),
+  myRecords: (params: any) => request.get('/api/collector/records', { params }),
 };

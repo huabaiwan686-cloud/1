@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import TgAccount
+from app.models.content import TaskLog
 from app.models.user import User
 from app.services.tg_client import (
     TgNotConfigured,
@@ -34,17 +35,48 @@ class CodeIn(BaseModel):
     password: str = ""  # 二级密码
 
 
-def _out(a: TgAccount) -> dict:
+def _out(a: TgAccount, db: Session | None = None) -> dict:
+    owner = ""
+    if a.user_id and db is not None:
+        u = db.query(User).filter(User.id == a.user_id).first()
+        owner = u.username if u else ""
     return {
         "id": a.id, "name": a.name, "username": a.username,
         "tgUserId": a.tg_user_id, "phone": a.phone, "status": a.status,
+        "userId": a.user_id, "owner": owner,
         "createdAt": a.created_at.isoformat() if a.created_at else None,
     }
 
 
 @router.get("/tg/accounts")
 def list_accounts(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return ok([_out(a) for a in db.query(TgAccount).order_by(TgAccount.id.desc()).all()])
+    return ok([_out(a, db) for a in db.query(TgAccount).order_by(TgAccount.id.desc()).all()])
+
+
+class TransferIn(BaseModel):
+    target_user_id: int | None = None  # 空=转回公共
+
+
+@router.post("/tg/accounts/{account_id}/transfer")
+def transfer_account(account_id: int, body: TransferIn,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """账号转移：把协议号的所属人转给目标用户（空=转回公共池）。仅管理员。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    a = db.query(TgAccount).filter(TgAccount.id == account_id).first()
+    if not a:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
+    target = None
+    if body.target_user_id:
+        target = db.query(User).filter(User.id == body.target_user_id).first()
+        if not target:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+    a.user_id = target.id if target else None
+    db.add(TaskLog(note_id=None, action="account_transfer", executor=user.username,
+                   result="success",
+                   detail=f"协议号 {a.phone or a.name} 转移给 {target.username if target else '公共池'}"))
+    db.commit()
+    return ok(msg=f"已转移给 {target.username if target else '公共池'}")
 
 
 @router.delete("/tg/accounts/{account_id}")

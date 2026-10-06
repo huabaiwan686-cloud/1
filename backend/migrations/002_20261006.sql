@@ -28,3 +28,19 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS scheduled_sent BOOLEAN DEFAULT FALSE;
 --    老数据 0/1 会自动转成 false/true
 ALTER TABLE image_jobs ALTER COLUMN quota_consumed TYPE BOOLEAN USING quota_consumed::boolean;
 ALTER TABLE image_jobs ALTER COLUMN fallback TYPE BOOLEAN USING fallback::boolean;
+
+-- 5) 系统公告表
+CREATE TABLE IF NOT EXISTS announcements (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) DEFAULT '',
+    content TEXT DEFAULT '',
+    enabled BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6) 笔记创建人（采集端内容/记录用）
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id);
+
+-- 7) 协议号所属人（账号转移用，空=公共）
+ALTER TABLE tg_accounts ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

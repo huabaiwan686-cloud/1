@@ -1,4 +1,5 @@
 from app.models.content import (  # noqa: F401
+    Announcement,
     City,
     CollectChannel,
     CollectRule,

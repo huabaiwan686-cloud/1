@@ -12,11 +12,19 @@
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a @click="refresh(record.id)">刷新状态</a>
+            <a @click="openTransfer(record)">转移</a>
             <a-popconfirm title="确认删除？" @confirm="remove(record.id)"><a>删除</a></a-popconfirm>
           </a-space>
         </template>
       </template>
     </a-table>
+
+    <a-modal v-model:open="transferVisible" title="账号转移" @ok="doTransfer">
+      <p style="color: #666">把该协议号转移给目标用户（不选=转回公共池）。</p>
+      <a-select v-model:value="transferUserId" placeholder="选择目标用户（不选=公共池）" allow-clear style="width: 100%">
+        <a-select-option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</a-select-option>
+      </a-select>
+    </a-modal>
 
     <a-modal v-model:open="phoneVisible" title="手机号登录" @ok="startPhone" ok-text="发送验证码">
       <a-input v-model:value="phone" placeholder="+8613800000000" />
@@ -34,19 +42,24 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { tgApi } from '@/api';
+import { tgApi, userApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
   { title: '名称', dataIndex: 'name' },
   { title: '用户名', dataIndex: 'username' },
+  { title: '所属', dataIndex: 'owner', width: 120 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 180 },
+  { title: '操作', key: 'action', width: 240 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
 const phoneVisible = ref(false); const codeVisible = ref(false); const qrVisible = ref(false);
 const phone = ref(''); const code = ref(''); const password = ref('');
 const sessionKey = ref('');
+const transferVisible = ref(false);
+const transferUserId = ref<number | null>(null);
+const transferId = ref(0);
+const users = ref<any[]>([]);
 
 async function load() {
   loading.value = true;
@@ -64,5 +77,16 @@ async function verifyCode() {
 }
 async function refresh(id: number) { await tgApi.refreshAccount(id); load(); }
 async function remove(id: number) { await tgApi.removeAccount(id); message.success('已删除'); load(); }
+async function openTransfer(record: any) {
+  transferId.value = record.id; transferUserId.value = record.userId || null;
+  try { users.value = await userApi.list(); } catch { users.value = []; }
+  transferVisible.value = true;
+}
+async function doTransfer() {
+  try {
+    const r: any = await tgApi.transferAccount(transferId.value, transferUserId.value);
+    message.success(r.msg || '已转移'); transferVisible.value = false; load();
+  } catch (e: any) { message.error(e.message); }
+}
 onMounted(load);
 </script>

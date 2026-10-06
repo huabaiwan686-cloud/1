@@ -19,6 +19,7 @@ class TgAccount(Base):
     phone: Mapped[str] = mapped_column(String(32), default="")
     session_secret: Mapped[str] = mapped_column(Text, default="")  # 加密后的 session
     status: Mapped[str] = mapped_column(String(16), default="offline")  # online/offline/expired
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # 所属人（空=公共）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

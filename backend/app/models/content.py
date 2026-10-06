@@ -42,6 +42,7 @@ class Note(Base):
     status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
     source: Mapped[str] = mapped_column(String(16), default="manual")  # manual/collect
     account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 所属上架账号
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # 创建人（采集端内容/记录用）
     channel_ids: Mapped[list] = mapped_column(JSON, default=list)  # 目标频道 id 列表
     service_remark: Mapped[str] = mapped_column(Text, default="")  # 客服备注（仅后台可见）
     number_code: Mapped[str] = mapped_column(String(64), default="")  # 编号/标识
@@ -128,3 +129,16 @@ class TaskLog(Base):
     result: Mapped[str] = mapped_column(String(16), default="success")  # success/fail/processing
     detail: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class Announcement(Base):
+    """系统公告：登录后弹窗展示。"""
+
+    __tablename__ = "announcements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
