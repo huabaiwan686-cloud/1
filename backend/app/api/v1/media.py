@@ -21,7 +21,10 @@ from app.services.image_pipeline import light_perturb, replace_background
 
 router = APIRouter(prefix="/media", tags=["media"])
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads")
+UPLOAD_DIR = os.environ.get(
+    "UPLOAD_DIR",
+    os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads")),
+)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(os.path.join(UPLOAD_DIR, "results"), exist_ok=True)
 

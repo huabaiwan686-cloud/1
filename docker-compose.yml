@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: xh
+      POSTGRES_PASSWORD: xh
+      POSTGRES_DB: xiaohuiji
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xh"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+    volumes:
+      - uploads:/srv/uploads
+    expose:
+      - "8000"
+
+  web:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,7 +1,7 @@
-import type { RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 
 export const routes: RouteRecordRaw[] = [
-  { path: '/login', component: () => import('@/views/login.vue'), meta: { public: true } },
+  { path: '/login', component: () => import('@/views/login.vue') },
   { path: '/', redirect: '/collector/upload' },
   { path: '/collector/upload', component: () => import('@/views/collector/upload.vue') },
   { path: '/admin/notes', component: () => import('@/views/admin/notes.vue') },
@@ -26,3 +26,13 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
   { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
 ];
+
+const router = createRouter({ history: createWebHistory(), routes });
+
+router.beforeEach((to) => {
+  if (to.path !== '/login' && !localStorage.getItem('access_token')) {
+    return '/login';
+  }
+});
+
+export default router;

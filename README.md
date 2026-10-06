@@ -43,15 +43,48 @@
 
 详见 `docs/API_CONTRACT.md`。
 
-## 分期计划
+## 快速开始
 
-1. **Phase 1** ✅ 后端骨架 + auth/account/menu（本提交）
-2. Phase 2 内容流：采集 → 审核 → 笔记 → 上传
-3. Phase 3 分发：频道 → 群聊推送 → 关键字监听
-4. Phase 4 账号体系：TG 协议号 / Bot Token / 双向机器人 / 好友关注
-5. Phase 5 变现：VIP 会员 / 邀请 / 图片处理额度
-6. Phase 6 图片处理管线：抠图换背景 + 防扫图扰动
-7. Phase 7 前端复刻 + 全链路联调（对照线上黑盒验证）
+### 一键部署（Docker Compose）
+
+```bash
+cp .env.example .env   # 修改 JWT_SECRET_KEY
+docker compose up -d --build
+```
+
+- 前端：http://服务器IP:8080
+- 后端 API：http://服务器IP:8080/api
+- 健康检查：http://服务器IP:8080/api/health
+
+首次登录：先注册账号（首个注册用户自动为管理员），再用该账号登录。
+
+### 本地开发
+
+```bash
+# 后端
+cd backend && pip install -r requirements.txt
+uvicorn app.main:app --reload   # http://localhost:8000
+
+# 前端
+cd frontend && npm install && npm run dev   # http://localhost:5173（/api 已代理到后端）
+```
+
+## 分期计划（全部完成）
+
+1. **Phase 1** ✅ 后端骨架 + auth/account/menu
+2. **Phase 2** ✅ 内容流：采集 → 审核 → 笔记 → 上传
+3. **Phase 3** ✅ 分发：频道 → 群聊推送 → 关键字监听
+4. **Phase 4** ✅ 账号体系：TG 协议号 / Bot Token / 双向机器人 / 好友关注
+5. **Phase 5** ✅ 变现：VIP 会员 / 邀请 / 图片处理额度
+6. **Phase 6** ✅ 图片处理管线：抠图换背景 + 防扫图扰动
+7. **Phase 7** ✅ 前端 19 页面 + 看板统计 + Docker 一键部署
+
+## 待接入的真实服务（需密钥）
+
+- Telethon：TG 协议号真实登录 / 采集 / 监听 / 推送（`app/api/v1/tg.py` 留有 TODO）
+- Bot API：Token 真实校验（`app/api/v1/bots.py`）
+- USDT 支付网关：订单回调（`app/api/v1/vip.py::mark_paid`）
+- 云抠图：实现 `MattingProvider.get_mask` 后注入（`app/services/image_pipeline.py`）
 
 ## 安全加固（相对原站）
 
