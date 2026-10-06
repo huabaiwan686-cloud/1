@@ -64,7 +64,7 @@
 | 页面 | 功能摘要 | API 调用 |
 |------|----------|----------|
 | `login.vue` | 登录/注册；商户端/平台端切换；登录成功跳 `/admin/notes` | authApi.login/register |
-| `admin/dashboard.vue` | 统计卡片、系统健康、7天趋势图、客服卡、按省市分布 | （写死/占位数据较多） |
+| `admin/dashboard.vue` | 工作台：统计卡片、系统健康、趋势图、客服卡（**静态骨架，无 API 调用**） | — |
 | `admin/users.vue` | 用户增删改、重置密码、邀请码生成/列表 | userApi.list/create/update/remove, inviteApi.generate/list |
 | `admin/channels.vue` ❌隐藏 | **旧版全功能频道页**：频道 CRUD、连通检测、全量推送、清空队列、发布规则管理、全局抠图开关、个人水印设置+预览 | channelApi.*, mediaApi.mattingGlobal/setMattingGlobal/watermark*, botApi.tokens |
 | `admin/channels-up.vue` | 上架频道列表（is_active）、新建/编辑/删除/检测 | channelApi.list/create/update/remove/check, botApi.tokens |
@@ -89,7 +89,7 @@
 | `publish/group-listen.vue` ❌隐藏 | 监听命中记录查看 | listenApi.hits |
 | `admin/friends.vue` | 好友关注：搜索、5 Tabs、关注配置 | socialApi.friends/applyFriend/followConfig/setFollowConfig |
 | `admin/accounts/friends.vue` ❌隐藏 | 旧版好友页 | 同上 |
-| `admin/tags.vue` | 标签新建/列表（删除为桩） | metaApi.tags/createTag |
+| `admin/tags.vue` | 标签新建/列表（**删除未实现，仅 toast 提示**） | metaApi.tags/createTag |
 | `collector/upload.vue` | 素材上传：发布资料表单、验证视频、定时上架、智能推荐频道 | noteApi.create/publish, mediaApi.uploadMaterial, channelApi.list/recommendPreview, metaApi.cityTree/tags |
 | `collector/content.vue` | 资料库：我的资料列表、删除 | collectorApi.myNotes, noteApi.remove |
 | `collector/records.vue` ❌隐藏 | 我的采集记录 | collectorApi.myRecords |
@@ -506,6 +506,8 @@
 4. 表 B 的 B12–B19 建议 parent 用浏览器实际验证可访问性。
 5. AI 图片处理（抠图/换背景/模糊）的**后端已完整实现**，前端入口 `/admin/global/bg-replace` 隐藏——这是本次扫描最重要的发现之一。
 6. 最重要的隐藏资产：`/admin/channels`（旧版全功能频道页）暴露了 B3/B4（全量推送/清空队列）、发布规则管理、全局抠图、水印设置——这些在 24 页侧栏中均无入口。
+7. 重复页面 4 组：`admin/bots.vue` ≡ `admin/accounts/bots.vue`；`admin/global-bg-replace.vue` ≈ `admin/backgrounds.vue`；`admin/global-loop.vue` ≈ `admin/publish-config.vue`（读写同一 sysconfig）；`admin/tg.vue` ⊃ `admin/accounts/protocol.vue`（后者为功能子集）。
+8. 权限/隐藏条件汇总：登录页 `mode` 切换、会员隐藏用户管理（MEMBER_HIDDEN）、笔记批量下拉 `v-if="selected.length"`、背景选择区 `matting.mode === 'replace_bg'`、Bot 表 `mode` 条件列。
 
 ---
 
