@@ -343,3 +343,132 @@ def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(require_me
     _set_setting(db, "matting_global_background_id", str(body.background_id or ""))
     db.commit()
     return ok(msg="全局抠图模式已" + ("开启" if body.enabled else "关闭"))
+
+
+@router.post("/dedup-check")
+async def dedup_check(
+    file: UploadFile = File(...),
+    user: User = Depends(require_member),
+):
+    """上传一张图片，返回其 dHash（用于去重比对）。"""
+    from app.services.dedup import dhash_bytes, hamming_distance
+
+    chunks, total = [], 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > 50 * 1024 * 1024:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "文件过大（上限 50MB）")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    try:
+        h = dhash_bytes(data)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"图片解析失败：{e}")
+    return ok({"dhash": format(h, "016x"), "dhash_int": str(h)})
+
+
+@router.post("/dedup-scan")
+def dedup_scan_materials(
+    threshold: int = 5,
+    user: User = Depends(require_member),
+    db: Session = Depends(get_db),
+):
+    """扫描素材库中的重复图片（dHash 汉明距离 <= threshold）。"""
+    from app.services.dedup import dhash_file, find_duplicates
+
+    materials = db.query(BackgroundMaterial).all()
+    paths: list[str] = []
+    id_by_path: dict[str, int] = {}
+    for m in materials:
+        try:
+            fp = _fs_path(m.url)
+        except Exception:  # noqa: BLE001
+            continue
+        if os.path.isfile(fp):
+            paths.append(fp)
+            id_by_path[fp] = m.id
+    groups = find_duplicates(paths, threshold=threshold)
+    out = []
+    for g in groups:
+        out.append([{"id": id_by_path[p], "path": p} for p in g])
+    return ok({"groups": out, "group_count": len(out), "scanned": len(paths)})
+
+
+# ============ 个人水印设置（P1-13 / P1-14）============
+
+class WatermarkSettingIn(BaseModel):
+    type: str = "text"          # text | qr
+    content: str = ""           # 文字内容 或 二维码数据
+    position: str = "bottom-right"  # top-left/top-right/bottom-left/bottom-right/center
+    opacity: int = 70           # 0-100
+    qr_size: int = 100
+    enabled: bool = False
+
+
+class WatermarkPreviewIn(BaseModel):
+    type: str = "text"
+    content: str = ""
+    position: str = "bottom-right"
+    opacity: int = 70
+    qr_size: int = 100
+
+
+@router.get("/watermark-setting")
+def get_watermark_setting(user: User = Depends(require_member),
+                          db: Session = Depends(get_db)):
+    """获取当前登录用户的个人水印设置。"""
+    from app.models.media import WatermarkSetting
+    s = db.query(WatermarkSetting).filter(WatermarkSetting.user_id == user.id).first()
+    if not s:
+        return ok({"type": "text", "content": "", "position": "bottom-right",
+                   "opacity": 70, "qr_size": 100, "enabled": False})
+    return ok({"type": s.type, "content": s.content, "position": s.position,
+               "opacity": int(s.opacity or 70), "qr_size": int(s.qr_size or 100),
+               "enabled": bool(s.enabled)})
+
+
+@router.post("/watermark-setting")
+def set_watermark_setting(body: WatermarkSettingIn, user: User = Depends(require_member),
+                          db: Session = Depends(get_db)):
+    """保存当前登录用户的个人水印设置（按作者覆盖）。"""
+    from app.models.media import WatermarkSetting
+    if body.type not in ("text", "qr"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "type 只能是 text 或 qr")
+    if body.position not in ("top-left", "top-right", "bottom-left", "bottom-right", "center"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "position 非法")
+    if body.enabled and not body.content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "启用水印前请填写水印内容")
+    s = db.query(WatermarkSetting).filter(WatermarkSetting.user_id == user.id).first()
+    if not s:
+        s = WatermarkSetting(user_id=user.id)
+        db.add(s)
+    s.type = body.type
+    s.content = body.content
+    s.position = body.position
+    s.opacity = max(0, min(100, body.opacity))
+    s.qr_size = max(48, min(300, body.qr_size))
+    s.enabled = body.enabled
+    db.commit()
+    return ok(msg="水印设置已保存")
+
+
+@router.post("/watermark-preview")
+async def watermark_preview(file: UploadFile = File(...),
+                            type: str = Form("text"),
+                            content: str = Form(""),
+                            position: str = Form("bottom-right"),
+                            opacity: int = Form(70),
+                            qr_size: int = Form(100),
+                            user: User = Depends(require_member)):
+    """上传图片 + 水印参数，返回叠加水印后的预览图（base64 data URL）。"""
+    from app.services.watermark import apply_watermark
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "请填写水印内容")
+    raw = await file.read()
+    out = apply_watermark(raw, type, content, position, opacity / 100.0, qr_size)
+    import base64
+    data_url = "data:image/jpeg;base64," + base64.b64encode(out).decode()
+    return ok({"preview": data_url})

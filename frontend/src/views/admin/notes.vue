@@ -18,6 +18,7 @@
           <a-select-option value="offline">已下架</a-select-option>
         </a-select>
         <a-button @click="load">刷新</a-button>
+        <a-button @click="scanDuplicates" :loading="scanning">查找重复</a-button>
         <div style="flex: 1" />
         <a-dropdown v-if="selected.length">
           <template #overlay>
@@ -65,6 +66,32 @@
         </div>
       </a-spin>
     </a-card>
+
+    <!-- 重复图片分组弹窗 -->
+    <a-modal
+      v-model:open="dedupVisible"
+      title="重复图片分组（dHash 感知去重）"
+      width="860px"
+      :footer="null"
+    >
+      <a-spin :spinning="scanning">
+        <a-empty v-if="!dedupGroups.length && !scanning" description="未发现重复图片" />
+        <div v-else class="dedup-groups">
+          <div v-for="(g, gi) in dedupGroups" :key="gi" class="dedup-group">
+            <div class="dedup-group-title">第 {{ gi + 1 }} 组（{{ g.length }} 张重复）</div>
+            <div class="dedup-thumbs">
+              <div v-for="m in g" :key="m.media_id" class="dedup-thumb">
+                <img :src="m.url" alt="" />
+                <div class="dedup-meta">笔记 #{{ m.note_id }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-if="dedupGroups.length" class="dedup-tip">
+          共扫描 {{ dedupScanned }} 张图片，发现 {{ dedupGroups.length }} 组重复
+        </div>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -82,6 +109,10 @@ const status = ref('all');
 const page = ref(1);
 const pageSize = ref(24);
 const selected = ref<number[]>([]);
+const scanning = ref(false);
+const dedupVisible = ref(false);
+const dedupGroups = ref<any[]>([]);
+const dedupScanned = ref(0);
 
 const STATUS_TEXT: Record<string, string> = {
   draft: '草稿', pending: '待审核', approved: '已通过',
@@ -144,6 +175,22 @@ async function runBatch(e: any) {
 }
 
 onMounted(() => { load(); });
+
+async function scanDuplicates() {
+  scanning.value = true;
+  dedupVisible.value = true;
+  dedupGroups.value = [];
+  try {
+    const data: any = await noteApi.dedupScan(5, 500);
+    dedupGroups.value = data.groups || [];
+    dedupScanned.value = data.scanned || 0;
+    if (!dedupGroups.value.length) message.success('未发现重复图片');
+  } catch (e: any) {
+    message.error(e.message || '扫描失败');
+  } finally {
+    scanning.value = false;
+  }
+}
 </script>
 
 <style scoped>
@@ -173,5 +220,12 @@ onMounted(() => { load(); });
 .note-footer { display: flex; justify-content: space-between; align-items: center; }
 .note-time { color: #bbb; font-size: 12px; }
 .note-actions { display: flex; gap: 4px; }
+.dedup-groups { max-height: 520px; overflow-y: auto; }
+.dedup-group { margin-bottom: 18px; border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px; }
+.dedup-group-title { font-weight: 500; margin-bottom: 10px; }
+.dedup-thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
+.dedup-thumb img { width: 120px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #eee; }
+.dedup-thumb .dedup-meta { font-size: 12px; color: #999; text-align: center; margin-top: 4px; }
+.dedup-tip { margin-top: 12px; color: #999; font-size: 13px; }
 .pagination-wrap { margin-top: 18px; text-align: right; }
 </style>

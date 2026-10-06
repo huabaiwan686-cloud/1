@@ -92,7 +92,8 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                      anti_scan_mode: str = "original",
                      resume: dict | None = None,
                      on_step=None,
-                     variation: bool = False) -> dict:
+                     variation: bool = False,
+                     author_user_id: int | None = None) -> dict:
     """发送一组上架内容。返回 {"media_group_id"/"message_id", "video_message_id"}。
 
     分步幂等：resume={"album": True} 时跳过已成功的相册，只发验证视频；
@@ -106,6 +107,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
       - {"data": bytes, "name": ...} 内存图片（全局抠图已处理好，不落盘）→ 按 photo
       - 有 .url / .media_type 属性的对象
     相册内图片/视频可混排（sendMediaGroup 原生支持）。
+    author_user_id：笔记作者 id，发布前按其个人水印设置自动叠加水印（P1-14）。
     """
     show_media = show_media or []
     verify_media = verify_media or []
@@ -114,6 +116,35 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     if variation:
         from app.services.variation import vary_text
         caption = vary_text(caption)
+
+    # 个人水印：发送前按作者设置叠加（只对图片，视频跳过）
+    # 一次性读取作者水印配置（独立短 session，读完即关）
+    _wm_cfg = None
+    if author_user_id:
+        try:
+            from app.core.database import SessionLocal
+            from app.models.media import WatermarkSetting
+            _s = SessionLocal()
+            try:
+                _wm_cfg = _s.query(WatermarkSetting).filter(
+                    WatermarkSetting.user_id == author_user_id,
+                    WatermarkSetting.enabled.is_(True)).first()
+                if _wm_cfg:
+                    _wm_cfg = {"type": _wm_cfg.type, "content": _wm_cfg.content,
+                               "position": _wm_cfg.position,
+                               "opacity": float(_wm_cfg.opacity or 70) / 100.0,
+                               "qr_size": int(_wm_cfg.qr_size or 100)}
+            finally:
+                _s.close()
+        except Exception:  # noqa: BLE001
+            _wm_cfg = None
+    if _wm_cfg and _wm_cfg["content"]:
+        from app.services.watermark import apply_watermark
+        _apply_wm = lambda d: apply_watermark(d, _wm_cfg["type"], _wm_cfg["content"],
+                                              _wm_cfg["position"], _wm_cfg["opacity"],
+                                              _wm_cfg["qr_size"])
+    else:
+        _apply_wm = lambda d: d
 
     # ---- 第 1 组：文字 + 混合媒体分批发送 ----
     # 分批策略（对齐运营代码）：
@@ -139,6 +170,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                     fname, data = _media_bytes(url)
                     if mtype == "photo":
                         data = _apply_anti_scan(data, anti_scan_mode)
+                        data = _apply_wm(data)  # 个人水印（P1-14）：按作者设置叠加
                     if variation:
                         from app.services.variation import vary_image, vary_video
                         try:

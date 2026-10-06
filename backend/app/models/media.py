@@ -45,3 +45,24 @@ class GlobalSetting(Base):
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WatermarkSetting(Base):
+    """个人水印设置（P1-14）：按作者（user_id）覆盖发布时的水印。
+
+    type: text=文字水印 / qr=二维码水印
+    content: 文字内容 或 二维码数据（链接/文本）
+    position: top-left/top-right/bottom-left/bottom-right/center
+    """
+
+    __tablename__ = "watermark_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    type: Mapped[str] = mapped_column(String(16), default="text")
+    content: Mapped[str] = mapped_column(Text, default="")
+    position: Mapped[str] = mapped_column(String(16), default="bottom-right")
+    opacity: Mapped[float] = mapped_column(Integer, default=70)  # 0-100 百分比，兼容 SQLite
+    qr_size: Mapped[int] = mapped_column(Integer, default=100)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

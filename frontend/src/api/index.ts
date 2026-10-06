@@ -28,6 +28,8 @@ export const noteApi = {
   reject: (id: number) => request.post(`/api/note/${id}/reject`),
   batch: (ids: number[], op: string, params: any = {}) =>
     request.post('/api/note/batch', { ids, op, params }),
+  dedupScan: (threshold = 5, limit = 500) =>
+    request.post('/api/note/dedup-scan', { threshold, limit }),
 };
 
 export const collectApi = {

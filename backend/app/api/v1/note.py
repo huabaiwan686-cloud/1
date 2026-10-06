@@ -249,6 +249,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 anti_scan_mode="original" if gm else (ch.anti_scan_mode or "original"),
                 resume=ch_progress, on_step=_mark_step,
                 variation=use_variation,
+                author_user_id=user.id,  # 个人水印（P1-14）：按作者设置叠加
             )
             detail = f"已发送到 {ch.name}（{chat}）：{res}"
             db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
@@ -428,3 +429,52 @@ def batch_op(body: BatchIn, user: User = Depends(get_current_user), db: Session 
     )
     db.commit()
     return ok(result, msg="批量操作完成")
+
+
+class DedupScanIn(BaseModel):
+    threshold: int = 5
+    limit: int = 500  # 最多扫描多少条媒体记录
+
+
+@router.post("/dedup-scan")
+def dedup_scan_notes(
+    body: DedupScanIn,
+    user: User = Depends(require_member),
+    db: Session = Depends(get_db),
+):
+    """扫描笔记素材中的重复图片（dHash），返回重复分组。
+
+    只扫描本地 uploads 目录内的图片文件。
+    """
+    import os as _os
+
+    from app.services.dedup import find_duplicates
+
+    upload_dir = _os.environ.get(
+        "UPLOAD_DIR",
+        _os.path.normpath(_os.path.join(_os.path.dirname(__file__), "..", "..", "..", "uploads")),
+    )
+    upload_dir = _os.path.realpath(upload_dir)
+
+    medias = db.query(NoteMedia).order_by(NoteMedia.id.desc()).limit(body.limit).all()
+    paths: list[str] = []
+    meta_by_path: dict[str, dict] = {}
+    for m in medias:
+        rel = (m.url or "").replace("/uploads/", "", 1).lstrip("/")
+        if not rel:
+            continue
+        rp = _os.path.realpath(_os.path.join(upload_dir, rel))
+        if not rp.startswith(upload_dir) or not _os.path.isfile(rp):
+            continue
+        suffix = _os.path.splitext(rp)[1].lower()
+        if suffix not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"):
+            continue
+        if rp not in meta_by_path:
+            paths.append(rp)
+            meta_by_path[rp] = {"note_id": m.note_id, "url": m.url, "media_id": m.id}
+
+    groups = find_duplicates(paths, threshold=body.threshold)
+    out = []
+    for g in groups:
+        out.append([meta_by_path[p] for p in g])
+    return ok({"groups": out, "group_count": len(out), "scanned": len(paths)})
