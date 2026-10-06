@@ -1,25 +1,26 @@
 <template>
   <div class="notes-page">
-    <!-- 顶部工具栏 -->
     <a-card class="toolbar-card" :bordered="false">
       <div class="toolbar">
-        <a-input-search
-          v-model:value="keyword"
-          placeholder="搜索标题 / 正文关键词"
-          @search="load"
-          style="width: 260px"
-          allow-clear
-        />
-        <a-select v-model:value="status" style="width: 120px" @change="load">
-          <a-select-option value="all">全部状态</a-select-option>
+        <a-input-search v-model:value="keyword" placeholder="搜索标题 / 正文关键词" @search="onSearch" style="width: 240px" allow-clear />
+        <a-select v-model:value="status" style="width: 120px" @change="onSearch" placeholder="状态">
+          <a-select-option value="">全部状态</a-select-option>
           <a-select-option value="draft">草稿</a-select-option>
           <a-select-option value="pending">待审核</a-select-option>
           <a-select-option value="published">已发布</a-select-option>
           <a-select-option value="offline">已下架</a-select-option>
         </a-select>
+        <a-select v-model:value="channelId" style="width: 160px" @change="onSearch" placeholder="频道" allow-clear>
+          <a-select-option value="">全部频道</a-select-option>
+          <a-select-option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+        </a-select>
         <a-button @click="load">刷新</a-button>
-        <a-button @click="scanDuplicates" :loading="scanning">查找重复</a-button>
+        <a-button @click="showDedup">查找重复</a-button>
         <div style="flex: 1" />
+        <a-radio-group v-model:value="viewMode" button-style="solid" size="small">
+          <a-radio-button value="card">卡片</a-radio-button>
+          <a-radio-button value="table">表格</a-radio-button>
+        </a-radio-group>
         <a-dropdown v-if="selected.length">
           <template #overlay>
             <a-menu @click="runBatch">
@@ -28,28 +29,28 @@
               <a-menu-item key="delete" danger>删除所选</a-menu-item>
             </a-menu>
           </template>
-          <a-button type="primary">
-            批量操作 ({{ selected.length }}) <down-outlined />
-          </a-button>
+          <a-button type="primary">批量 ({{ selected.length }}) <down-outlined /></a-button>
         </a-dropdown>
       </div>
     </a-card>
 
-    <!-- 内容区 -->
     <a-card :bordered="false" class="list-card">
       <a-spin :spinning="loading">
-        <a-empty v-if="!list.length && !loading" description="暂无笔记，点击上方刷新试试" />
-        <div v-else class="note-grid">
+        <a-empty v-if="!list.length && !loading" description="暂无笔记" />
+        <div v-else-if="viewMode === 'card'" class="note-grid">
           <div v-for="n in list" :key="n.id" class="note-card" :class="{ selected: selected.includes(n.id) }">
             <div class="note-header">
-              <a-checkbox :checked="selected.includes(n.id)" @change="(e: any) => toggleSelect(n.id, e.target.checked)" />
+              <a-checkbox :checked="selected.includes(n.id)" @change="(e) => toggleSelect(n.id, e.target.checked)" />
               <span class="note-id">#{{ n.id }}</span>
-              <a-tag :color="statusColor(n.status)">{{ statusText(n.status) }}</a-tag>
+              <a-tag :color="statusColor(n.status)" size="small">{{ statusText(n.status) }}</a-tag>
+              <div style="flex: 1" />
+              <a-button type="link" size="small" @click="preview(n)">预览</a-button>
             </div>
             <div class="note-title">{{ n.title || '(无标题)' }}</div>
-            <div class="note-preview">{{ (n.content || '').slice(0, 80) }}</div>
+            <div class="note-preview">{{ (n.content || '').slice(0, 90) }}</div>
+            <div class="note-meta" v-if="n.images && n.images.length"><span>{{ n.images.length }} 张图</span></div>
             <div class="note-footer">
-              <span class="note-time">{{ formatTime(n.createdAt) }}</span>
+              <span class="note-time">{{ fmtTime(n.createdAt) }}</span>
               <div class="note-actions">
                 <a-button size="small" type="link" @click="quickOp(n.id, 'publish')" v-if="n.status !== 'published'">上架</a-button>
                 <a-button size="small" type="link" @click="quickOp(n.id, 'unpublish')" v-if="n.status === 'published'">下架</a-button>
@@ -57,38 +58,57 @@
             </div>
           </div>
         </div>
+
+        <a-table v-else :data-source="list" :pagination="false" row-key="id" size="small" :row-selection="{ selectedRowKeys: selected, onChange: onTableSelect }">
+          <a-table-column title="ID" data-index="id" width="60" />
+          <a-table-column title="标题" data-index="title" ellipsis>
+            <template #default="{ record }"><a @click="preview(record)">{{ record.title || '(无标题)' }}</a></template>
+          </a-table-column>
+          <a-table-column title="状态" width="90">
+            <template #default="{ record }"><a-tag :color="statusColor(record.status)" size="small">{{ statusText(record.status) }}</a-tag></template>
+          </a-table-column>
+          <a-table-column title="图片" width="70">
+            <template #default="{ record }">{{ (record.images || []).length }}</template>
+          </a-table-column>
+          <a-table-column title="创建时间" width="150">
+            <template #default="{ record }">{{ fmtTime(record.createdAt) }}</template>
+          </a-table-column>
+          <a-table-column title="操作" width="140">
+            <template #default="{ record }">
+              <a-button size="small" type="link" @click="preview(record)">预览</a-button>
+              <a-button size="small" type="link" @click="quickOp(record.id, 'publish')" v-if="record.status !== 'published'">上架</a-button>
+              <a-button size="small" type="link" @click="quickOp(record.id, 'unpublish')" v-if="record.status === 'published'">下架</a-button>
+            </template>
+          </a-table-column>
+        </a-table>
+
         <div class="pagination-wrap" v-if="total > pageSize">
-          <a-pagination
-            :total="total" :current="page" :page-size="pageSize"
-            @change="(p: number) => { page = p; load(); }"
-            show-less-items
-          />
+          <a-pagination :total="total" :current="page" :page-size="pageSize" @change="(p) => { page = p; load(); }" show-less-items size="small" />
         </div>
       </a-spin>
     </a-card>
 
-    <!-- 重复图片分组弹窗 -->
-    <a-modal
-      v-model:open="dedupVisible"
-      title="重复图片分组（dHash 感知去重）"
-      width="860px"
-      :footer="null"
-    >
-      <a-spin :spinning="scanning">
-        <a-empty v-if="!dedupGroups.length && !scanning" description="未发现重复图片" />
-        <div v-else class="dedup-groups">
-          <div v-for="(g, gi) in dedupGroups" :key="gi" class="dedup-group">
-            <div class="dedup-group-title">第 {{ gi + 1 }} 组（{{ g.length }} 张重复）</div>
-            <div class="dedup-thumbs">
-              <div v-for="m in g" :key="m.media_id" class="dedup-thumb">
-                <img :src="m.url" alt="" />
-                <div class="dedup-meta">笔记 #{{ m.note_id }}</div>
-              </div>
+    <a-modal v-model:open="previewVisible" title="笔记预览" :footer="null" width="600px">
+      <div v-if="previewNote">
+        <h3>{{ previewNote.title || '(无标题)' }}</h3>
+        <div style="white-space: pre-wrap; margin: 12px 0;">{{ previewNote.content }}</div>
+        <div v-if="previewNote.images && previewNote.images.length" style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <img v-for="(img, i) in previewNote.images" :key="i" :src="img" style="width: 120px; height: 120px; object-fit: cover; border-radius: 4px;" />
+        </div>
+      </div>
+    </a-modal>
+
+    <a-modal v-model:open="dedupVisible" title="重复图片" :footer="null" width="700px">
+      <a-spin :spinning="dedupLoading">
+        <a-empty v-if="!dedupGroups.length && !dedupLoading" description="未发现重复" />
+        <div v-for="(g, gi) in dedupGroups" :key="gi" style="margin-bottom: 16px; border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px;">
+          <div style="margin-bottom: 8px; color: #999;">第 {{ gi + 1 }} 组（{{ g.length }} 张相似）</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <div v-for="(item, ii) in g" :key="ii" style="text-align: center;">
+              <img :src="item.url" style="width: 100px; height: 100px; object-fit: cover; border-radius: 4px;" />
+              <div style="font-size: 12px; color: #999;">笔记 #{{ item.note_id }}</div>
             </div>
           </div>
-        </div>
-        <div v-if="dedupGroups.length" class="dedup-tip">
-          共扫描 {{ dedupScanned }} 张图片，发现 {{ dedupGroups.length }} 组重复
         </div>
       </a-spin>
     </a-modal>
@@ -99,98 +119,67 @@
 import { onMounted, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { DownOutlined } from '@ant-design/icons-vue';
-import { noteApi } from '@/api';
+import { noteApi, channelApi, mediaApi } from '@/api';
 
 const list = ref<any[]>([]);
+const channels = ref<any[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const keyword = ref('');
-const status = ref('all');
+const status = ref('');
+const channelId = ref('');
 const page = ref(1);
 const pageSize = ref(24);
 const selected = ref<number[]>([]);
-const scanning = ref(false);
+const viewMode = ref<'card' | 'table'>('card');
+const previewVisible = ref(false);
+const previewNote = ref<any>(null);
 const dedupVisible = ref(false);
+const dedupLoading = ref(false);
 const dedupGroups = ref<any[]>([]);
-const dedupScanned = ref(0);
 
-const STATUS_TEXT: Record<string, string> = {
-  draft: '草稿', pending: '待审核', approved: '已通过',
-  published: '已发布', offline: '已下架', collected: '已采集', rejected: '已拒绝',
-};
-const STATUS_COLOR: Record<string, string> = {
-  draft: 'default', pending: 'orange', approved: 'blue',
-  published: 'green', offline: 'red', collected: 'purple', rejected: 'red',
-};
-function statusText(s: string) { return STATUS_TEXT[s] || s; }
+const STATUS_TEXT: Record<string, string> = { draft: '草稿', pending: '待审核', approved: '已通过', published: '已发布', offline: '已下架', collected: '已采集', rejected: '已拒绝' };
+const STATUS_COLOR: Record<string, string> = { draft: 'default', pending: 'orange', approved: 'blue', published: 'green', offline: 'red', collected: 'purple', rejected: 'red' };
+function statusText(s: string) { return STATUS_TEXT[s] || s || '未知'; }
 function statusColor(s: string) { return STATUS_COLOR[s] || 'default'; }
-function formatTime(t: string) {
-  if (!t) return '';
-  return t.slice(0, 16).replace('T', ' ');
-}
+function fmtTime(t: string) { return t ? t.slice(0, 16).replace('T', ' ') : ''; }
 
 async function load() {
   loading.value = true;
   try {
-    const data: any = await noteApi.list({
-      keyword: keyword.value, status: status.value,
-      page: page.value, page_size: pageSize.value,
-    });
+    const data: any = await noteApi.list({ keyword: keyword.value || undefined, status: status.value || undefined, channel_id: channelId.value || undefined, page: page.value, page_size: pageSize.value });
     list.value = data.list || [];
     total.value = data.total || 0;
-  } catch (e: any) {
-    message.error(e.message || '加载失败');
-  } finally {
-    loading.value = false;
-  }
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
-
+async function loadChannels() {
+  try { const data: any = await channelApi.list(); channels.value = data.list || data || []; } catch { /* ignore */ }
+}
+function onSearch() { page.value = 1; load(); }
 function toggleSelect(id: number, checked: boolean) {
-  if (checked) selected.value.push(id);
+  if (checked) { if (!selected.value.includes(id)) selected.value.push(id); }
   else selected.value = selected.value.filter(x => x !== id);
 }
-
+function onTableSelect(keys: any[]) { selected.value = keys as number[]; }
+function preview(n: any) { previewNote.value = n; previewVisible.value = true; }
 async function quickOp(id: number, op: string) {
-  try {
-    await noteApi.batch([id], op);
-    message.success('已执行');
-    selected.value = selected.value.filter(x => x !== id);
-    load();
-  } catch (e: any) {
-    message.error(e.message || '操作失败');
-  }
+  try { await noteApi.batch([id], op); message.success('已执行'); selected.value = selected.value.filter(x => x !== id); load(); }
+  catch (e: any) { message.error(e.message || '操作失败'); }
 }
-
 async function runBatch(e: any) {
   const op = e.key;
   if (!selected.value.length) return;
-  try {
-    await noteApi.batch(selected.value, op);
-    message.success(`批量${op === 'publish' ? '上架' : op === 'unpublish' ? '下架' : '删除'}成功`);
-    selected.value = [];
-    load();
-  } catch (err: any) {
-    message.error(err.message || '批量操作失败');
-  }
+  try { await noteApi.batch(selected.value, op); message.success('批量操作成功'); selected.value = []; load(); }
+  catch (err: any) { message.error(err.message || '批量操作失败'); }
 }
-
-onMounted(() => { load(); });
-
-async function scanDuplicates() {
-  scanning.value = true;
-  dedupVisible.value = true;
-  dedupGroups.value = [];
-  try {
-    const data: any = await noteApi.dedupScan(5, 500);
-    dedupGroups.value = data.groups || [];
-    dedupScanned.value = data.scanned || 0;
-    if (!dedupGroups.value.length) message.success('未发现重复图片');
-  } catch (e: any) {
-    message.error(e.message || '扫描失败');
-  } finally {
-    scanning.value = false;
-  }
+async function showDedup() {
+  dedupVisible.value = true; dedupLoading.value = true; dedupGroups.value = [];
+  try { const data: any = await mediaApi.dedupScanNotes({}); dedupGroups.value = data.groups || data.list || []; }
+  catch (e: any) { message.error(e.message || '扫描失败'); }
+  finally { dedupLoading.value = false; }
 }
+onMounted(() => { load(); loadChannels(); });
 </script>
 
 <style scoped>
@@ -198,34 +187,17 @@ async function scanDuplicates() {
 .toolbar-card { margin-bottom: 12px; }
 .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .list-card { min-height: 400px; }
-.note-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-}
-.note-card {
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 14px;
-  background: #fff;
-  transition: all 0.2s;
-  cursor: default;
-}
+.note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.note-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px; background: #fff; transition: all 0.2s; }
 .note-card:hover { border-color: #d9d9d9; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .note-card.selected { border-color: #1890ff; background: #f6fbff; }
 .note-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .note-id { color: #999; font-size: 12px; }
 .note-title { font-weight: 500; font-size: 14px; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.note-preview { color: #666; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; margin-bottom: 10px; }
+.note-preview { color: #666; font-size: 13px; line-height: 1.5; height: 40px; overflow: hidden; margin-bottom: 8px; }
+.note-meta { color: #999; font-size: 12px; margin-bottom: 8px; }
 .note-footer { display: flex; justify-content: space-between; align-items: center; }
 .note-time { color: #bbb; font-size: 12px; }
 .note-actions { display: flex; gap: 4px; }
-.dedup-groups { max-height: 520px; overflow-y: auto; }
-.dedup-group { margin-bottom: 18px; border: 1px solid #f0f0f0; border-radius: 8px; padding: 12px; }
-.dedup-group-title { font-weight: 500; margin-bottom: 10px; }
-.dedup-thumbs { display: flex; gap: 10px; flex-wrap: wrap; }
-.dedup-thumb img { width: 120px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #eee; }
-.dedup-thumb .dedup-meta { font-size: 12px; color: #999; text-align: center; margin-top: 4px; }
-.dedup-tip { margin-top: 12px; color: #999; font-size: 13px; }
 .pagination-wrap { margin-top: 18px; text-align: right; }
 </style>
