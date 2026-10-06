@@ -91,3 +91,62 @@ def create_user(body: UserCreateIn, user: User = Depends(get_current_user), db: 
     db.add(u)
     db.commit()
     return ok(_user_out(u), msg="账号已创建")
+
+
+class UserUpdateIn(BaseModel):
+    is_admin: bool | None = None
+    is_active: bool | None = None
+    password: str | None = None  # 重置密码（至少6位）
+    display_name: str | None = None
+
+
+@router.patch("/{user_id}")
+def update_user(user_id: int, body: UserUpdateIn, user: User = Depends(get_current_user),
+                db: Session = Depends(get_db)):
+    """超级管理员：改权限（管理员/禁用）、重置密码、改显示名。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
+    if target.id == user.id and body.is_admin is False:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能取消自己的管理员权限")
+    if target.id == user.id and body.is_active is False:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能禁用自己")
+    if body.is_admin is not None:
+        # 至少保留一个管理员
+        if not body.is_admin and target.is_admin:
+            admins = db.query(User).filter(User.is_admin.is_(True)).count()
+            if admins <= 1:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "至少保留一个管理员")
+        target.is_admin = body.is_admin
+    if body.is_active is not None:
+        target.is_active = body.is_active
+    if body.password:
+        if len(body.password) < 6:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "密码至少 6 位")
+        target.hashed_password = pwd_context.hash(body.password)
+    if body.display_name is not None:
+        target.display_name = body.display_name
+    db.commit()
+    return ok(_user_out(target), msg="已更新")
+
+
+@router.delete("/{user_id}")
+def delete_user(user_id: int, user: User = Depends(get_current_user),
+                db: Session = Depends(get_db)):
+    """超级管理员：删除账号（不能删自己，不能删最后一个管理员）。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
+    if target.id == user.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "不能删除自己")
+    if target.is_admin:
+        admins = db.query(User).filter(User.is_admin.is_(True)).count()
+        if admins <= 1:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "至少保留一个管理员")
+    db.delete(target)
+    db.commit()
+    return ok(msg=f"账号 {target.username} 已删除")

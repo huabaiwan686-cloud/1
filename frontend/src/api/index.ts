@@ -15,6 +15,8 @@ export const authApi = {
 export const userApi = {
   list: () => request.get('/api/account/list'),
   create: (data: any) => request.post('/api/account/create', data),
+  update: (id: number, data: any) => request.patch(`/api/account/${id}`, data),
+  remove: (id: number) => request.delete(`/api/account/${id}`),
 };
 
 export const noteApi = {
