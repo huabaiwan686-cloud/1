@@ -29,8 +29,8 @@
         </a-form-item>
         <a-divider orientation="left">采集设置</a-divider>
         <a-form-item label="采集间隔（分钟）">
-          <a-input-number v-model:value="cfg.collect_interval" :min="1" :max="1440" style="width: 200px" />
-          <div class="hint">worker 拉取采集源新消息的间隔</div>
+          <a-input-number v-model:value="cfg.collect_interval" :min="1" :max="1440" style="width: 200px" disabled />
+          <div class="hint">待后端支持，当前仅展示</div>
         </a-form-item>
         <a-form-item label="快捷操作">
           <a-space compact>

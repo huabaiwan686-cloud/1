@@ -21,11 +21,11 @@ def list_tags(user: User = Depends(get_current_user), db: Session = Depends(get_
 def create_tag(name: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if db.query(Tag).filter(Tag.name == name).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "标签已存在")
-    # 新标签进入审核（对齐原站）
-    t = Tag(name=name, status="pending")
+    # 管理员创建直接通过
+    t = Tag(name=name, status="approved")
     db.add(t)
     db.commit()
-    return ok({"id": t.id, "name": t.name}, msg="标签已提交审核")
+    return ok({"id": t.id, "name": t.name}, msg="标签已创建")
 
 
 @city_router.get("/tree")
