@@ -17,6 +17,8 @@ export const noteApi = {
   get: (id: number) => request.get(`/api/note/${id}`),
   create: (data: any) => request.post('/api/note/create', data),
   publish: (id: number) => request.post(`/api/note/${id}/publish`),
+  approve: (id: number) => request.post(`/api/note/${id}/approve`),
+  reject: (id: number) => request.post(`/api/note/${id}/reject`),
   batch: (ids: number[], op: string, params: any = {}) =>
     request.post('/api/note/batch', { ids, op, params }),
 };
@@ -53,6 +55,10 @@ export const messageApi = {
   createPlan: (data: any) => request.post('/api/message/plans', data),
   deletePlan: (id: number) => request.delete(`/api/message/plans/${id}`),
   quickTargets: () => request.get('/api/message/quick_targets'),
+  dialogs: (account_id: number) =>
+    request.get('/api/message/dialogs', { params: { account_id } }),
+  refreshDialogs: (account_id: number) =>
+    request.post('/api/message/dialogs/refresh', { account_id }),
 };
 
 export const listenApi = {
@@ -79,6 +85,7 @@ export const botApi = {
   create: (data: any) => request.post('/api/bot/tokens', data),
   verify: (id: number) => request.post(`/api/bot/tokens/${id}/verify`),
   remove: (id: number) => request.delete(`/api/bot/tokens/${id}`),
+  autoCreate: (data: any) => request.post('/api/bot/tokens/auto-create', data),
   bindStart: (bot_token_id: number) =>
     request.post('/api/youban-bot/bot/bind/start', { bot_token_id }),
   bindStatus: (session_key: string) =>
@@ -108,6 +115,8 @@ export const vipApi = {
   subscription: () => request.get('/api/vip/subscription'),
   orders: () => request.get('/api/vip/orders'),
   createOrder: () => request.post('/api/vip/orders'),
+  payInfo: () => request.get('/api/vip/pay/info'),
+  payWatch: () => request.post('/api/vip/pay/watch'),
   quota: () => request.get('/api/vip/quota'),
 };
 
@@ -126,6 +135,8 @@ export const mediaApi = {
     return request.post('/api/media/materials', fd);
   },
   deleteMaterial: (id: number) => request.delete(`/api/media/materials/${id}`),
+  mattingGlobal: () => request.get('/api/media/matting-global'),
+  setMattingGlobal: (data: any) => request.post('/api/media/matting-global', data),
   process: (file: File, mode: string, background_id?: number) => {
     const fd = new FormData();
     fd.append('file', file);

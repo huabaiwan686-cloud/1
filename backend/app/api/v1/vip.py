@@ -79,23 +79,20 @@ def list_orders(user: User = Depends(get_current_user), db: Session = Depends(ge
 
 @router.post("/orders")
 def create_order(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.services.tron_watch import pay_address, pay_configured
     order_no = f"VIP{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
     o = VipOrder(order_no=order_no, plan="pro", amount_usdt=PRO_PRICE_USDT, days=PRO_DAYS)
     db.add(o)
     db.commit()
-    # TODO: 接 USDT 支付网关（当前返回待支付订单，前端弹支付弹窗）
     return ok({"id": o.id, "orderNo": o.order_no, "amountUsdt": PRO_PRICE_USDT,
-               "status": "pending"}, msg="订单已创建，请完成支付")
+               "status": "pending",
+               "payAddress": pay_address() if pay_configured() else "",
+               "payConfigured": pay_configured()},
+              msg="订单已创建，请完成支付")
 
 
-@router.post("/orders/{order_id}/mark_paid")
-def mark_paid(order_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """支付回调占位：USDT 支付网关回调后标记已支付并开通会员。"""
-    if not user.is_admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
-    o = db.query(VipOrder).filter(VipOrder.id == order_id).first()
-    if not o:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "订单不存在")
+def _activate_order(db: Session, o: VipOrder) -> None:
+    """订单已支付 → 开通 PRO + 发放当月额度（mark_paid 与自动监听共用）。"""
     o.status = "paid"
     o.paid_at = datetime.utcnow()
     sub = db.query(VipSubscription).order_by(VipSubscription.id.desc()).first() or VipSubscription()
@@ -103,11 +100,42 @@ def mark_paid(order_id: int, user: User = Depends(get_current_user), db: Session
     sub.plan = "pro"
     sub.active_until = base + timedelta(days=o.days)
     db.add(sub)
-    # 开通当月额度
     q = _get_or_create_quota(db)
     q.monthly_quota = PRO_MONTHLY_BG_QUOTA
     db.commit()
+
+
+@router.post("/orders/{order_id}/mark_paid")
+def mark_paid(order_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """人工确认收款：USDT 支付网关回调/自动监听接通前使用。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    o = db.query(VipOrder).filter(VipOrder.id == order_id).first()
+    if not o:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "订单不存在")
+    _activate_order(db, o)
+    sub = db.query(VipSubscription).order_by(VipSubscription.id.desc()).first()
     return ok(msg=f"已开通 PRO，有效期至 {sub.active_until:%Y-%m-%d}")
+
+
+@router.get("/pay/info")
+def pay_info(user: User = Depends(get_current_user)):
+    """前端支付弹窗用：收款地址 + 金额；未配置时提示联系管理员。"""
+    from app.services.tron_watch import pay_address, pay_configured
+    return ok({"configured": pay_configured(), "address": pay_address(),
+               "amountUsdt": PRO_PRICE_USDT, "network": "TRC20"})
+
+
+@router.post("/pay/watch")
+def pay_watch(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """手动/定时触发 TRC20 到账检查（可挂 cron 每 2 分钟）。"""
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    from app.services.tron_watch import match_and_activate, pay_configured
+    if not pay_configured():
+        return ok({"matched": [], "msg": "未配置 USDT_TRC20_ADDRESS，仍走人工确认"})
+    matched = match_and_activate(db)
+    return ok({"matched": matched, "msg": f"自动开通 {len(matched)} 单"})
 
 
 @router.get("/quota")

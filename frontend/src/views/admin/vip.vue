@@ -51,7 +51,11 @@ async function load() {
 }
 async function buy() {
   const order: any = await vipApi.createOrder();
-  Modal.info({ title: '订单已创建', content: `订单号 ${order.orderNo}，请支付 ${order.amountUsdt} USDT（待接支付网关）` });
+  const payInfo: any = await vipApi.payInfo();
+  const addrLine = payInfo.configured
+    ? `请向 TRC20 地址转账：${payInfo.address}`
+    : '收款地址待配置，请联系管理员';
+  Modal.info({ title: '订单已创建', content: `订单号 ${order.orderNo}，金额 ${order.amountUsdt} USDT。${addrLine}` });
 }
 async function genCode() {
   const r: any = await inviteApi.generate();

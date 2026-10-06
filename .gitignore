@@ -1,3 +1,19 @@
 # 大文件：RMBG-1.4 抠图模型（约 170MB），部署时手动下载，不进仓库
 /models/
 *.onnx
+
+backend/data.db
+backend/uploads/
+
+# Python 虚拟环境与缓存
+backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 前端构建产物与依赖
+frontend/node_modules/
+frontend/dist/
+
+# 系统文件
+.DS_Store

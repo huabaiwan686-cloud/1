@@ -20,6 +20,11 @@
           <div><plus-outlined /><div>上传</div></div>
         </a-upload>
       </a-form-item>
+      <a-form-item label="验证视频（单独发送，紧跟上架消息）">
+        <a-upload :before-upload="() => false" v-model:file-list="verifyList" :max-count="1" accept="video/*">
+          <a-button><plus-outlined />选择验证视频</a-button>
+        </a-upload>
+      </a-form-item>
       <a-form-item label="目标频道">
         <a-select v-model:value="form.channel_ids" mode="multiple" placeholder="选择频道" style="width: 100%">
           <a-select-option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
@@ -45,13 +50,14 @@
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { PlusOutlined } from '@ant-design/icons-vue';
-import { noteApi, metaApi, channelApi } from '@/api';
+import { noteApi, metaApi, channelApi, mediaApi } from '@/api';
 
 const loading = ref(false);
 const tags = ref<any[]>([]);
 const cities = ref<any[]>([]);
 const channels = ref<any[]>([]);
 const showList = ref<any[]>([]);
+const verifyList = ref<any[]>([]);
 const form = reactive({
   title: '', body: '', tags: [] as string[], city: [] as number[],
   channel_ids: [] as number[], scheduled_at: null as any, service_remark: '',
@@ -64,14 +70,33 @@ onMounted(async () => {
 });
 
 async function buildPayload() {
-  // 注：媒体直传后端 /api/media/materials，取 URL 组装；此处简化为占位
+  // 展示图 + 验证视频：逐个上传到 /api/media/materials，拿到 URL 后组装进笔记
+  async function uploadList(list: any[], kind: string, mediaType: string) {
+    const media: any[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      let url = f.url;
+      if (!url && f.originFileObj) {
+        const res: any = await mediaApi.uploadMaterial(f.originFileObj, f.name || kind);
+        url = res.url;
+        f.url = url;
+        f.status = 'done'; // 记下来，避免重复上传
+      }
+      if (url) media.push({ url, media_type: mediaType, kind, sort_order: i });
+    }
+    return media;
+  }
+  const media = [
+    ...(await uploadList(showList.value, 'show', 'image')),
+    ...(await uploadList(verifyList.value, 'verify', 'video')),
+  ];
   return {
     title: form.title, body: form.body, tags: form.tags,
     city_id: form.city.length ? form.city[form.city.length - 1] : null,
     channel_ids: form.channel_ids,
     scheduled_at: form.scheduled_at ? form.scheduled_at.toISOString() : null,
     service_remark: form.service_remark,
-    media: [],
+    media,
   };
 }
 async function onSubmit() {

@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, ok
 from app.core.database import get_db
+from app.models.account import BotToken
 from app.models.content import Note, NoteMedia, TaskLog
+from app.models.distribution import Channel
 from app.models.user import User
 
 router = APIRouter(prefix="/note", tags=["note"])
@@ -85,9 +87,18 @@ def list_notes(
     if account_id:
         q = q.filter(Note.account_id == account_id)
     total = q.count()
-    notes = q.order_by(Note.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
     if tag:
-        notes = [n for n in notes if tag in (n.tags or [])]
+        # tags 是 JSON 数组，跨库（SQLite/PostgreSQL）统一在 Python 层过滤；
+        # 先按 id 取 (id, tags) 做过滤再分页，保证 total 与列表一致
+        id_tags = q.with_entities(Note.id, Note.tags).order_by(Note.id.desc()).all()
+        matched_ids = [nid for nid, t in id_tags if tag in (t or [])]
+        total = len(matched_ids)
+        page_ids = matched_ids[(page - 1) * page_size : page * page_size]
+        notes = db.query(Note).filter(Note.id.in_(page_ids)).all() if page_ids else []
+        pos = {nid: i for i, nid in enumerate(page_ids)}
+        notes.sort(key=lambda n: pos[n.id])
+    else:
+        notes = q.order_by(Note.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
     # 一次查出本页所有媒体，避免 N+1
     media_map: dict[int, list[NoteMedia]] = {}
     ids = [n.id for n in notes]
@@ -144,7 +155,107 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     n.published_at = datetime.utcnow()
     db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="success", detail="手动发布"))
     db.commit()
-    return ok(msg="已发布")
+    # 定时上架：时间未到只改状态，等后台 worker 到点发送
+    if n.scheduled_at and n.scheduled_at > datetime.utcnow():
+        return ok(msg="已发布（定时，到点自动发送到频道）")
+    sent, failed = _send_to_channels(n, user, db)
+    db.commit()
+    if failed and not sent:
+        return ok(msg=f"已发布，但发送失败：{failed[0]}")
+    return ok(msg="已发布" + (f"，已发送到 {sent} 个频道" if sent else ""))
+
+
+def _send_to_channels(n: Note, user: User, db: Session) -> tuple[list[str], list[str]]:
+    """把一组上架内容真实发送到笔记绑定的频道。
+
+    一组 =（文字+混合媒体）打包发送，紧跟一条单独验证视频。
+    返回 (成功频道名, 失败原因)。
+    """
+    from app.api.v1.bots import _dec
+    from app.api.v1.media import get_matting_global
+    from app.services.publisher import _media_bytes, matt_for_publish, send_listing_set
+
+    media = db.query(NoteMedia).filter(NoteMedia.note_id == n.id).order_by(NoteMedia.sort_order).all()
+    show = [{"url": m.url} for m in media if m.kind == "show"]
+    verify = [{"url": m.url} for m in media if m.kind == "verify"]
+
+    # 全局抠图模式：开启后所有发往频道的展示图按所选背景自动抠图（内存处理，不落盘）；
+    # 服务器只保留原图，每次循环都拿原图重新处理再发送
+    gm = get_matting_global(db)
+    if gm:
+        processed = []
+        for m in show:
+            try:
+                fname, data = _media_bytes(m["url"])
+                data = matt_for_publish(data, gm["bg_data"], db)
+                processed.append({"data": data, "name": fname})
+            except Exception:  # noqa: BLE001  单张失败用原图，不中断整组
+                processed.append(m)
+        show = processed
+
+    sent, failed = [], []
+    for cid in n.channel_ids or []:
+        ch = db.query(Channel).filter(Channel.id == cid).first()
+        if not ch or not ch.is_active:
+            continue
+        chat = ch.tg_channel_id or ch.username
+        if not chat:
+            failed.append(f"{ch.name}：未配置频道地址")
+            continue
+        if not ch.bot_id:
+            failed.append(f"{ch.name}：未绑定推送 Bot")
+            continue
+        bot = db.query(BotToken).filter(BotToken.id == ch.bot_id).first()
+        if not bot:
+            failed.append(f"{ch.name}：推送 Bot 不存在")
+            continue
+        try:
+            res = send_listing_set(
+                _dec(bot.token_secret), chat,
+                title=n.title, body=n.body, tags=n.tags,
+                show_media=show, verify_media=verify,
+                # 全局抠图已处理则不再叠加频道防扫图
+                anti_scan_mode="original" if gm else (ch.anti_scan_mode or "original"),
+            )
+            detail = f"已发送到 {ch.name}（{chat}）：{res}"
+            db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
+                           result="success", detail=detail))
+            sent.append(ch.name)
+        except Exception as e:  # noqa: BLE001
+            detail = f"{ch.name} 发送失败：{e}"
+            db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
+                           result="failed", detail=detail))
+            failed.append(detail)
+    return sent, failed
+
+
+def _review_note(note_id: int, approve: bool, user: User, db: Session):
+    """正式审核：通过 → published；拒绝 → offline（可恢复，非删除）。"""
+    n = db.query(Note).filter(Note.id == note_id).first()
+    if not n:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
+    if approve:
+        n.status = "published"
+        n.published_at = datetime.utcnow()
+        action, detail, msg = "review_approve", "审核通过并发布", "审核通过，已发布"
+        if not (n.scheduled_at and n.scheduled_at > datetime.utcnow()):
+            _send_to_channels(n, user, db)
+    else:
+        n.status = "offline"
+        action, detail, msg = "review_reject", "审核拒绝（下架，可恢复）", "已拒绝（移入下架）"
+    db.add(TaskLog(note_id=n.id, action=action, executor=user.username, result="success", detail=detail))
+    db.commit()
+    return ok(msg=msg)
+
+
+@router.post("/{note_id}/approve")
+def approve_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _review_note(note_id, True, user, db)
+
+
+@router.post("/{note_id}/reject")
+def reject_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _review_note(note_id, False, user, db)
 
 
 VALID_BATCH_OPS = {
@@ -153,8 +264,8 @@ VALID_BATCH_OPS = {
 }
 
 
-def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session) -> dict:
-    """10 项批量操作（原站 VIP 下拉）。"""
+def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user: User | None = None) -> dict:
+    """10 项批量操作（原站 VIP 下拉）。publish 会真实发送到绑定频道（一组=文字+媒体打包，紧跟验证视频）。"""
     if op not in VALID_BATCH_OPS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知操作: {op}")
     count = 0
@@ -163,6 +274,8 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session) -> di
         if op == "publish":
             n.status = "published"
             n.published_at = datetime.utcnow()
+            if user is not None and not (n.scheduled_at and n.scheduled_at > datetime.utcnow()):
+                _send_to_channels(n, user, db)
         elif op == "unpublish":
             n.status = "offline"
         elif op == "delete":
@@ -209,7 +322,7 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session) -> di
 def batch_op(body: BatchIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # TODO(Phase 5): VIP 鉴权——批量操作为 VIP 功能
     notes = db.query(Note).filter(Note.id.in_(body.ids)).all()
-    result = _apply_batch_op(notes, body.op, body.params, db)
+    result = _apply_batch_op(notes, body.op, body.params, db, user)
     db.add(
         TaskLog(
             action=f"batch_{body.op}",

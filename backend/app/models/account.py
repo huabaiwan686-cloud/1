@@ -102,3 +102,17 @@ class CooperationConfig(Base):
     channel_ids: Mapped[list] = mapped_column(JSON, default=list)
     need_review: Mapped[bool] = mapped_column(Boolean, default=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class TgDialog(Base):
+    """TG 会话缓存：协议号可见的群组/频道列表，推送目标选择用（刷新缓存更新）。"""
+
+    __tablename__ = "tg_dialogs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int] = mapped_column(Integer, index=True)
+    chat_id: Mapped[str] = mapped_column(String(64), default="")
+    title: Mapped[str] = mapped_column(String(256), default="")
+    username: Mapped[str] = mapped_column(String(128), default="")
+    kind: Mapped[str] = mapped_column(String(16), default="group")  # group/channel/user
+    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

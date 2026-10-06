@@ -1,7 +1,7 @@
-"""图片处理数据模型：背景素材库 / 处理任务。"""
+"""图片处理数据模型：背景素材库 / 处理任务 / 全局设置。"""
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -31,7 +31,17 @@ class ImageJob(Base):
     source: Mapped[str] = mapped_column(String(512), default="")  # 原图标识/URL
     result_url: Mapped[str] = mapped_column(String(512), default="")
     background_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    quota_consumed: Mapped[bool] = mapped_column(Integer, default=False)
-    fallback: Mapped[bool] = mapped_column(Integer, default=False)  # 是否降级为轻量扰动
+    quota_consumed: Mapped[bool] = mapped_column(Boolean, default=False)
+    fallback: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否降级为轻量扰动
     detail: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class GlobalSetting(Base):
+    """全局键值设置（如全局抠图模式开关/背景）。"""
+
+    __tablename__ = "global_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

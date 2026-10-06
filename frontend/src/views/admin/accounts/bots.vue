@@ -9,13 +9,18 @@
         </a-space>
       </template>
     </a-table>
-    <a-modal v-model:open="visible" title="Bot Token" @ok="save">
+    <a-modal v-model:open="visible" title="Bot Token" @ok="save" :confirm-loading="saving">
       <a-form :model="editing" layout="vertical">
         <a-form-item label="名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="Bot 用户名（以 bot 结尾）"><a-input v-model:value="editing.username" placeholder="@xxxbot" /></a-form-item>
-        <a-form-item label="Token"><a-input v-model:value="editing.token" placeholder="123456:ABC-DEF..." /></a-form-item>
+        <a-form-item label="Token" v-if="!editing.auto_create"><a-input v-model:value="editing.token" placeholder="123456:ABC-DEF..." /></a-form-item>
+        <a-form-item label="用哪个协议号创建" v-if="editing.auto_create">
+          <a-select v-model:value="editing.tg_account_id" placeholder="选择已登录的 TG 协议号" style="width: 100%">
+            <a-select-option v-for="a in tgAccounts" :key="a.id" :value="a.id">{{ a.phone }}（{{ a.name }}）</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="备注"><a-textarea v-model:value="editing.remark" :rows="2" /></a-form-item>
-        <a-checkbox v-model:checked="editing.auto_create">自动创建（通过 BotFather）</a-checkbox>
+        <a-checkbox v-model:checked="editing.auto_create">自动创建（通过 BotFather，约 10~20 秒）</a-checkbox>
       </a-form>
     </a-modal>
   </div>
@@ -24,7 +29,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { botApi } from '@/api';
+import { botApi, tgApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
@@ -33,19 +38,37 @@ const columns = [
   { title: '操作', key: 'action', width: 140 },
 ];
 const list = ref<any[]>([]); const loading = ref(false);
-const visible = ref(false); const editing = reactive<any>({});
+const visible = ref(false); const saving = ref(false);
+const tgAccounts = ref<any[]>([]);
+const editing = reactive<any>({});
 
 async function load() {
   loading.value = true;
-  try { list.value = await botApi.tokens(); } finally { loading.value = false; }
+  try {
+    list.value = await botApi.tokens();
+    tgAccounts.value = await tgApi.accounts();
+  } finally { loading.value = false; }
 }
 function openEditor() {
-  Object.assign(editing, { name: '', username: '', token: '', remark: '', auto_create: false });
+  Object.assign(editing, { name: '', username: '', token: '', remark: '', auto_create: false, tg_account_id: null });
   visible.value = true;
 }
 async function save() {
-  try { await botApi.create(editing); message.success('已保存'); visible.value = false; load(); }
-  catch (e: any) { message.error(e.message); }
+  saving.value = true;
+  try {
+    if (editing.auto_create) {
+      if (!editing.tg_account_id) { message.error('请选择用于创建的 TG 协议号'); return; }
+      const r: any = await botApi.autoCreate({
+        name: editing.name, username: editing.username, tg_account_id: editing.tg_account_id,
+      });
+      message.success(r.msg || '已自动创建');
+    } else {
+      await botApi.create(editing);
+      message.success('已保存');
+    }
+    visible.value = false; load();
+  }
+  catch (e: any) { message.error(e.message); } finally { saving.value = false; }
 }
 async function verify(id: number) {
   const r: any = await botApi.verify(id); message.info(r.msg);

@@ -10,10 +10,17 @@ from app.api.deps import get_current_user, ok
 from app.core.database import get_db
 from app.models.account import TgAccount
 from app.models.user import User
+from app.services.tg_client import (
+    TgNotConfigured,
+    refresh_status as tg_refresh_status,
+    start_login as tg_start_login,
+    tg_configured,
+    verify_code as tg_verify_code,
+)
 
 router = APIRouter(tags=["tg"])
 
-# 登录会话（内存态；生产应放 Redis）。TODO(Phase 4b): 接 Telethon 真实扫码/短信流程
+# 登录会话（内存态；生产应放 Redis）。
 _login_sessions: dict[str, dict] = {}
 
 
@@ -51,24 +58,37 @@ def delete_account(account_id: int, user: User = Depends(get_current_user), db: 
 
 
 @router.post("/tg/accounts/{account_id}/refresh")
-def refresh_status(account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def refresh_status(account_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     a = db.query(TgAccount).filter(TgAccount.id == account_id).first()
     if not a:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
-    # TODO: Telethon 真实状态检测
+    if tg_configured() and a.phone:
+        a.status = await tg_refresh_status(f"acct_{a.id}", a.phone)
+        db.commit()
     return ok(_out(a))
 
 
 @router.post("/youban-bot/bot/login/start")
-def login_start(body: PhoneStartIn, user: User = Depends(get_current_user)):
+async def login_start(body: PhoneStartIn, user: User = Depends(get_current_user)):
     """开始登录：手机号登录返回 session_key；扫码登录由前端轮询 qr_token。"""
     key = secrets.token_hex(8)
+    if tg_configured():
+        try:
+            res = await tg_start_login(key, body.phone)
+        except TgNotConfigured:
+            res = {"authed": False, "client": None}
+        _login_sessions[key] = {
+            "phone": body.phone, "stage": "authed" if res["authed"] else "code",
+            "expires": datetime.utcnow() + timedelta(minutes=10), "real": True,
+        }
+        msg = "已登录（会话有效）" if res["authed"] else "验证码已发送到 TG"
+        return ok({"sessionKey": key, "next": "done" if res["authed"] else "code", "msg": msg})
     _login_sessions[key] = {
         "phone": body.phone,
         "stage": "code",  # code -> authed
         "expires": datetime.utcnow() + timedelta(minutes=10),
     }
-    return ok({"sessionKey": key, "next": "code", "msg": "验证码已发送（待接 Telethon）"})
+    return ok({"sessionKey": key, "next": "code", "msg": "验证码已发送（待配置 TG_API_ID / TG_API_HASH）"})
 
 
 @router.get("/youban-bot/bot/login/status")
@@ -80,13 +100,29 @@ def login_status(session_key: str, user: User = Depends(get_current_user), db: S
 
 
 @router.post("/youban-bot/bot/login/verify")
-def login_verify(body: CodeIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def login_verify(body: CodeIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     s = _login_sessions.get(body.session_key)
     if not s or s["expires"] < datetime.utcnow():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "会话已过期，请重新开始")
-    # TODO: Telethon 验证码/二级密码真实校验
+    if s.get("real"):
+        from telethon.errors import SessionPasswordNeededError
+        try:
+            me = await tg_verify_code(body.session_key, s["phone"], body.code, body.password)
+        except SessionPasswordNeededError:
+            return ok({"needPassword": True}, msg="请输入二级密码")
+        except TgNotConfigured as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e))
+        except Exception as e:  # noqa: BLE001  验证码错误等
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"登录失败: {e}")
+        a = TgAccount(name=me["name"] or me["username"] or s["phone"], phone=s["phone"],
+                      username=me["username"], tg_user_id=str(me["id"]), status="online")
+        db.add(a)
+        db.commit()
+        _login_sessions.pop(body.session_key, None)
+        return ok(_out(a), msg="登录成功")
+    # 未配置 api_id/api_hash：保持原有模拟流程
     s["stage"] = "authed"
     a = TgAccount(name=body.session_key[:8], phone=s["phone"], status="online")
     db.add(a)
     db.commit()
-    return ok(_out(a), msg="登录成功（待接 Telethon 真实校验）")
+    return ok(_out(a), msg="登录成功（待配置 TG_API_ID / TG_API_HASH）")

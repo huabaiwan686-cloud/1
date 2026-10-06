@@ -1,5 +1,17 @@
 <template>
   <div>
+    <a-card title="全局抠图模式" style="margin-bottom: 16px">
+      <a-space>
+        <a-switch v-model:checked="gm.enabled" @change="saveGm" />
+        <span style="color: #666">开启后，所有发往频道的资料按所选背景自动抠图后发送；服务器只保留原图，处理图不留存，每次循环重新处理</span>
+      </a-space>
+      <div style="margin-top: 12px" v-if="gm.enabled">
+        <a-select v-model:value="gm.background_id" placeholder="选择抠图背景素材" style="width: 320px" @change="saveGm">
+          <a-select-option v-for="m in materials" :key="m.id" :value="m.id">{{ m.name }}</a-select-option>
+        </a-select>
+        <span style="color: #999; margin-left: 12px">每次上架/循环推送时实时处理，按次扣额度（重复图不重复扣）</span>
+      </div>
+    </a-card>
     <a-space style="margin-bottom: 16px">
       <a-button type="primary" @click="openEditor()">添加频道</a-button>
       <a-radio-group v-model:value="filter" @change="load">
@@ -47,7 +59,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { channelApi } from '@/api';
+import { channelApi, mediaApi } from '@/api';
 
 const columns = [
   { title: 'ID', dataIndex: 'id', width: 60 },
@@ -60,12 +72,23 @@ const columns = [
 const list = ref<any[]>([]); const loading = ref(false);
 const filter = ref<any>('all'); const visible = ref(false);
 const editing = reactive<any>({});
+const gm = reactive<any>({ enabled: false, background_id: null });
+const materials = ref<any[]>([]);
 
 async function load() {
   loading.value = true;
   try {
     list.value = await channelApi.list(filter.value === 'all' ? undefined : filter.value);
+    const g: any = await mediaApi.mattingGlobal();
+    gm.enabled = g.enabled; gm.background_id = g.backgroundId;
+    materials.value = await mediaApi.materials();
   } finally { loading.value = false; }
+}
+async function saveGm() {
+  try {
+    await mediaApi.setMattingGlobal({ enabled: gm.enabled, background_id: gm.background_id });
+    message.success('全局抠图模式已' + (gm.enabled ? '开启' : '关闭'));
+  } catch (e: any) { message.error(e.message); load(); }
 }
 function openEditor(r?: any) {
   Object.assign(editing, { name: '', username: '', anti_scan_mode: 'original', is_active: true, is_default: false, ...r });

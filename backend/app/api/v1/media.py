@@ -14,12 +14,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from PIL import Image as PILImage
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, ok
 from app.api.v1.vip import consume_quota
 from app.core.database import get_db
-from app.models.media import BackgroundMaterial, ImageJob
+from app.models.media import BackgroundMaterial, GlobalSetting, ImageJob
 from app.models.user import User
 from app.services.image_pipeline import blur_background, light_perturb, replace_background
 from app.services.matting import is_table_image
@@ -69,7 +70,10 @@ async def upload_material(
     db: Session = Depends(get_db),
 ):
     data = await file.read()
-    _, web_path = _store(data)
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
+    if suffix not in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".webm"):
+        suffix = ".jpg"
+    _, web_path = _store(data, suffix=suffix)
     m = BackgroundMaterial(name=name, url=web_path, category=category)
     db.add(m)
     db.commit()
@@ -106,52 +110,70 @@ async def process_image(
     job = ImageJob(mode=mode, source=f"upload:{file.filename}")
     fallback = False
     quota_consumed = False
+    reuse_result: str | None = None  # 缓存命中时直接复用，不重新推理
 
     try:
         if mode == "original":
             out = data
         elif mode in MATTING_MODES:
-            probe = PILImage.open(io.BytesIO(data)).convert("RGB")
-            if is_table_image(probe):
-                # 表格/自评表：本地识别，直接轻量扰动，不扣额度
-                out = light_perturb(data)
-                job.detail = f"table_skipped:{src_hash}"
+            bg_data = None
+            if mode == "replace_bg":
+                bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
+                if not bg:
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
+                bg_fs = _fs_path(bg.url)
+                if not os.path.exists(bg_fs):
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
+                with open(bg_fs, "rb") as f:
+                    bg_data = f.read()
+            # 缓存键：模式 + 原图哈希 + 参数（虚化半径/背景 id）；先查缓存，命中则连 PIL 解码都省了
+            cache_key = f"{mode}:{src_hash}:r{blur_radius}" if mode == "blur_bg" else f"{mode}:{src_hash}:bg{background_id}"
+            hit = db.query(ImageJob).filter(
+                ImageJob.status == "success",
+                ImageJob.detail.contains(cache_key),
+            ).first()
+            hit_fs = _fs_path(hit.result_url) if hit and hit.result_url else ""
+            if hit and hit_fs and os.path.isfile(hit_fs):
+                # 命中：直接复用上次结果，不推理、不扣额度
+                reuse_result = hit.result_url
+                job.detail = f"cache_hit:{cache_key}"
             else:
-                bg_data = None
-                if mode == "replace_bg":
-                    bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
-                    if not bg:
-                        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
-                    bg_fs = _fs_path(bg.url)
-                    if not os.path.exists(bg_fs):
-                        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
-                    with open(bg_fs, "rb") as f:
-                        bg_data = f.read()
-                try:
-                    if mode == "blur_bg":
-                        out = blur_background(data, {"blur_radius": blur_radius})
-                    else:
-                        out = replace_background(data, bg_data)
-                    # 首次成功抠图才扣额度；缓存命中不重复扣
-                    dup = db.query(ImageJob).filter(
-                        ImageJob.mode.in_(list(MATTING_MODES)),
-                        ImageJob.status == "success",
-                        ImageJob.quota_consumed.is_(True),
-                        ImageJob.detail.contains(src_hash),
-                    ).first()
-                    if not dup:
-                        ok_q, _ = consume_quota(db, 1)
-                        quota_consumed = ok_q
-                except NotImplementedError:
-                    # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
+                probe = PILImage.open(io.BytesIO(data)).convert("RGB")
+                if is_table_image(probe):
+                    # 表格/自评表：本地识别，直接轻量扰动，不扣额度
                     out = light_perturb(data)
-                    fallback = True
+                    job.detail = f"table_skipped:{src_hash}"
+                else:
+                    try:
+                        if mode == "blur_bg":
+                            out = blur_background(data, {"blur_radius": blur_radius})
+                        else:
+                            out = replace_background(data, bg_data)
+                        # 首次成功抠图才扣额度；缓存命中不重复扣
+                        dup = db.query(ImageJob).filter(
+                            ImageJob.mode.in_(list(MATTING_MODES)),
+                            ImageJob.status == "success",
+                            ImageJob.quota_consumed.is_(True),
+                            ImageJob.detail.contains(src_hash),
+                        ).first()
+                        if not dup:
+                            ok_q, _ = consume_quota(db, 1)
+                            quota_consumed = ok_q
+                        job.detail = cache_key
+                    except NotImplementedError:
+                        # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
+                        out = light_perturb(data)
+                        fallback = True
         else:  # light_perturb
             out = light_perturb(data)
 
-        _, result_web = _store(out, subdir="results")
-        job.status = "success"
-        job.result_url = result_web
+        if reuse_result:
+            job.status = "success"
+            job.result_url = reuse_result
+        else:
+            _, result_web = _store(out, subdir="results")
+            job.status = "success"
+            job.result_url = result_web
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
@@ -169,6 +191,7 @@ async def process_image(
         "jobId": job.id, "mode": mode, "status": job.status,
         "resultUrl": job.result_url, "quotaConsumed": quota_consumed,
         "fallback": fallback, "tableSkipped": job.detail.startswith("table_skipped") if job.detail else False,
+        "cacheHit": reuse_result is not None,
     }, msg="处理完成" if job.status == "success" else "处理失败")
 
 
@@ -209,3 +232,76 @@ def thumb(
             img = img.resize((w, int(img.height * w / img.width)), PILImage.LANCZOS)
         img.save(cached, "JPEG", quality=82)
     return FileResponse(cached, media_type="image/jpeg")
+
+
+class MattingGlobalIn(BaseModel):
+    enabled: bool
+    background_id: int | None = None
+
+
+def _get_setting(db: Session, key: str, default: str = "") -> str:
+    r = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
+    return r.value if r else default
+
+
+def _set_setting(db: Session, key: str, value: str) -> None:
+    r = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
+    if r:
+        r.value = value
+    else:
+        db.add(GlobalSetting(key=key, value=value))
+
+
+def get_matting_global(db: Session) -> dict | None:
+    """全局抠图配置：启用返回 {"background_id", "bg_data"}，否则 None。"""
+    if _get_setting(db, "matting_global_enabled") != "1":
+        return None
+    try:
+        bg_id = int(_get_setting(db, "matting_global_background_id") or 0)
+    except ValueError:
+        return None
+    bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == bg_id).first()
+    if not bg:
+        return None
+    try:
+        _, bg_data = _media_bytes_local(bg.url)
+    except Exception:  # noqa: BLE001
+        return None
+    return {"background_id": bg_id, "bg_data": bg_data}
+
+
+def _media_bytes_local(url: str) -> tuple[str, bytes]:
+    rel = url.replace("/uploads/", "", 1).lstrip("/")
+    rp = os.path.realpath(os.path.join(UPLOAD_DIR, rel))
+    if not rp.startswith(os.path.realpath(UPLOAD_DIR)) or not os.path.isfile(rp):
+        raise FileNotFoundError(f"背景素材不存在: {url}")
+    with open(rp, "rb") as f:
+        return os.path.basename(rp), f.read()
+
+
+@router.get("/matting-global")
+def get_matting_global_ep(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    enabled = _get_setting(db, "matting_global_enabled") == "1"
+    try:
+        bg_id = int(_get_setting(db, "matting_global_background_id") or 0) or None
+    except ValueError:
+        bg_id = None
+    bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == bg_id).first() if bg_id else None
+    return ok({"enabled": enabled, "backgroundId": bg_id,
+               "backgroundName": bg.name if bg else "",
+               "backgroundUrl": bg.url if bg else ""})
+
+
+@router.post("/matting-global")
+def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
+    if body.enabled:
+        if not body.background_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "请先选择抠图背景素材")
+        bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == body.background_id).first()
+        if not bg:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "背景素材不存在")
+    _set_setting(db, "matting_global_enabled", "1" if body.enabled else "0")
+    _set_setting(db, "matting_global_background_id", str(body.background_id or ""))
+    db.commit()
+    return ok(msg="全局抠图模式已" + ("开启" if body.enabled else "关闭"))

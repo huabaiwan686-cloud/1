@@ -33,9 +33,21 @@
               <a-select-option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }} ({{ t.code }})</a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="目标群组（逗号分隔）"><a-input v-model:value="planEditing.target_groups_str" /></a-form-item>
+          <a-form-item label="执行协议号">
+            <a-select v-model:value="planEditing.account_id" placeholder="选择 TG 协议号" style="width: 100%" @change="loadDialogs">
+              <a-select-option v-for="a in tgAccounts" :key="a.id" :value="a.id">{{ a.phone }}（{{ a.name }}）</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="目标群组">
+            <a-space style="margin-bottom: 8px">
+              <a-button size="small" @click="refreshDialogs" :loading="dlgLoading">刷新缓存</a-button>
+              <span style="color: #999; font-size: 12px">{{ dlgCachedAt ? '缓存时间：' + dlgCachedAt : '尚未缓存，请点刷新' }}</span>
+            </a-space>
+            <a-select v-model:value="planEditing.target_groups" mode="multiple" placeholder="从缓存的会话中选择"
+              style="width: 100%" :options="dlgOptions" />
+          </a-form-item>
           <a-form-item label="执行间隔"><a-input-number v-model:value="planEditing.interval_days" :min="1" /> 天</a-form-item>
-          <a-form-item label="执行时间点（逗号分隔 HH:mm）"><a-input v-model:value="planEditing.times_str" placeholder="09:00,21:00" /></a-form-item>
+          <a-form-item label="执行时间点（逗号分隔 HH:mm）"><a-input v-model:value="planEditing.times_str" placeholder="09:00,21:00" style="width: 100%" /></a-form-item>
         </a-form>
       </a-modal>
     </a-tab-pane>
@@ -45,7 +57,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { messageApi } from '@/api';
+import { messageApi, tgApi } from '@/api';
 
 const tplCols = [
   { title: 'ID', dataIndex: 'id', width: 60 },
@@ -64,13 +76,36 @@ const templates = ref<any[]>([]); const plans = ref<any[]>([]);
 const loading = ref(false);
 const tplVisible = ref(false); const planVisible = ref(false);
 const tplEditing = reactive<any>({}); const planEditing = reactive<any>({});
+const tgAccounts = ref<any[]>([]);
+const dlgOptions = ref<any[]>([]);
+const dlgCachedAt = ref('');
+const dlgLoading = ref(false);
 
 async function load() {
   loading.value = true;
   try {
     templates.value = await messageApi.templates();
     plans.value = await messageApi.plans();
+    tgAccounts.value = await tgApi.accounts();
   } finally { loading.value = false; }
+}
+async function loadDialogs() {
+  dlgOptions.value = []; dlgCachedAt.value = '';
+  if (!planEditing.account_id) return;
+  const r: any = await messageApi.dialogs(planEditing.account_id);
+  dlgOptions.value = r.list.map((d: any) => ({
+    value: d.chatId, label: `${d.title}${d.username ? ' (@' + d.username + ')' : ''} [${d.kind}]`,
+  }));
+  dlgCachedAt.value = r.cachedAt ? r.cachedAt.slice(0, 16).replace('T', ' ') : '';
+}
+async function refreshDialogs() {
+  if (!planEditing.account_id) { message.error('请先选择执行协议号'); return; }
+  dlgLoading.value = true;
+  try {
+    const r: any = await messageApi.refreshDialogs(planEditing.account_id);
+    message.success(r.msg || '已刷新');
+    await loadDialogs();
+  } catch (e: any) { message.error(e.message); } finally { dlgLoading.value = false; }
 }
 function openTpl() { Object.assign(tplEditing, { name: '', content: '' }); tplVisible.value = true; }
 async function saveTpl() {
@@ -80,13 +115,15 @@ async function saveTpl() {
 async function delTpl(id: number) { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }
 async function pushTpl(id: number) { await messageApi.pushTemplate(id); message.success('推送任务已创建'); }
 function openPlan() {
-  Object.assign(planEditing, { template_id: null, target_groups_str: '', interval_days: 1, times_str: '' });
+  Object.assign(planEditing, { template_id: null, account_id: null, target_groups: [], interval_days: 1, times_str: '' });
+  dlgOptions.value = []; dlgCachedAt.value = '';
   planVisible.value = true;
 }
 async function savePlan() {
   await messageApi.createPlan({
+    account_id: planEditing.account_id,
     template_id: planEditing.template_id,
-    target_groups: planEditing.target_groups_str.split(',').map((s: string) => s.trim()).filter(Boolean),
+    target_groups: planEditing.target_groups || [],
     interval_days: planEditing.interval_days,
     times: planEditing.times_str.split(',').map((s: string) => s.trim()).filter(Boolean),
   });

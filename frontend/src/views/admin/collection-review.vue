@@ -91,15 +91,16 @@ async function reload() {
   }
 }
 
-async function decide(op: 'publish' | 'unpublish') {
+async function decide(approveIt: boolean) {
   if (!current.value) return;
   const id = current.value.id;
-  await noteApi.batch([id], op);
+  if (approveIt) await noteApi.approve(id);
+  else await noteApi.reject(id);
   queue.value.shift();
   doneCount.value += 1;
 }
-function approve() { decide('publish').then(() => message.success('已通过并发布')); }
-function reject() { decide('unpublish').then(() => message.info('已拒绝（移入下架）')); }
+function approve() { decide(true).then(() => message.success('已通过并发布')); }
+function reject() { decide(false).then(() => message.info('已拒绝（移入下架）')); }
 function skip() {
   if (!queue.value.length) return;
   queue.value.push(queue.value.shift());
