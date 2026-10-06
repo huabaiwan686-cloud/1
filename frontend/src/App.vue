@@ -1,9 +1,26 @@
 <template>
   <router-view v-if="isLoginPage" />
   <a-layout v-else style="min-height: 100vh">
-    <a-layout-sider collapsible v-model:collapsed="collapsed" width="220">
-      <div class="logo">小灰机 · 商家后台</div>
-      <a-menu v-model:selectedKeys="selected" mode="inline" theme="dark" @click="onMenu">
+    <a-layout-sider
+      class="pro-sider"
+      collapsible
+      v-model:collapsed="collapsed"
+      width="220"
+      :trigger="null"
+    >
+      <div class="pro-logo" :class="{ collapsed }">
+        <span class="pro-logo-badge">灰</span>
+        <span v-if="!collapsed" style="margin-left: 12px">
+          <span class="pro-logo-title">小灰机</span>
+          <span class="pro-logo-sub">商家后台</span>
+        </span>
+      </div>
+      <a-menu
+        v-model:selectedKeys="selected"
+        mode="inline"
+        theme="dark"
+        @click="onMenu"
+      >
         <template v-for="m in menus" :key="m.path">
           <a-sub-menu v-if="m.children" :key="m.path" :title="m.title">
             <a-menu-item v-for="c in m.children" :key="c.path">{{ c.title }}</a-menu-item>
@@ -13,18 +30,23 @@
       </a-menu>
     </a-layout-sider>
     <a-layout>
-      <a-layout-header class="header">
-        <a-button type="text" @click="collapsed = !collapsed" style="font-size: 18px; padding: 0 12px;">
+      <a-layout-header class="pro-header">
+        <span class="trigger-btn" @click="collapsed = !collapsed">
           <menu-outlined v-if="collapsed" />
           <menu-fold-outlined v-else />
-        </a-button>
-        <div style="flex: 1" />
-        <a-space>
-          <span>{{ username }}</span>
+        </span>
+        <a-breadcrumb class="pro-breadcrumb">
+          <a-breadcrumb-item v-for="b in breadcrumb" :key="b">{{ b }}</a-breadcrumb-item>
+        </a-breadcrumb>
+        <div class="pro-header-right">
+          <span class="pro-username">
+            <span class="pro-avatar">{{ username ? username.slice(0, 1).toUpperCase() : 'U' }}</span>
+            <span class="uname">{{ username }}</span>
+          </span>
           <a-button size="small" @click="logout">退出</a-button>
-        </a-space>
+        </div>
       </a-layout-header>
-      <a-layout-content class="content">
+      <a-layout-content class="pro-content">
         <router-view />
       </a-layout-content>
       <!-- 移动端底部导航 -->
@@ -46,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { MenuOutlined, MenuFoldOutlined, HomeOutlined, UploadOutlined, FileTextOutlined, UserOutlined } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
@@ -69,6 +91,27 @@ const username = ref('');
 const annQueue = ref<any[]>([]);
 const annCurrent = ref<any>({});
 const annVisible = ref(false);
+
+// 面包屑：根据当前路由在菜单树中定位
+const breadcrumb = computed(() => {
+  const p = route.path;
+  for (const m of menus.value) {
+    if (m.path === p) return [m.title];
+    if (m.children) {
+      const c = (m.children as any[]).find((x: any) => x.path === p);
+      if (c) return [m.title, c.title];
+    }
+  }
+  return [];
+});
+
+function onResize() {
+  const mobile = window.innerWidth < 768;
+  if (mobile !== isMobile.value) {
+    isMobile.value = mobile;
+    collapsed.value = mobile;
+  }
+}
 
 function dismissAnn() {
   try { localStorage.setItem('ann_read_' + annCurrent.value.id, '1'); } catch { /* ignore */ }
@@ -115,13 +158,16 @@ async function loadUserState() {
   } catch { /* 401 由 request 拦截器跳登录 */ }
 }
 watch(() => route.path, () => { loadUserState(); });
-onMounted(() => { loadUserState(); });
+onMounted(() => {
+  loadUserState();
+  window.addEventListener('resize', onResize);
+});
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize);
+});
 </script>
 
 <style scoped>
-.logo { color: #fff; text-align: center; padding: 16px 0; font-weight: bold; }
-.header { background: #fff; padding: 0 16px 0 0; display: flex; align-items: center; }
-.content { margin: 16px; background: #fff; padding: 16px; min-height: 80vh; }
 .mobile-tabbar {
   display: none;
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
@@ -136,7 +182,6 @@ onMounted(() => { loadUserState(); });
 .tab-icon { font-size: 20px; margin-bottom: 2px; }
 @media (max-width: 768px) {
   .mobile-tabbar { display: flex; }
-  .content { margin: 8px; padding: 12px; margin-bottom: 70px; }
   .ant-layout-sider { position: fixed !important; z-index: 101; height: 100vh; }
 }
 </style>

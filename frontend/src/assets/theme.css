@@ -1,0 +1,310 @@
+/* ============================================================
+ * Pro 主题：Ant Design Pro / Vben Admin 设计语言
+ * 深色侧边栏 #001529 + 白色顶栏 + 浅灰内容区 #f0f2f5
+ * 纯视觉层：只做样式统一，不改任何业务逻辑
+ * ============================================================ */
+
+:root {
+  --pro-primary: #1890ff;
+  --pro-primary-hover: #40a9ff;
+  --pro-sider-bg: #001529;
+  --pro-sider-light: #002140;
+  --pro-layout-bg: #f0f2f5;
+  --pro-header-bg: #ffffff;
+  --pro-text: rgba(0, 0, 0, 0.85);
+  --pro-text-secondary: rgba(0, 0, 0, 0.45);
+  --pro-border: #f0f0f0;
+  --pro-radius: 8px;
+  --pro-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.03),
+    0 1px 6px -1px rgba(0, 0, 0, 0.02),
+    0 2px 4px 0 rgba(0, 0, 0, 0.02);
+  --pro-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ---------- 全局 ---------- */
+html,
+body {
+  background: var(--pro-layout-bg);
+  font-family: var(--pro-font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--pro-text);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* 细滚动条（桌面端） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ant-layout-sider ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ---------- 卡片 ---------- */
+.ant-card {
+  border-radius: var(--pro-radius);
+  box-shadow: var(--pro-shadow-card);
+}
+.ant-card-head {
+  border-bottom: 1px solid var(--pro-border);
+}
+.ant-card-head-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+/* ---------- 按钮 ---------- */
+.ant-btn {
+  border-radius: 6px;
+  font-weight: 400;
+}
+.ant-btn-primary {
+  box-shadow: 0 2px 0 rgba(24, 144, 255, 0.1);
+}
+
+/* ---------- 表格 ---------- */
+.ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+  color: var(--pro-text-secondary);
+}
+.ant-table-thead > tr > th::before {
+  display: none;
+}
+.ant-table-wrapper {
+  border-radius: var(--pro-radius);
+}
+
+/* ---------- 表单 ---------- */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: 6px !important;
+}
+
+/* ---------- 顶栏 ---------- */
+.pro-header {
+  background: var(--pro-header-bg);
+  padding: 0 24px 0 8px;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  position: relative;
+  z-index: 10;
+}
+.pro-header .trigger-btn {
+  font-size: 18px;
+  padding: 0 16px;
+  height: 64px;
+  line-height: 64px;
+  cursor: pointer;
+  color: var(--pro-text);
+  transition: color 0.2s;
+}
+.pro-header .trigger-btn:hover {
+  color: var(--pro-primary);
+}
+.pro-breadcrumb {
+  margin-left: 4px;
+}
+.pro-header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pro-username {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pro-text-secondary);
+}
+.pro-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------- 侧边栏 ---------- */
+.pro-sider {
+  box-shadow: 2px 0 8px rgba(0, 21, 41, 0.15);
+}
+.pro-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--pro-sider-light);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.pro-logo.collapsed {
+  padding: 0;
+  justify-content: center;
+}
+.pro-logo-badge {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 60%, #0050b3 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.45);
+}
+.pro-logo-title {
+  margin-left: 12px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.pro-logo-sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 2px;
+}
+
+/* 深色菜单微调：选中项更醒目 */
+.ant-menu-dark .ant-menu-item-selected {
+  background-color: var(--pro-primary) !important;
+}
+.ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  color: #fff;
+}
+
+/* ---------- 内容区 ---------- */
+.pro-content {
+  margin: 24px;
+  padding: 24px;
+  background: #fff;
+  border-radius: var(--pro-radius);
+  box-shadow: var(--pro-shadow-card);
+  min-height: calc(100vh - 112px);
+}
+
+/* ---------- 登录页 ---------- */
+.pro-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(24, 144, 255, 0.28), transparent 60%),
+    radial-gradient(1000px 500px at 85% 90%, rgba(9, 109, 217, 0.32), transparent 60%),
+    linear-gradient(135deg, #001529 0%, #002140 55%, #003a8c 100%);
+  position: relative;
+  overflow: hidden;
+}
+.pro-login-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+.pro-login-card {
+  width: 400px;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+  position: relative;
+  z-index: 1;
+  border: none;
+}
+.pro-login-brand {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.pro-login-brand .pro-logo-badge {
+  width: 52px;
+  height: 52px;
+  font-size: 26px;
+  border-radius: 12px;
+  margin: 0 auto 12px;
+}
+.pro-login-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--pro-text);
+  margin: 0;
+}
+.pro-login-sub {
+  color: var(--pro-text-secondary);
+  font-size: 13px;
+  margin-top: 6px;
+  letter-spacing: 3px;
+}
+.pro-login-card .ant-card-body {
+  padding: 32px 32px 28px;
+}
+.pro-login-card .ant-btn-primary {
+  height: 42px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+.pro-login-card .ant-input,
+.pro-login-card .ant-input-password {
+  height: 42px;
+  border-radius: 8px;
+}
+.pro-login-foot {
+  text-align: center;
+  margin-top: 20px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 768px) {
+  .pro-content {
+    margin: 12px;
+    padding: 16px;
+    margin-bottom: 84px;
+    min-height: calc(100vh - 160px);
+  }
+  .pro-header {
+    padding-right: 12px;
+  }
+  .pro-breadcrumb {
+    display: none;
+  }
+  .pro-username span.uname {
+    display: none;
+  }
+  .pro-login-card .ant-card-body {
+    padding: 24px 20px;
+  }
+}
