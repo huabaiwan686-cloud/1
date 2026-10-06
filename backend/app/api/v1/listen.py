@@ -74,6 +74,49 @@ def toggle_plan(plan_id: int, body: PlanToggleIn,
     return ok(msg="已" + ("启用" if body.enabled else "停用"))
 
 
+class AlertConfigIn(BaseModel):
+    enabled: bool = False
+    target: str = ""  # 管理员 TG 用户名/ID
+    notify_via: str = "tg_dm"
+
+
+@router.get("/alert-config")
+def get_alert_config(user: User = Depends(require_member), db: Session = Depends(get_db)):
+    """关键词命中告警配置（命中后经监听协议号给管理员发 TG 私信）。"""
+    from app.models.media import GlobalSetting
+
+    def _g(k: str, d: str = "") -> str:
+        r = db.query(GlobalSetting).filter(GlobalSetting.key == k).first()
+        return r.value if r and r.value else d
+
+    return ok({
+        "enabled": _g("listen_alert_enabled", "0") == "1",
+        "target": _g("listen_alert_target", ""),
+        "notifyVia": _g("listen_alert_notify_via", "tg_dm"),
+    })
+
+
+@router.post("/alert-config")
+def set_alert_config(body: AlertConfigIn, user: User = Depends(require_member),
+                     db: Session = Depends(get_db)):
+    from app.models.media import GlobalSetting
+
+    def _s(k: str, v: str) -> None:
+        r = db.query(GlobalSetting).filter(GlobalSetting.key == k).first()
+        if r:
+            r.value = v
+        else:
+            db.add(GlobalSetting(key=k, value=v))
+
+    if body.enabled and not body.target.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "启用告警请填写管理员 TG 用户名/ID")
+    _s("listen_alert_enabled", "1" if body.enabled else "0")
+    _s("listen_alert_target", body.target.strip())
+    _s("listen_alert_notify_via", body.notify_via or "tg_dm")
+    db.commit()
+    return ok(msg="告警配置已" + ("启用" if body.enabled else "关闭"))
+
+
 @router.get("/hits")
 def list_hits(plan_id: int = 0, limit: int = 50,
               user: User = Depends(require_member), db: Session = Depends(get_db)):

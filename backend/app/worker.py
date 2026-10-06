@@ -61,7 +61,20 @@ def sweep_once() -> dict:
             return {"done": 0, "failed": 0}
         admin = db.query(User).filter(User.is_admin.is_(True)).first()
         user = admin if admin else SimpleNamespace(username=EXECUTOR)
-        for n in notes:
+        # 发布间隔可配：单任务串行，批次之间按配置 sleep（全局设置 publish_interval_seconds）
+        from app.models.media import GlobalSetting
+        _iv = db.query(GlobalSetting).filter(
+            GlobalSetting.key == "publish_interval_seconds").first()
+        try:
+            interval = max(0, int((_iv.value if _iv and _iv.value else "0").strip()))
+        except (ValueError, AttributeError):
+            interval = 0
+        if interval:
+            log.info("定时发布间隔：%s 秒", interval)
+        import time
+        for i, n in enumerate(notes):
+            if i > 0 and interval:
+                time.sleep(interval)
             try:
                 sent, fail_reasons = _send_to_channels(n, user, db)
                 n.scheduled_sent = True
@@ -176,6 +189,16 @@ async def run() -> None:
 
     listen_task = asyncio.create_task(_listen_guard())
 
+    # 自动转发：常驻任务（无启用规则时直接返回）
+    async def _forward_guard():
+        try:
+            from app.services.forwarder import run_forwarders
+            await run_forwarders()
+        except Exception:  # noqa: BLE001
+            log.exception("转发任务异常退出")
+
+    forward_task = asyncio.create_task(_forward_guard())
+
     while not stop.is_set():
         try:
             await asyncio.wait_for(stop.wait(), timeout=INTERVAL)
@@ -226,6 +249,7 @@ async def run() -> None:
         except Exception:  # noqa: BLE001
             log.exception("pay/watch 轮询异常")
     listen_task.cancel()
+    forward_task.cancel()
     log.info("worker 退出")
 
 

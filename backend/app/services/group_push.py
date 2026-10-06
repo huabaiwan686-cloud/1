@@ -16,6 +16,12 @@ from datetime import datetime, timedelta
 log = logging.getLogger("group_push")
 
 
+def _gsetting(db, key: str, default: str = "") -> str:
+    from app.models.media import GlobalSetting
+    r = db.query(GlobalSetting).filter(GlobalSetting.key == key).first()
+    return r.value if r and r.value else default
+
+
 def _parse_times(times: list) -> list:
     out = []
     for t in times or []:
@@ -117,7 +123,13 @@ async def run_plan(plan_id: int) -> dict:
             log.warning("push plan %s: 协议号未登录", plan.id)
             return {"sent": 0, "failed": 0}
         gap = plan.multi_interval_seconds or 0
-        for t in plan.target_groups or []:
+        targets = list(plan.target_groups or [])
+        # 循环打乱：避免固定群组顺序被风控识别（全局开关 push_shuffle_targets）
+        if _gsetting(db, "push_shuffle_targets", "0") == "1" and len(targets) > 1:
+            import random
+            random.shuffle(targets)
+            log.info("push plan %s: 目标群组已打乱", plan.id)
+        for t in targets:
             try:
                 target = await client.get_entity(t)
             except Exception as e:  # noqa: BLE001

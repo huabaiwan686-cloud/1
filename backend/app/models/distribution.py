@@ -129,3 +129,17 @@ class PublishRule(Base):
     channel_ids: Mapped[list] = mapped_column(JSON, default=list)  # 命中的频道
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class AutoForwardRule(Base):
+    """自动转发规则：协议号监听源群新消息，自动转发到目标群。"""
+
+    __tablename__ = "auto_forward_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 执行协议号
+    source_chat: Mapped[str] = mapped_column(String(128), default="")  # 源群（用户名/链接/ID）
+    target_chat: Mapped[str] = mapped_column(String(128), default="")  # 目标群
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

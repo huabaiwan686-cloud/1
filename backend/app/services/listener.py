@@ -268,6 +268,11 @@ async def handle_message(client, db, plan, event) -> None:
     )
     max_notes = int(_setting(db, MAX_NOTES_KEY, "10") or 10)
     notes = notes[:max_notes]
+    # 循环打乱：避免每次固定顺序发素材被识别（全局开关 listen_shuffle_notes）
+    if _setting(db, "listen_shuffle_notes", "0") == "1" and len(notes) > 1:
+        import random
+        random.shuffle(notes)
+        log.info("listen plan %s: 素材顺序已打乱", plan.id)
     if not notes:
         await asyncio.to_thread(
             _finalize_hit, db, claim, 0, "skipped", f"{city.name}暂无已上架素材")
@@ -281,6 +286,39 @@ async def handle_message(client, db, plan, event) -> None:
     await asyncio.to_thread(
         _finalize_hit, db, claim, sent, "success" if sent else "failed",
         f"监听触发：{username or tg_uid} 在[{chat_title}]发[{hit_kw}]→{city.name}，发出 {sent}/{len(notes)} 组")
+    # 关键词监控告警：命中且发出后，按配置通知管理员
+    if sent > 0:
+        try:
+            await _maybe_alert(db, client, plan, hit_kw, city.name, chat_title,
+                               username or str(tg_uid), sent)
+        except Exception as e:  # noqa: BLE001  告警失败不影响主流程
+            log.warning("listen alert failed: %s", e)
+
+
+ALERT_ENABLED_KEY = "listen_alert_enabled"
+ALERT_TARGET_KEY = "listen_alert_target"  # 管理员 TG 用户名/ID，监听号给其发 DM
+ALERT_VIA_KEY = "listen_alert_notify_via"  # tg_dm（默认）
+
+
+async def _maybe_alert(db, client, plan, keyword: str, city_name: str,
+                       chat_title: str, who: str, notes_sent: int) -> None:
+    """关键词命中告警：给管理员发一条 TG 私信（经监听协议号）。"""
+    if _setting(db, ALERT_ENABLED_KEY, "0") != "1":
+        return
+    target = (_setting(db, ALERT_TARGET_KEY, "") or "").strip()
+    if not target:
+        return
+    text = (
+        f"🔔 关键词命中告警\n"
+        f"计划：{plan.name}\n"
+        f"关键词：{keyword} → {city_name}\n"
+        f"触发人：{who}\n"
+        f"群组：{chat_title}\n"
+        f"已发出：{notes_sent} 组素材"
+    )
+    entity = await client.get_entity(target)
+    await client.send_message(entity, text)
+    log.info("listen alert sent to %s", target)
 
 
 async def _run_phone(phone: str, plan_ids: list[int]):
