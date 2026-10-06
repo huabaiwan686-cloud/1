@@ -44,3 +44,65 @@ def stats(user: User = Depends(require_member), db: Session = Depends(get_db)):
         "vipPlan": sub.plan if active else "starter",
         "vipActive": active,
     })
+
+
+@router.get("/trend")
+def trend(startDate: str = "", endDate: str = "",
+          user: User = Depends(require_member), db: Session = Depends(get_db)):
+    """趋势图：按天统计新增资料 / 发布成功 / 下架资料 / 发布失败。
+    对标原站 GET /publish-admin/dashboard/trend?startDate&endDate&accountId?
+    """
+    from datetime import date, timedelta
+    try:
+        start = date.fromisoformat(startDate) if startDate else date.today() - timedelta(days=13)
+        end = date.fromisoformat(endDate) if endDate else date.today()
+    except ValueError:
+        from fastapi import HTTPException, status
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "日期格式错误（YYYY-MM-DD）")
+    if (end - start).days > 90:
+        start = end - timedelta(days=89)
+
+    days = []
+    d = start
+    while d <= end:
+        days.append(d)
+        d += timedelta(days=1)
+
+    def day_count(model, day, **filters):
+        day_start = datetime(day.year, day.month, day.day)
+        day_end = day_start + timedelta(days=1)
+        q = db.query(func.count(model.id)).filter(
+            model.created_at >= day_start, model.created_at < day_end)
+        for k, v in filters.items():
+            q = q.filter(getattr(model, k) == v)
+        return q.scalar() or 0
+
+    # 发布成功/失败走 TaskLog；下架走 Note(status=offline)
+    new_notes, pub_ok, pub_fail, offlined = [], [], [], []
+    for day in days:
+        new_notes.append(day_count(Note, day))
+        day_start = datetime(day.year, day.month, day.day)
+        day_end = day_start + timedelta(days=1)
+        pub_ok.append(
+            db.query(func.count(TaskLog.id)).filter(
+                TaskLog.action == "publish", TaskLog.result == "success",
+                TaskLog.created_at >= day_start, TaskLog.created_at < day_end).scalar() or 0)
+        pub_fail.append(
+            db.query(func.count(TaskLog.id)).filter(
+                TaskLog.action == "publish", TaskLog.result == "fail",
+                TaskLog.created_at >= day_start, TaskLog.created_at < day_end).scalar() or 0)
+        # 下架：用 updated_at 近似（Note 无下架时间字段时）
+        offlined.append(
+            db.query(func.count(Note.id)).filter(
+                Note.status == "offline",
+                Note.updated_at >= day_start, Note.updated_at < day_end).scalar() or 0)
+
+    return ok({
+        "dates": [d.isoformat() for d in days],
+        "series": [
+            {"name": "新增资料", "data": new_notes},
+            {"name": "发布成功", "data": pub_ok},
+            {"name": "下架资料", "data": offlined},
+            {"name": "发布失败", "data": pub_fail},
+        ],
+    })

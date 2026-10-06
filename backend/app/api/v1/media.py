@@ -17,7 +17,7 @@ from PIL import Image as PILImage
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_member
+from app.core.permissions import require_admin, require_member
 from app.api.deps import get_current_user, ok
 from app.api.v1.vip import consume_quota, quota_available
 from app.core.database import get_db
@@ -489,3 +489,183 @@ async def watermark_preview(file: UploadFile = File(...),
     import base64
     data_url = "data:image/jpeg;base64," + base64.b64encode(out).decode()
     return ok({"preview": data_url})
+
+
+@router.post("/image-search")
+async def image_search(
+    file: UploadFile = File(...),
+    page: int = Form(1),
+    per_page: int = Form(20),
+    threshold: int = Form(10),
+    user: User = Depends(require_member),
+    db: Session = Depends(get_db),
+):
+    """以图搜图：上传一张图片，在笔记素材中找相似图（dHash 海明距离）。
+    原站对标：POST /follow/note/image-search
+    """
+    from app.models.content import Note, NoteMedia
+    from app.services.dedup import dhash_bytes, hamming_distance
+
+    data = await file.read()
+    if len(data) > 50 * 1024 * 1024:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "文件过大（上限 50MB）")
+    try:
+        query_hash = dhash_bytes(data)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"图片解析失败：{e}")
+
+    # 遍历所有图片素材计算相似度（数据量大时可加缓存优化）
+    medias = db.query(NoteMedia).filter(NoteMedia.media_type == "image").all()
+    hits = []
+    for m in medias:
+        try:
+            fp = _fs_path(m.url)
+            if not os.path.exists(fp):
+                continue
+            with open(fp, "rb") as f:
+                h = dhash_bytes(f.read())
+            dist = hamming_distance(query_hash, h)
+            if dist <= threshold:
+                hits.append((dist, m))
+        except Exception:  # noqa: BLE001
+            continue
+    hits.sort(key=lambda x: x[0])
+    total = len(hits)
+    start = (page - 1) * per_page
+    page_hits = hits[start:start + per_page]
+    # 取关联笔记信息
+    note_ids = list({m.note_id for _, m in page_hits})
+    notes = {n.id: n for n in db.query(Note).filter(Note.id.in_(note_ids)).all()} if note_ids else {}
+    items = []
+    for dist, m in page_hits:
+        n = notes.get(m.note_id)
+        items.append({
+            "note_id": m.note_id,
+            "note_title": n.title if n else "",
+            "media_url": m.url,
+            "distance": dist,
+        })
+    return ok({"total": total, "page": page, "per_page": per_page, "items": items})
+
+
+# ============ 防扫图完整配置（对标原站 30+ 字段） ============
+
+ANTI_SCAN_DEFAULTS = {
+    "globalEnabled": False,
+    "allowSingleOverrideEnabled": False,
+    "forceBeforeSendEnabled": False,
+    "existingBatchEnabled": False,
+    # 基础保护
+    "metadataStripEnabled": False,
+    "compressionEnabled": False,
+    "compressionQuality": 82,
+    "resizeEnabled": False,
+    "resizeScale": 96,
+    "cropEnabled": False,
+    "cropPercent": 2,
+    "jpegQualityControlEnabled": False,
+    # 图像扰动
+    "noiseEnabled": False,
+    "noiseStrength": 18,
+    "colorJitterEnabled": False,
+    "colorJitterStrength": 12,
+    "sharpenBlurEnabled": False,
+    "sharpenBlurMode": "blur",
+    "sharpenBlurStrength": 8,
+    # 背景水印
+    "backgroundReplaceEnabled": False,
+    "backgroundReplaceVipEnabled": False,
+    "backgroundBlurEnabled": False,
+    "portraitBackgroundEnabled": False,
+    "portraitSoftEdgeEnabled": False,
+    "portraitSoftEdgeWidth": 12,
+    "originalOverlayEnabled": False,
+    "originalOverlayOpacity": 92,
+    "originalOverlayWidth": 72,
+    "backgroundTextureEnabled": False,
+    "backgroundTexturePreset": "rabbit",
+    "backgroundTextureImage": "",
+    "watermarkEnabled": False,
+    "watermarkText": "xiaohuiji",
+    "watermarkFontSize": 20,
+    "watermarkOpacity": 20,
+    "profileNoWatermarkEnabled": False,
+    # 遮罩/二维码/贴图
+    "maskEnabled": False,
+    "maskMode": "qr",
+    "maskCount": 1,
+    "maskOpacity": 42,
+    "maskItemsJson": "[]",
+    "qrText": "",
+    "stickerImage": "",
+    "stickerText": "",
+}
+
+# 内置背景纹理 SVG（从原站前端提取）
+ANTI_SCAN_TEXTURES = {
+    "dot": None, "grid": None, "heart": None, "rabbit": None,
+}
+
+
+def _load_textures():
+    if ANTI_SCAN_TEXTURES["dot"]:
+        return
+    import pathlib
+    base = pathlib.Path(__file__).resolve().parents[3] / "docs" / "reverse"
+    for name in ANTI_SCAN_TEXTURES:
+        p = base / f"texture-{name}.svg"
+        if p.exists():
+            ANTI_SCAN_TEXTURES[name] = p.read_text(encoding="utf-8")
+
+
+def get_anti_scan_config(db: Session) -> dict:
+    import json
+    raw = _get_setting(db, "anti_scan_config", "")
+    cfg = dict(ANTI_SCAN_DEFAULTS)
+    if raw:
+        try:
+            saved = json.loads(raw)
+            cfg.update({k: v for k, v in saved.items() if k in ANTI_SCAN_DEFAULTS})
+        except Exception:  # noqa: BLE001
+            pass
+    return cfg
+
+
+@router.get("/anti-scan")
+def get_anti_scan(user: User = Depends(require_member), db: Session = Depends(get_db)):
+    return ok(get_anti_scan_config(db))
+
+
+@router.post("/anti-scan")
+def set_anti_scan(body: dict, user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    import json
+    cfg = dict(ANTI_SCAN_DEFAULTS)
+    cfg.update({k: v for k, v in (body or {}).items() if k in ANTI_SCAN_DEFAULTS})
+    # 联动：开启背景替换 → 纹理开、水印关；关闭 → 相关全关
+    if cfg.get("backgroundReplaceEnabled"):
+        cfg["backgroundTextureEnabled"] = True
+        cfg["watermarkEnabled"] = False
+        cfg["profileNoWatermarkEnabled"] = False
+    else:
+        cfg["backgroundTextureEnabled"] = False
+        cfg["originalOverlayEnabled"] = False
+        cfg["portraitSoftEdgeEnabled"] = False
+    _set_setting(db, "anti_scan_config", json.dumps(cfg, ensure_ascii=False))
+    db.commit()
+    return ok(msg="防扫图配置已保存")
+
+
+@router.get("/anti-scan/textures")
+def list_anti_scan_textures(user: User = Depends(require_member)):
+    """返回 4 个内置背景纹理（data URL）。"""
+    import base64
+    _load_textures()
+    out = []
+    labels = {"rabbit": "粉色贴图", "heart": "爱心纹理", "dot": "点阵纹理", "grid": "网格纹理"}
+    for name, label in labels.items():
+        svg = ANTI_SCAN_TEXTURES.get(name) or ""
+        data_url = ""
+        if svg:
+            data_url = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+        out.append({"name": name, "label": label, "preview": data_url})
+    return ok(out)

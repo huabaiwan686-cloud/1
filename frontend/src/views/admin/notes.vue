@@ -16,6 +16,7 @@
         </a-select>
         <a-button @click="load">刷新</a-button>
         <a-button @click="showDedup">查找重复</a-button>
+        <a-button @click="imgSearchVisible = true">以图搜图</a-button>
         <div style="flex: 1" />
         <a-radio-group v-model:value="viewMode" button-style="solid" size="small">
           <a-radio-button value="card">卡片</a-radio-button>
@@ -121,13 +122,29 @@
         </div>
       </a-spin>
     </a-modal>
+    <a-modal v-model:open="imgSearchVisible" title="以图搜图" :footer="null" width="700px">
+      <a-upload-dragger :before-upload="doImageSearch" :show-upload-list="false" accept="image/*">
+        <p class="ant-upload-drag-icon"><inbox-outlined /></p>
+        <p class="ant-upload-text">点击上传或拖拽图片到此处，也可直接粘贴截图 (Ctrl+V)</p>
+      </a-upload-dragger>
+      <a-spin :spinning="imgSearchLoading" style="margin-top: 16px; width: 100%;">
+        <div v-if="imgSearchResults.length" style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px;">
+          <div v-for="(r, i) in imgSearchResults" :key="i" style="text-align: center; cursor: pointer;" @click="preview({id: r.note_id})">
+            <img :src="r.media_url" style="width: 120px; height: 120px; object-fit: cover; border-radius: 8px;" />
+            <div style="font-size: 12px;">{{ r.note_title || ('笔记 #' + r.note_id) }}</div>
+            <div style="font-size: 11px; color: #999;">相似度 {{ 100 - r.distance }}%</div>
+          </div>
+        </div>
+        <a-empty v-if="imgSearched && !imgSearchResults.length && !imgSearchLoading" description="未找到相似图片" style="margin-top: 12px;" />
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { DownOutlined } from '@ant-design/icons-vue';
+import { DownOutlined, InboxOutlined } from '@ant-design/icons-vue';
 import { noteApi, channelApi, mediaApi } from '@/api';
 
 const list = ref<any[]>([]);
@@ -144,6 +161,23 @@ const viewMode = ref<'card' | 'table'>('card');
 const previewVisible = ref(false);
 const previewNote = ref<any>(null);
 const dedupVisible = ref(false);
+const imgSearchVisible = ref(false);
+const imgSearchLoading = ref(false);
+const imgSearchResults = ref<any[]>([]);
+const imgSearched = ref(false);
+
+async function doImageSearch(file: File) {
+  imgSearchLoading.value = true; imgSearched.value = false; imgSearchResults.value = [];
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const data: any = await mediaApi.imageSearch(fd);
+    imgSearchResults.value = data.items || [];
+    imgSearched.value = true;
+  } catch (e: any) { message.error(e.message || '搜索失败'); }
+  finally { imgSearchLoading.value = false; }
+  return false; // 阻止自动上传
+}
 const dedupLoading = ref(false);
 const dedupGroups = ref<any[]>([]);
 

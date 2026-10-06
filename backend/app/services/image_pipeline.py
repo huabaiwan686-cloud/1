@@ -139,3 +139,102 @@ def blur_background(
     blurred = img.filter(ImageFilter.GaussianBlur(float(o.get("blur_radius", 12))))
     composed = Image.composite(img.convert("RGBA"), blurred.convert("RGBA"), mask)
     return _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+
+
+def apply_anti_scan_config(data: bytes, cfg: dict) -> bytes:
+    """按完整防扫图配置处理图片（对标原站 30+ 字段面板）。
+    顺序：去EXIF → 压缩重编码 → 尺寸微调 → 轻微裁剪 → 噪点 → 色彩扰动 →
+          锐化/模糊 → 背景替换/虚化 → 纹理 → 轻水印
+    """
+    import numpy as np
+
+    img = _open(data)  # convert RGB 本身丢弃 EXIF
+
+    # --- 基础保护 ---
+    quality = 90
+    if cfg.get("compressionEnabled"):
+        quality = max(50, min(100, int(cfg.get("compressionQuality", 82))))
+    if cfg.get("resizeEnabled"):
+        scale = max(50, min(100, int(cfg.get("resizeScale", 96)))) / 100.0
+        w, h = img.size
+        img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+        # 缩回原尺寸，保持观感一致但像素已变
+        img = img.resize((w, h), Image.LANCZOS)
+    if cfg.get("cropEnabled"):
+        pct = max(1, min(10, int(cfg.get("cropPercent", 2)))) / 100.0
+        w, h = img.size
+        dx, dy = int(w * pct / 2), int(h * pct / 2)
+        img = img.crop((dx, dy, w - dx, h - dy)).resize((w, h), Image.LANCZOS)
+
+    # --- 图像扰动 ---
+    if cfg.get("noiseEnabled"):
+        strength = max(1, min(50, int(cfg.get("noiseStrength", 18))))
+        arr = np.asarray(img).astype(np.int16)
+        noise = np.random.randint(-strength, strength + 1, arr.shape)
+        arr = np.clip(arr + noise, 0, 255).astype(np.uint8)
+        img = Image.fromarray(arr)
+    if cfg.get("colorJitterEnabled"):
+        s = max(1, min(50, int(cfg.get("colorJitterStrength", 12)))) / 100.0
+        img = ImageEnhance.Brightness(img).enhance(1 + random.uniform(-s, s))
+        img = ImageEnhance.Color(img).enhance(1 + random.uniform(-s, s))
+        img = ImageEnhance.Contrast(img).enhance(1 + random.uniform(-s / 2, s / 2))
+    if cfg.get("sharpenBlurEnabled"):
+        strength = max(1, min(30, int(cfg.get("sharpenBlurStrength", 8))))
+        mode = cfg.get("sharpenBlurMode", "blur")
+        if mode == "sharpen":
+            img = ImageEnhance.Sharpness(img).enhance(1 + strength / 20.0)
+        else:
+            img = img.filter(ImageFilter.GaussianBlur(radius=strength / 10.0))
+
+    # --- 背景水印 ---
+    if cfg.get("backgroundBlurEnabled"):
+        try:
+            img = blur_background(data if False else _encode(img, quality))
+        except Exception:  # noqa: BLE001
+            pass
+    if cfg.get("backgroundTextureEnabled"):
+        preset = cfg.get("backgroundTexturePreset", "rabbit") or "rabbit"
+        try:
+            from app.api.v1.media import ANTI_SCAN_TEXTURES, _load_textures
+            _load_textures()
+            svg = ANTI_SCAN_TEXTURES.get(preset)
+            if svg:
+                # SVG 转小图平铺作为背景
+                import cairosvg
+                png = cairosvg.svg2png(bytestring=svg.encode(), write_to=None,
+                                      output_width=160, output_height=160)
+                tile = Image.open(io.BytesIO(png)).convert("RGB")
+                w, h = img.size
+                bg = Image.new("RGB", (w, h))
+                for y in range(0, h, 160):
+                    for x in range(0, w, 160):
+                        bg.paste(tile, (x, y))
+                # 人像区域保留：简单中心叠加原图
+                ow = max(30, min(100, int(cfg.get("originalOverlayWidth", 72))))
+                nw, nh = int(w * ow / 100), int(h * ow / 100)
+                fg = img.resize((nw, nh), Image.LANCZOS)
+                op = max(50, min(100, int(cfg.get("originalOverlayOpacity", 92)))) / 100.0
+                if op < 1.0:
+                    fg = fg.convert("RGBA")
+                    alpha = fg.split()[3] if fg.mode == "RGBA" else None
+                    white = Image.new("RGBA", fg.size, (255, 255, 255, 0))
+                    fg = Image.alpha_composite(white, fg)
+                    fg.putalpha(int(255 * op))
+                    fg = fg.convert("RGB")
+                bg.paste(fg, ((w - nw) // 2, (h - nh) // 2))
+                img = bg
+        except Exception:  # noqa: BLE001
+            pass
+    if cfg.get("watermarkEnabled"):
+        try:
+            from app.services.watermark import apply_watermark
+            text = cfg.get("watermarkText", "xiaohuiji") or "xiaohuiji"
+            fs = max(10, min(60, int(cfg.get("watermarkFontSize", 20))))
+            op = max(5, min(100, int(cfg.get("watermarkOpacity", 20)))) / 100.0
+            img = Image.open(io.BytesIO(
+                apply_watermark(_encode(img, quality), "text", text, "bottom-right", op, fs)
+            )).convert("RGB")
+        except Exception:  # noqa: BLE001
+            pass
+
+    return _encode(img, quality)

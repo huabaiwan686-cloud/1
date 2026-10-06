@@ -210,3 +210,33 @@ def save_coop_config(body: CoopConfigIn, user: User = Depends(require_member), d
         db.add(cfg)
     db.commit()
     return ok({"id": cfg.id}, msg="合作配置已保存")
+
+
+# ---- 好友关注配置（对标原站 followApprovalRequired / publicFollowEnabled） ----
+@router.get("/follow-config")
+def get_follow_config(user: User = Depends(require_member), db: Session = Depends(get_db)):
+    from app.models.media import GlobalSetting
+    def gv(k, default):
+        r = db.query(GlobalSetting).filter(GlobalSetting.key == k).first()
+        return r.value if r else default
+    return ok({
+        "followApprovalRequired": gv("follow_approval_required", "0") == "1",
+        "publicFollowEnabled": gv("public_follow_enabled", "1") == "1",
+    })
+
+
+@router.post("/follow-config")
+def set_follow_config(body: dict, user: User = Depends(require_member), db: Session = Depends(get_db)):
+    from app.core.permissions import require_admin
+    require_admin(user)
+    from app.models.media import GlobalSetting
+    def sv(k, v):
+        r = db.query(GlobalSetting).filter(GlobalSetting.key == k).first()
+        if r:
+            r.value = v
+        else:
+            db.add(GlobalSetting(key=k, value=v))
+    sv("follow_approval_required", "1" if body.get("followApprovalRequired") else "0")
+    sv("public_follow_enabled", "1" if body.get("publicFollowEnabled") else "0")
+    db.commit()
+    return ok(msg="关注配置已保存")

@@ -131,6 +131,8 @@ export const socialApi = {
     request.get('/api/social/friends', { params: { direction } }),
   applyFriend: (username: string) =>
     request.post('/api/social/friends/apply', { username }),
+  followConfig: () => request.get('/api/social/follow-config'),
+  setFollowConfig: (data: any) => request.post('/api/social/follow-config', data),
   bindings: () => request.get('/api/social/bindings'),
   createBinding: (bind_code: string) =>
     request.post('/api/social/bindings', { bind_code }),
@@ -167,6 +169,10 @@ export const mediaApi = {
     return request.post('/api/media/materials', fd);
   },
   deleteMaterial: (id: number) => request.delete(`/api/media/materials/${id}`),
+  imageSearch: (fd: FormData) => request.post('/api/media/image-search', fd),
+  antiScan: () => request.get('/api/media/anti-scan'),
+  setAntiScan: (data: any) => request.post('/api/media/anti-scan', data),
+  antiScanTextures: () => request.get('/api/media/anti-scan/textures'),
   mattingGlobal: () => request.get('/api/media/matting-global'),
   setMattingGlobal: (data: any) => request.post('/api/media/matting-global', data),
   watermarkSetting: () => request.get('/api/media/watermark-setting'),

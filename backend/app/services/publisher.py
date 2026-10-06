@@ -65,12 +65,25 @@ def _media_bytes(url: str) -> tuple[str, bytes]:
     raise ValueError(f"不支持的媒体地址: {url}")
 
 
-def _apply_anti_scan(data: bytes, mode: str) -> bytes:
-    """按频道防扫图模式处理展示图。original=原图；light_perturb=轻量扰动（免费）。"""
+def _apply_anti_scan(data: bytes, mode: str, db=None) -> bytes:
+    """按频道防扫图模式处理展示图。original=原图；light_perturb=轻量扰动（免费）。
+    若全局防扫图配置启用且 forceBeforeSendEnabled，则叠加全局配置处理。
+    """
+    out = data
     if mode == "light_perturb":
         from app.services.image_pipeline import light_perturb
-        return light_perturb(data)
-    return data
+        out = light_perturb(out)
+    # 全局防扫图配置
+    if db is not None:
+        try:
+            from app.api.v1.media import get_anti_scan_config
+            cfg = get_anti_scan_config(db)
+            if cfg.get("globalEnabled") and cfg.get("forceBeforeSendEnabled"):
+                from app.services.image_pipeline import apply_anti_scan_config
+                out = apply_anti_scan_config(out, cfg)
+        except Exception:  # noqa: BLE001
+            pass
+    return out
 
 
 def _bot_post(token: str, method: str, data: dict | None = None,
@@ -93,7 +106,8 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                      resume: dict | None = None,
                      on_step=None,
                      variation: bool = False,
-                     author_user_id: int | None = None) -> dict:
+                     author_user_id: int | None = None,
+                     db=None) -> dict:
     """发送一组上架内容。返回 {"media_group_id"/"message_id", "video_message_id"}。
 
     分步幂等：resume={"album": True} 时跳过已成功的相册，只发验证视频；
@@ -169,7 +183,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                     mtype = "video" if mtype_raw == "video" else "photo"
                     fname, data = _media_bytes(url)
                     if mtype == "photo":
-                        data = _apply_anti_scan(data, anti_scan_mode)
+                        data = _apply_anti_scan(data, anti_scan_mode, db)
                         data = _apply_wm(data)  # 个人水印（P1-14）：按作者设置叠加
                     if variation:
                         from app.services.variation import vary_image, vary_video
