@@ -44,3 +44,22 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(i
 
 -- 7) 协议号所属人（账号转移用，空=公共）
 ALTER TABLE tg_accounts ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+
+-- 9) 监听命中记录表
+CREATE TABLE IF NOT EXISTS listen_hits (
+    id SERIAL PRIMARY KEY,
+    plan_id INTEGER NOT NULL,
+    tg_user_id BIGINT NOT NULL,
+    tg_username VARCHAR(128) DEFAULT '',
+    city_id INTEGER,
+    city_name VARCHAR(64) DEFAULT '',
+    keyword VARCHAR(64) DEFAULT '',
+    chat_title VARCHAR(255) DEFAULT '',
+    notes_sent INTEGER DEFAULT 0,
+    result VARCHAR(16) DEFAULT 'success',
+    detail VARCHAR(512) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS ix_listen_hits_plan_id ON listen_hits (plan_id);
+CREATE INDEX IF NOT EXISTS ix_listen_hits_tg_user_id ON listen_hits (tg_user_id);
+CREATE INDEX IF NOT EXISTS ix_listen_hits_created_at ON listen_hits (created_at);

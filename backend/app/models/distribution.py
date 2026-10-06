@@ -79,3 +79,22 @@ class ListenPlan(Base):
     bind_id: Mapped[str] = mapped_column(String(16), default="")  # 8 位绑定 ID
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ListenHit(Base):
+    """监听命中记录：谁在哪个群触发了哪个城市，做了去重冷却。"""
+
+    __tablename__ = "listen_hits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_id: Mapped[int] = mapped_column(Integer, index=True)
+    tg_user_id: Mapped[int] = mapped_column(Integer, index=True)  # 触发者的 TG id
+    tg_username: Mapped[str] = mapped_column(String(128), default="")
+    city_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    city_name: Mapped[str] = mapped_column(String(64), default="")
+    keyword: Mapped[str] = mapped_column(String(64), default="")  # 命中的关键词
+    chat_title: Mapped[str] = mapped_column(String(255), default="")  # 触发群
+    notes_sent: Mapped[int] = mapped_column(Integer, default=0)  # 发出的素材组数
+    result: Mapped[str] = mapped_column(String(16), default="success")  # success/failed/skipped
+    detail: Mapped[str] = mapped_column(String(512), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

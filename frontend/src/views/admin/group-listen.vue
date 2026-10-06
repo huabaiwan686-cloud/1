@@ -15,9 +15,19 @@
       <a-form :model="editing" layout="vertical">
         <a-form-item label="计划名称"><a-input v-model:value="editing.name" /></a-form-item>
         <a-form-item label="监听目标（逗号分隔）"><a-input v-model:value="editing.targets_str" placeholder="@group1,@channel1" /></a-form-item>
-        <a-form-item label="关键词（逗号分隔）"><a-input v-model:value="editing.keywords_str" placeholder="上新,到货" /></a-form-item>
+        <a-form-item label="关键词（逗号分隔，地区词如：北京,上海）"><a-input v-model:value="editing.keywords_str" placeholder="北京,上海" /></a-form-item>
+        <a-alert type="info" show-icon message="有人在监听群里发地区关键词，系统自动私聊他该地区全部已上架素材（文字+媒体+验证视频）" />
       </a-form>
     </a-modal>
+
+    <h3 style="margin: 24px 0 12px">命中记录</h3>
+    <a-table :columns="hitColumns" :data-source="hits" row-key="id" :loading="hitsLoading" :pagination="{ pageSize: 20 }">
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'result'">
+          <a-tag :color="record.result === 'success' ? 'green' : 'default'">{{ record.result === 'success' ? '已发送' : record.result === 'skipped' ? '跳过' : '失败' }}</a-tag>
+        </template>
+      </template>
+    </a-table>
   </div>
 </template>
 
@@ -34,10 +44,25 @@ const columns = [
 ];
 const list = ref<any[]>([]); const loading = ref(false);
 const visible = ref(false); const editing = reactive<any>({});
+const hits = ref<any[]>([]); const hitsLoading = ref(false);
+const hitColumns = [
+  { title: '时间', dataIndex: 'createdAt', width: 170 },
+  { title: '触发用户', dataIndex: 'tgUsername', width: 130 },
+  { title: '触发群', dataIndex: 'chatTitle' },
+  { title: '关键词', dataIndex: 'keyword', width: 90 },
+  { title: '城市', dataIndex: 'cityName', width: 90 },
+  { title: '发出组数', dataIndex: 'notesSent', width: 90 },
+  { title: '结果', key: 'result', width: 90 },
+  { title: '详情', dataIndex: 'detail', ellipsis: true },
+];
 
 async function load() {
   loading.value = true;
   try { list.value = await listenApi.plans(); } finally { loading.value = false; }
+}
+async function loadHits() {
+  hitsLoading.value = true;
+  try { hits.value = await listenApi.hits(); } finally { hitsLoading.value = false; }
 }
 function openEditor() {
   Object.assign(editing, { name: '', targets_str: '', keywords_str: '' });
@@ -53,5 +78,5 @@ async function save() {
   visible.value = false; load();
 }
 async function remove(id: number) { await listenApi.remove(id); message.success('已删除'); load(); }
-onMounted(load);
+onMounted(() => { load(); loadHits(); });
 </script>

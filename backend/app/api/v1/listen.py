@@ -54,3 +54,21 @@ def delete_plan(plan_id: int, user: User = Depends(get_current_user), db: Sessio
     db.delete(p)
     db.commit()
     return ok(msg="计划已删除")
+
+
+@router.get("/hits")
+def list_hits(plan_id: int = 0, limit: int = 50,
+              user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """监听命中记录（触发去重冷却、发送结果都在这里）。"""
+    from app.models.distribution import ListenHit
+    q = db.query(ListenHit)
+    if plan_id:
+        q = q.filter(ListenHit.plan_id == plan_id)
+    rows = q.order_by(ListenHit.id.desc()).limit(min(limit, 200)).all()
+    return ok([{
+        "id": r.id, "planId": r.plan_id, "tgUserId": r.tg_user_id,
+        "tgUsername": r.tg_username, "cityName": r.city_name, "keyword": r.keyword,
+        "chatTitle": r.chat_title, "notesSent": r.notes_sent,
+        "result": r.result, "detail": r.detail,
+        "createdAt": r.created_at.isoformat() if r.created_at else "",
+    } for r in rows])

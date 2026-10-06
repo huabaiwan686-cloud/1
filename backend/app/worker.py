@@ -4,6 +4,12 @@
 → 复用 _send_to_channels 真实发送到频道（一组=文字+媒体打包，紧跟验证视频）
 → 标记 scheduled_sent=真（幂等），写 TaskLog(action="scheduled_send")。
 
+常驻任务：群聊关键词监听（app/services/listener.py）。
+  启用的 ListenPlan → 协议号长连接监听目标群新消息
+  → 命中关键词 → 映射城市 → 该城市全部已上架笔记
+  → 每组「文字+媒体相册，紧跟验证视频」DM 发给发消息的人。
+  同一用户+同一城市 cooldown 小时内只触发一次（默认 24h）。
+
 启动时先扫一轮：补发宕机期间错过的定时（默认行为）。
 单次尝试后即标记已发送；失败原因记 TaskLog，管理员可手动重发。
 """
@@ -84,6 +90,17 @@ async def run() -> None:
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, _stop)
+
+    # 群聊关键词监听：常驻任务（无启用计划时直接返回）
+    async def _listen_guard():
+        try:
+            from app.services.listener import run_listeners
+            await run_listeners()
+        except Exception:  # noqa: BLE001
+            log.exception("监听任务异常退出")
+
+    listen_task = asyncio.create_task(_listen_guard())
+
     while not stop.is_set():
         try:
             await asyncio.wait_for(stop.wait(), timeout=INTERVAL)
@@ -97,6 +114,7 @@ async def run() -> None:
                 log.info("轮询：%s", r)
         except Exception:  # noqa: BLE001
             log.exception("轮询异常")
+    listen_task.cancel()
     log.info("worker 退出")
 
 

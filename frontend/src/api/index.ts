@@ -70,6 +70,8 @@ export const listenApi = {
     request.get('/api/listen/plans', { params: { keyword } }),
   create: (data: any) => request.post('/api/listen/plans', data),
   remove: (id: number) => request.delete(`/api/listen/plans/${id}`),
+  hits: (planId = 0, limit = 50) =>
+    request.get('/api/listen/hits', { params: { plan_id: planId, limit } }),
 };
 
 export const tgApi = {
