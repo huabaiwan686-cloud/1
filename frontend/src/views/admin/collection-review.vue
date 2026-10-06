@@ -1,4 +1,15 @@
 <template>
+  <div>
+    <div class="aq-header">
+      <div class="aq-title">采集审核</div>
+      <p class="aq-desc">审核采集到的资料，通过后进入资料库</p>
+      <div class="aq-toolbar">
+        <a-checkbox v-model:checked="selectAll" @change="toggleSelectAll">全选</a-checkbox>
+        <a-button @click="approveSelected" :disabled="!selected.length">批量通过</a-button>
+        <a-button @click="rejectSelected" danger :disabled="!selected.length">批量拒绝</a-button>
+      </div>
+    </div>
+    <div class="aq-card">
   <div class="review" tabindex="0" @keydown="onKey">
     <!-- 顶部：进度 + 操作 -->
     <div class="topbar">
@@ -59,6 +70,7 @@
       <a-button size="large" type="primary" @click="approve" class="act-btn">通过 →</a-button>
     </div>
     <div v-if="current" class="kbd-hint">键盘快捷键：← 拒绝　→ 通过　↓ 跳过</div>
+    </div>
   </div>
 </template>
 
@@ -72,6 +84,28 @@ const queue = ref<any[]>([]);
 const loading = ref(false);
 const doneCount = ref(0);
 const totalCount = ref(0);
+const selectAll = ref(false);
+const selected = ref<number[]>([]);
+
+function toggleSelectAll() {
+  selected.value = selectAll.value ? queue.value.map((q: any) => q.id) : [];
+}
+async function approveSelected() {
+  for (const id of selected.value) {
+    try { await noteApi.approve(id); } catch {}
+  }
+  message.success(`已通过 ${selected.value.length} 条`);
+  selected.value = []; selectAll.value = false;
+  reload();
+}
+async function rejectSelected() {
+  for (const id of selected.value) {
+    try { await noteApi.reject(id); } catch {}
+  }
+  message.success(`已拒绝 ${selected.value.length} 条`);
+  selected.value = []; selectAll.value = false;
+  reload();
+}
 
 const current = computed(() => queue.value[0] || null);
 const media = computed(() => (current.value?.media || []).filter((m: any) => m.kind !== 'verify'));

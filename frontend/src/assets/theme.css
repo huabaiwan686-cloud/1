@@ -624,3 +624,79 @@ a {
     max-width: calc(100vw - 32px);
   }
 }
+
+/* ---------- meiren 逆向：页面头/工具栏/aq 系列 ---------- */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.page-header h2.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--app-text);
+  margin: 0 0 4px;
+}
+.page-header p.page-desc {
+  font-size: 14px;
+  color: #8a91a5;
+  margin: 0;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.search-input { width: 200px; }
+.city-input { width: 150px; }
+
+.aq-header { margin-bottom: 16px; }
+.aq-header .aq-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--app-text);
+  margin: 0 0 4px;
+}
+.aq-header .aq-desc {
+  font-size: 14px;
+  color: #8a91a5;
+  margin: 0 0 12px;
+}
+.aq-header .aq-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.aq-card {
+  background: #fff;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-card);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.aq-tip {
+  color: #999;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.aq-tag-gray {
+  background: #f5f5f5;
+  color: rgba(0,0,0,.65);
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 20px;
+  display: inline-block;
+}
+.mode-label { font-weight: 600; font-size: 14px; color: var(--app-text); }
+.mode-desc { font-size: 12px; color: #8a91a5; margin-top: 2px; }
+.file-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.table-card { margin-bottom: 16px; }
+.hide-mobile { }
+@media (max-width: 768px) {
+  .hide-mobile { display: none; }
+}

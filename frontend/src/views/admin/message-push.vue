@@ -1,6 +1,10 @@
 <template>
-  <div class="page">
-  <a-tabs>
+  <div>
+    <div class="aq-header">
+      <div class="aq-title">消息推送</div>
+      <p class="aq-desc">创建消息模板并推送到群组，支持定时推送计划</p>
+    </div>
+    <a-tabs>
     <a-tab-pane key="tpl" tab="消息模板">
       <a-button type="primary" @click="openTpl()" class="mb-16">新建模板</a-button>
       <a-table :columns="tplCols" :data-source="templates" row-key="id" :loading="loading">
