@@ -27,6 +27,8 @@
         </template>
       </a-table>
       <a-modal v-model:open="planVisible" title="推送计划" @ok="savePlan">
+        <a-alert type="error" show-icon style="margin-bottom: 16px"
+          message="风险提示：请勿使用上架账号进行群发，频繁群发可能导致账号受限" />
         <a-form :model="planEditing" layout="vertical">
           <a-form-item label="模板">
             <a-select v-model:value="planEditing.template_id" style="width: 100%">
@@ -47,6 +49,8 @@
               style="width: 100%" :options="dlgOptions" />
           </a-form-item>
           <a-form-item label="执行间隔"><a-input-number v-model:value="planEditing.interval_days" :min="1" /> 天</a-form-item>
+          <a-form-item label="或每 X 小时执行一次（>0 时优先按小时）"><a-input-number v-model:value="planEditing.interval_hours" :min="0" /> 小时</a-form-item>
+          <a-form-item label="群组之间发送间隔"><a-input-number v-model:value="planEditing.multi_interval_seconds" :min="0" /> 秒</a-form-item>
           <a-form-item label="执行时间点（逗号分隔 HH:mm）"><a-input v-model:value="planEditing.times_str" placeholder="09:00,21:00" style="width: 100%" /></a-form-item>
         </a-form>
       </a-modal>
@@ -115,7 +119,7 @@ async function saveTpl() {
 async function delTpl(id: number) { await messageApi.deleteTemplate(id); message.success('已删除'); load(); }
 async function pushTpl(id: number) { const r: any = await messageApi.pushTemplate(id); message.success(r.msg || '推送完成'); }
 function openPlan() {
-  Object.assign(planEditing, { template_id: null, account_id: null, target_groups: [], interval_days: 1, times_str: '' });
+  Object.assign(planEditing, { template_id: null, account_id: null, target_groups: [], interval_days: 1, interval_hours: 0, multi_interval_seconds: 0, times_str: '' });
   dlgOptions.value = []; dlgCachedAt.value = '';
   planVisible.value = true;
 }
@@ -125,6 +129,8 @@ async function savePlan() {
     template_id: planEditing.template_id,
     target_groups: planEditing.target_groups || [],
     interval_days: planEditing.interval_days,
+    interval_hours: planEditing.interval_hours || 0,
+    multi_interval_seconds: planEditing.multi_interval_seconds || 0,
     times: planEditing.times_str.split(',').map((s: string) => s.trim()).filter(Boolean),
   });
   message.success('已创建'); planVisible.value = false; load();

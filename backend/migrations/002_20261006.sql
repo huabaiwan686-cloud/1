@@ -66,3 +66,7 @@ CREATE INDEX IF NOT EXISTS ix_listen_hits_created_at ON listen_hits (created_at)
 
 -- 10) 监听计划自定义关键词→城市映射
 ALTER TABLE listen_plans ADD COLUMN IF NOT EXISTS keyword_city_map JSON DEFAULT '{}';
+
+-- 11) 推送计划：小时级间隔 + 上次执行时间
+ALTER TABLE push_plans ADD COLUMN IF NOT EXISTS interval_hours INTEGER DEFAULT 0;
+ALTER TABLE push_plans ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP;

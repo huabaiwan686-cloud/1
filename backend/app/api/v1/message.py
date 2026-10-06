@@ -27,6 +27,7 @@ class PlanIn(BaseModel):
     template_id: int | None = None
     target_groups: list[str] = []
     interval_days: int = 1
+    interval_hours: int = 0
     times: list[str] = []
     multi_interval_seconds: int = 0
     enabled: bool = True
@@ -111,8 +112,10 @@ def _plan_out(p: PushPlan) -> dict:
     return {
         "id": p.id, "accountId": p.account_id, "templateId": p.template_id,
         "targetGroups": p.target_groups, "intervalDays": p.interval_days,
+        "intervalHours": p.interval_hours or 0,
         "times": p.times, "multiIntervalSeconds": p.multi_interval_seconds,
         "enabled": p.enabled,
+        "lastRunAt": p.last_run_at.isoformat() if p.last_run_at else "",
     }
 
 

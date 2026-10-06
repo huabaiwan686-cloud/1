@@ -8,7 +8,11 @@
   启用的 ListenPlan → 协议号长连接监听目标群新消息
   → 命中关键词 → 映射城市 → 该城市全部已上架笔记
   → 每组「文字+媒体相册，紧跟验证视频」DM 发给发消息的人。
-  同一用户+同一城市 cooldown 小时内只触发一次（默认 24h）。
+  同一用户+同一城市 cooldown 小时内只触发一次（默认 3h）。
+
+轮询任务：群聊推送计划（app/services/group_push.py）。
+  到点的 PushPlan → 经协议号把模板（文字+混合媒体）推送到目标群组。
+  支持每天多时间点 / X 天间隔 / X 小时一次，群组间可设 X 秒间隔。
 
 启动时先扫一轮：补发宕机期间错过的定时（默认行为）。
 单次尝试后即标记已发送；失败原因记 TaskLog，管理员可手动重发。
@@ -114,6 +118,14 @@ async def run() -> None:
                 log.info("轮询：%s", r)
         except Exception:  # noqa: BLE001
             log.exception("轮询异常")
+        # 群聊推送计划：到点的经协议号推送
+        try:
+            from app.services.group_push import sweep_push_plans
+            pr = await asyncio.to_thread(sweep_push_plans)
+            if pr["plans"]:
+                log.info("推送计划：%s", pr)
+        except Exception:  # noqa: BLE001
+            log.exception("推送计划轮询异常")
     listen_task.cancel()
     log.info("worker 退出")
 

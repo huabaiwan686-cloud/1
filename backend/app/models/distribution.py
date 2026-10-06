@@ -49,9 +49,11 @@ class PushPlan(Base):
     template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("message_templates.id"), nullable=True)
     target_groups: Mapped[list] = mapped_column(JSON, default=list)  # 目标群组
     interval_days: Mapped[int] = mapped_column(Integer, default=1)  # 执行间隔 X 天
+    interval_hours: Mapped[int] = mapped_column(Integer, default=0)  # 执行间隔 X 小时（>0 时优先按小时）
     times: Mapped[list] = mapped_column(JSON, default=list)  # 执行时间点 ["09:00"]
-    multi_interval_seconds: Mapped[int] = mapped_column(Integer, default=0)  # 多次间隔 X 秒
+    multi_interval_seconds: Mapped[int] = mapped_column(Integer, default=0)  # 群组之间发送间隔 X 秒
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 上次执行
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
