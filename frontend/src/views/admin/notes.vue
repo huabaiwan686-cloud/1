@@ -239,11 +239,11 @@ async function doBatch(params: any) {
 
 const canFull = ref(false);
 onMounted(async () => {
+  load();
   try {
     const me: any = await authApi.current();
     canFull.value = !!(me.isAdmin || me.isMember);
   } catch {}
-  load();
 });
 </script>
 
