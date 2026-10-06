@@ -175,3 +175,141 @@ def clear_queue(channel_id: int, user: User = Depends(get_current_user), db: Ses
                    detail=f"频道 {c.name} 待发送队列已清空（移出 {n} 条定时笔记）"))
     db.commit()
     return ok(msg=f"队列已清空，共移出 {n} 条待发送")
+
+
+# ============ 智能频道推荐规则 ============
+
+class PublishRuleIn(BaseModel):
+    name: str = ""
+    keyword: str = ""
+    tag: str = ""
+    city: str = ""
+    province: str = ""
+    price_min: float | None = None
+    price_max: float | None = None
+    channel_ids: list[int] = []
+    enabled: bool = True
+
+
+def _rule_out(r) -> dict:
+    return {"id": r.id, "name": r.name, "keyword": r.keyword, "tag": r.tag,
+            "city": r.city, "province": r.province,
+            "priceMin": r.price_min, "priceMax": r.price_max,
+            "channelIds": r.channel_ids or [], "enabled": r.enabled}
+
+
+@router.get("/publish-rules")
+def list_publish_rules(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from app.models.distribution import PublishRule
+    rules = db.query(PublishRule).order_by(PublishRule.id.desc()).all()
+    return ok([_rule_out(r) for r in rules])
+
+
+@router.post("/publish-rules")
+def create_publish_rule(body: PublishRuleIn, user: User = Depends(get_current_user),
+                        db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    from app.models.distribution import PublishRule
+    r = PublishRule(**{k: v for k, v in body.model_dump().items()
+                       if k in ("name", "keyword", "tag", "city", "province",
+                                "price_min", "price_max", "channel_ids", "enabled")})
+    db.add(r)
+    db.commit()
+    return ok(_rule_out(r), msg="规则已创建")
+
+
+@router.delete("/publish-rules/{rule_id}")
+def delete_publish_rule(rule_id: int, user: User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "无权限")
+    from app.models.distribution import PublishRule
+    r = db.query(PublishRule).filter(PublishRule.id == rule_id).first()
+    if not r:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "规则不存在")
+    db.delete(r)
+    db.commit()
+    return ok(msg="规则已删除")
+
+
+def _rule_matches(rule, title: str, body: str, tags: list) -> bool:
+    """规则是否匹配笔记（对齐运营代码 rule_matches）。"""
+    import math
+    import re
+    if not rule.enabled:
+        return False
+    text = (title or "") + "\n" + (body or "")
+    if rule.keyword and rule.keyword not in text:
+        return False
+    if rule.tag and rule.tag not in (tags or []):
+        return False
+    # 正文标注行解析：城市/省份/价格
+    fields: dict[str, str] = {}
+    for line in (body or "").splitlines():
+        m = re.fullmatch(r"\s*(城市|省份|价格)\s*[:：]\s*(.*?)\s*", line)
+        if m:
+            fields[m.group(1)] = m.group(2)
+    if rule.city and rule.city != fields.get("城市"):
+        return False
+    if rule.province and rule.province != fields.get("省份"):
+        return False
+    if rule.price_min is not None or rule.price_max is not None:
+        value = fields.get("价格", "").removeprefix("￥").removeprefix("¥").removesuffix("元").strip()
+        try:
+            price = float(value)
+        except ValueError:
+            return False
+        if not math.isfinite(price):
+            return False
+        if rule.price_min is not None and price < rule.price_min:
+            return False
+        if rule.price_max is not None and price > rule.price_max:
+            return False
+    return True
+
+
+@router.get("/publish-recommend/{note_id}")
+def recommend_channels(note_id: int, user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)):
+    """智能推荐频道：按规则匹配，无命中时回退默认频道。"""
+    from app.models.distribution import PublishRule
+    n = db.query(Note).filter(Note.id == note_id).first()
+    if not n:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
+    selected: set[int] = set()
+    matched = False
+    for rule in db.query(PublishRule).filter(PublishRule.enabled.is_(True)).all():
+        if _rule_matches(rule, n.title, n.body, n.tags or []):
+            selected.update(rule.channel_ids or [])
+            matched = True
+    # 只保留启用且上架方向的频道
+    eligible = {c.id for c in db.query(Channel).filter(Channel.is_active.is_(True)).all()}
+    selected &= eligible
+    if not selected:
+        # 回退默认频道
+        selected = {c.id for c in db.query(Channel).filter(
+            Channel.is_active.is_(True), Channel.is_default.is_(True)).all()}
+    return ok({"channelIds": sorted(selected), "matchedRule": matched})
+
+
+@router.post("/publish-recommend/preview")
+def recommend_channels_preview(body: dict, user: User = Depends(get_current_user),
+                               db: Session = Depends(get_db)):
+    """智能推荐频道（预览版）：上传页填写标题/正文/标签后直接推荐，无需先建笔记。"""
+    from app.models.distribution import PublishRule
+    title = body.get("title", "")
+    text = body.get("body", "")
+    tags = body.get("tags", [])
+    selected: set[int] = set()
+    matched = False
+    for rule in db.query(PublishRule).filter(PublishRule.enabled.is_(True)).all():
+        if _rule_matches(rule, title, text, tags):
+            selected.update(rule.channel_ids or [])
+            matched = True
+    eligible = {c.id for c in db.query(Channel).filter(Channel.is_active.is_(True)).all()}
+    selected &= eligible
+    if not selected:
+        selected = {c.id for c in db.query(Channel).filter(
+            Channel.is_active.is_(True), Channel.is_default.is_(True)).all()}
+    return ok({"channelIds": sorted(selected), "matchedRule": matched})

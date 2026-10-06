@@ -93,6 +93,66 @@ def sweep_once() -> dict:
         db.close()
 
 
+def sweep_removals() -> dict:
+    """扫删帖队列：逐条调 Bot API deleteMessage 删帖。返回 {"done": n, "failed": m}。"""
+    from app.models.content import PublishReceipt, RemovalQueue
+    db = SessionLocal()
+    done, failed = 0, 0
+    try:
+        q = db.query(RemovalQueue).filter(RemovalQueue.status == "queued").order_by(RemovalQueue.id).first()
+        if not q:
+            return {"done": 0, "failed": 0}
+        q.status = "running"
+        db.commit()
+        from app.api.v1.bots import _dec, _bot_api
+        from app.models.distribution import Channel
+        rq = db.query(PublishReceipt).filter(
+            PublishReceipt.note_id == q.note_id,
+            PublishReceipt.deleted.is_(False),
+        )
+        if q.upto:
+            rq = rq.filter(PublishReceipt.id <= q.upto)
+        receipts = rq.all()
+        ok_count, fail_count = 0, 0
+        for r in receipts:
+            try:
+                if r.bot_id:
+                    from app.models.account import BotToken
+                    bot = db.query(BotToken).filter(BotToken.id == r.bot_id).first()
+                    if not bot:
+                        raise ValueError("Bot 不存在")
+                    _bot_api(_dec(bot.token_secret), "deleteMessage",
+                             {"chat_id": r.chat_id, "message_id": r.message_id})
+                elif r.account_id:
+                    # 协议号通道：用 Telethon 删除
+                    from app.services.tg_client import get_shared_client
+                    import asyncio
+                    async def _del():
+                        client = await get_shared_client(str(r.account_id))
+                        await client.delete_messages(int(r.chat_id), [r.message_id])
+                    asyncio.run(_del())
+                else:
+                    raise ValueError("无发送通道")
+                r.deleted = True
+                ok_count += 1
+            except Exception as e:  # noqa: BLE001  单条失败不影响其他（可能已超可删除期限）
+                log.warning("删帖失败 note=%s msg=%s: %s", r.note_id, r.message_id, e)
+                fail_count += 1
+        db.add(TaskLog(note_id=q.note_id, action="removal", executor="scheduler",
+                       result="success" if not fail_count else "failed",
+                       detail=f"下架删帖：成功 {ok_count} 条，失败 {fail_count} 条"))
+        q.status = "done" if not fail_count else "failed"
+        q.detail = f"成功 {ok_count} 条，失败 {fail_count} 条"
+        db.commit()
+        return {"done": ok_count, "failed": fail_count}
+    except Exception as e:  # noqa: BLE001
+        db.rollback()
+        log.exception("删帖队列异常：%s", e)
+        return {"done": done, "failed": failed}
+    finally:
+        db.close()
+
+
 async def run() -> None:
     init_db()
     log.info("worker 启动，立即补扫一轮")
@@ -145,6 +205,13 @@ async def run() -> None:
                 log.info("采集：%s", cr)
         except Exception:  # noqa: BLE001
             log.exception("采集轮询异常")
+        # 删帖队列：下架资料自动删频道帖子
+        try:
+            r = await asyncio.to_thread(sweep_removals)
+            if r["done"] or r["failed"]:
+                log.info("删帖队列：%s", r)
+        except Exception:  # noqa: BLE001
+            log.exception("删帖队列轮询异常")
         # USDT 到账监听：每轮顺带扫一次（内部有未配置门控），用户付款后自动开通
         try:
             from app.services.tron_watch import match_and_activate

@@ -29,6 +29,8 @@
         <a-select v-model:value="form.channel_ids" mode="multiple" placeholder="选择频道" style="width: 100%">
           <a-select-option v-for="c in channels" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
         </a-select>
+        <a-button type="link" @click="smartRecommend" style="padding: 0">智能推荐</a-button>
+        <span style="color: #999; margin-left: 8px">按关键词/标签/城市/省份/价格自动匹配</span>
       </a-form-item>
       <a-form-item label="定时上架">
         <a-date-picker v-model:value="form.scheduled_at" show-time placeholder="留空=立即草稿" style="width: 100%" />
@@ -70,6 +72,15 @@ onMounted(async () => {
   // 默认选中的频道自动勾选，第二次上传不用重新选
   form.channel_ids = channels.value.filter((c: any) => c.isDefault).map((c: any) => c.id);
 });
+async function smartRecommend() {
+  try {
+    const r: any = await channelApi.recommendPreview({
+      title: form.title, body: form.body, tags: form.tags,
+    });
+    form.channel_ids = r.channelIds || [];
+    message.success(r.matchedRule ? '已按规则推荐频道' : '无规则命中，已回退默认频道');
+  } catch (e: any) { message.error(e.message); }
+}
 
 async function buildPayload() {
   // 展示图 + 验证视频：逐个上传到 /api/media/materials，拿到 URL 后组装进笔记

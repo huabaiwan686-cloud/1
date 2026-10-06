@@ -65,6 +65,38 @@
         </a-space>
       </a-form>
     </a-modal>
+
+    <a-card title="智能频道推荐规则" style="margin-top: 16px">
+      <div style="color: #666; margin-bottom: 12px">按关键词/标签/城市/省份/价格自动匹配发布频道；无命中时回退默认频道。正文标注行格式：城市：北京 / 省份：广东 / 价格：￥500</div>
+      <a-button type="primary" @click="openRuleEditor()" style="margin-bottom: 12px">添加规则</a-button>
+      <a-table :columns="ruleColumns" :data-source="rules" row-key="id" :loading="ruleLoading" size="small">
+        <template #bodyCell="{ column, record }">
+          <a-tag v-if="column.key === 'enabled'" :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '禁用' }}</a-tag>
+          <a-space v-else-if="column.key === 'raction'">
+            <a-popconfirm title="确认删除？" @confirm="removeRule(record.id)"><a>删除</a></a-popconfirm>
+          </a-space>
+        </template>
+      </a-table>
+    </a-card>
+    <a-modal v-model:open="ruleVisible" title="推荐规则" @ok="saveRule">
+      <a-form :model="ruleForm" layout="vertical">
+        <a-form-item label="规则名称"><a-input v-model:value="ruleForm.name" /></a-form-item>
+        <a-form-item label="关键词（标题+正文包含）"><a-input v-model:value="ruleForm.keyword" /></a-form-item>
+        <a-form-item label="标签"><a-input v-model:value="ruleForm.tag" /></a-form-item>
+        <a-row :gutter="12">
+          <a-col :span="12"><a-form-item label="城市"><a-input v-model:value="ruleForm.city" placeholder="如：北京" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="省份"><a-input v-model:value="ruleForm.province" placeholder="如：广东" /></a-form-item></a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12"><a-form-item label="最低价格"><a-input-number v-model:value="ruleForm.price_min" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="最高价格"><a-input-number v-model:value="ruleForm.price_max" style="width: 100%" /></a-form-item></a-col>
+        </a-row>
+        <a-form-item label="匹配的频道"><a-select v-model:value="ruleForm.channel_ids" mode="multiple" style="width: 100%">
+          <a-select-option v-for="c in list" :key="c.id" :value="c.id">{{ c.name }}</a-select-option>
+        </a-select></a-form-item>
+        <a-checkbox v-model:checked="ruleForm.enabled">启用</a-checkbox>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -141,5 +173,31 @@ async function remove(id: number) { await channelApi.remove(id); message.success
 async function check(id: number) { const r: any = await channelApi.check(id); message.info(r.msg); }
 async function pushAll(id: number) { const r: any = await channelApi.pushAll(id); message.success(r.msg || '全量推送完成'); }
 async function clearQueue(id: number) { const r: any = await channelApi.clearQueue(id); message.success(r.msg || '队列已清空'); }
-onMounted(load);
+// 智能推荐规则
+const ruleColumns = [
+  { title: 'ID', dataIndex: 'id', width: 50 },
+  { title: '规则', dataIndex: 'name' },
+  { title: '关键词', dataIndex: 'keyword' },
+  { title: '标签', dataIndex: 'tag' },
+  { title: '城市', dataIndex: 'city' },
+  { title: '状态', key: 'enabled', width: 70 },
+  { title: '操作', key: 'raction', width: 80 },
+];
+const rules = ref<any[]>([]); const ruleLoading = ref(false);
+const ruleVisible = ref(false);
+const ruleForm = reactive({ name: '', keyword: '', tag: '', city: '', province: '', price_min: null, price_max: null, channel_ids: [], enabled: true });
+async function loadRules() {
+  ruleLoading.value = true;
+  try { rules.value = await channelApi.publishRules(); } finally { ruleLoading.value = false; }
+}
+function openRuleEditor() {
+  Object.assign(ruleForm, { name: '', keyword: '', tag: '', city: '', province: '', price_min: null, price_max: null, channel_ids: [], enabled: true });
+  ruleVisible.value = true;
+}
+async function saveRule() {
+  try { await channelApi.createPublishRule(ruleForm); message.success('已保存'); ruleVisible.value = false; loadRules(); }
+  catch (e: any) { message.error(e.message); }
+}
+async function removeRule(id: number) { await channelApi.deletePublishRule(id); message.success('已删除'); loadRules(); }
+onMounted(() => { load(); loadRules(); });
 </script>

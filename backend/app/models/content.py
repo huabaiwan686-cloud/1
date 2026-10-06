@@ -151,3 +151,34 @@ class Announcement(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PublishReceipt(Base):
+    """发送回执：每次真实发送记录 message_id，用于下架时自动删帖。"""
+
+    __tablename__ = "publish_receipts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    bot_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 推送 Bot（Bot 通道）
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 协议号（协议号通道）
+    chat_id: Mapped[str] = mapped_column(String(64), default="")
+    message_id: Mapped[int] = mapped_column(Integer, default=0)
+    part: Mapped[str] = mapped_column(String(16), default="ordinary")  # ordinary=相册/正文 / video=验证视频
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已删帖
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RemovalQueue(Base):
+    """删帖队列：资料下架/归档时自动入队，worker 逐条删帖。"""
+
+    __tablename__ = "removal_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(Integer, default=0)  # 0=全部频道
+    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued/running/done/failed
+    detail: Mapped[str] = mapped_column(Text, default="")
+    upto: Mapped[int] = mapped_column(Integer, default=0)  # 处理到的 receipt id 上限
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

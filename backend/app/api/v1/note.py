@@ -158,6 +158,7 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     n = db.query(Note).filter(Note.id == note_id).first()
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
+    _check_verify_video(db, n.id)  # 硬校验：必须且只能 1 个 MP4 验证视频
     n.status = "published"
     n.published_at = datetime.utcnow()
     db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="success", detail="手动发布"))
@@ -233,6 +234,11 @@ def _send_to_channels(n: Note, user: User, db: Session,
             n.send_progress = dict(progress)
             db.flush()  # 每步成功立即持久化，崩溃后可续
 
+        # 循环重发变体：该频道开变体开关 且 之前成功发过（非首次）→ 做无意义微调防 TG 判重
+        use_variation = bool(getattr(ch, "variation_enabled", True)) and db.query(TaskLog).filter(
+            TaskLog.note_id == n.id, TaskLog.action == "push_send",
+            TaskLog.result == "success",
+            TaskLog.detail.contains(ch.name)).first() is not None
         try:
             res = send_listing_set(
                 _dec(bot.token_secret), chat,
@@ -241,10 +247,20 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 # 全局抠图已处理则不再叠加频道防扫图
                 anti_scan_mode="original" if gm else (ch.anti_scan_mode or "original"),
                 resume=ch_progress, on_step=_mark_step,
+                variation=use_variation,
             )
             detail = f"已发送到 {ch.name}（{chat}）：{res}"
             db.add(TaskLog(note_id=n.id, action="push_send", executor=user.username,
                            result="success", detail=detail))
+            # 记录发送回执（message_id），用于下架自动删帖
+            from app.models.content import PublishReceipt
+            for mid in (res.get("message_ids") or []):
+                if mid:
+                    db.add(PublishReceipt(note_id=n.id, channel_id=cid, bot_id=ch.bot_id,
+                                          chat_id=str(chat), message_id=mid, part="ordinary"))
+            if res.get("video_message_id"):
+                db.add(PublishReceipt(note_id=n.id, channel_id=cid, bot_id=ch.bot_id,
+                                      chat_id=str(chat), message_id=res["video_message_id"], part="video"))
             sent.append(ch.name)
         except Exception as e:  # noqa: BLE001
             detail = f"{ch.name} 发送失败：{e}"
@@ -257,12 +273,45 @@ def _send_to_channels(n: Note, user: User, db: Session,
     return sent, failed
 
 
+def _check_verify_video(db, note_id: int):
+    """发布前硬校验：验证视频必须且只能是 1 个 MP4，否则拒绝发布。"""
+    from app.models.content import NoteMedia
+    videos = db.query(NoteMedia).filter(
+        NoteMedia.note_id == note_id, NoteMedia.kind == "verify").all()
+    if len(videos) != 1:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            f"验证视频必须且只能是 1 个（当前 {len(videos)} 个）")
+    v = videos[0]
+    url = (v.url or "").lower()
+    if not url.endswith(".mp4"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "验证视频必须是 MP4 格式")
+
+
+def _queue_removal(db, note_id: int):
+    """资料下架时入删帖队列：有未删回执且无进行中任务才入队。"""
+    from app.models.content import PublishReceipt, RemovalQueue
+    has_receipts = db.query(PublishReceipt).filter(
+        PublishReceipt.note_id == note_id, PublishReceipt.deleted.is_(False)).first()
+    if not has_receipts:
+        return
+    running = db.query(RemovalQueue).filter(
+        RemovalQueue.note_id == note_id,
+        RemovalQueue.status.in_(["queued", "running"])).first()
+    if running:
+        return
+    upto = db.query(PublishReceipt.id).filter(
+        PublishReceipt.note_id == note_id).order_by(PublishReceipt.id.desc()).first()
+    db.add(RemovalQueue(note_id=note_id, upto=upto[0] if upto else 0))
+    db.flush()
+
+
 def _review_note(note_id: int, approve: bool, user: User, db: Session):
     """正式审核：通过 → published；拒绝 → offline（可恢复，非删除）。"""
     n = db.query(Note).filter(Note.id == note_id).first()
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
     if approve:
+        _check_verify_video(db, n.id)  # 硬校验：必须且只能 1 个 MP4 验证视频
         n.status = "published"
         n.published_at = datetime.utcnow()
         action, detail, msg = "review_approve", "审核通过并发布", "审核通过，已发布"
@@ -273,6 +322,7 @@ def _review_note(note_id: int, approve: bool, user: User, db: Session):
                 msg = f"审核通过，但发送失败：{failed[0]}"
     else:
         n.status = "offline"
+        _queue_removal(db, n.id)  # 下架自动删帖
         action, detail, msg = "review_reject", "审核拒绝（下架，可恢复）", "已拒绝（移入下架）"
     db.add(TaskLog(note_id=n.id, action=action, executor=user.username, result="success", detail=detail))
     db.commit()
@@ -310,6 +360,7 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
                 n.scheduled_sent = True  # 防 worker 重复发送
         elif op == "unpublish":
             n.status = "offline"
+            _queue_removal(db, n.id)
         elif op == "delete":
             # 同步删磁盘文件（与素材删除一致），避免 uploads 残留
             from app.api.v1.media import _fs_path

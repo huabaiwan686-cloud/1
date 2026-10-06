@@ -48,6 +48,12 @@ export const channelApi = {
   check: (id: number) => request.post(`/api/channel/${id}/check`),
   pushAll: (id: number) => request.post(`/api/channel/${id}/push_all`),
   clearQueue: (id: number) => request.post(`/api/channel/${id}/clear_queue`),
+  // 智能频道推荐规则
+  publishRules: () => request.get('/api/channel/publish-rules'),
+  createPublishRule: (data: any) => request.post('/api/channel/publish-rules', data),
+  deletePublishRule: (id: number) => request.delete(`/api/channel/publish-rules/${id}`),
+  recommend: (noteId: number) => request.get(`/api/channel/publish-recommend/${noteId}`),
+  recommendPreview: (data: any) => request.post('/api/channel/publish-recommend/preview', data),
 };
 
 export const messageApi = {

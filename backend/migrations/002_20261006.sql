@@ -100,3 +100,6 @@ CREATE INDEX IF NOT EXISTS ix_vip_orders_user_id ON vip_orders (user_id);
 -- 监听占位防重：同一键同一时间只允许一个 claimed 占位行
 CREATE UNIQUE INDEX IF NOT EXISTS uq_listen_hit_claimed
     ON listen_hits (plan_id, tg_user_id, city_id) WHERE result = 'claimed';
+
+-- 循环重发变体开关
+ALTER TABLE channels ADD COLUMN IF NOT EXISTS variation_enabled BOOLEAN DEFAULT 1;

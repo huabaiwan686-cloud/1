@@ -53,7 +53,7 @@ with patch("app.services.publisher.httpx.post", side_effect=fake_post):
     calls.clear()
     res = send_listing_set("tok", "@ch", title="T", show_media=[{"url": "/uploads/t/p1.jpg"}])
     ok.append(("无验证视频只发一条",
-               [c["method"] for c in calls] == ["sendMediaGroup"] and "video_message_id" not in res))
+               [c["method"] for c in calls] == ["sendPhoto"] and "video_message_id" not in res))
 
     ok.append(("caption格式", build_caption("T", "B", ["a"]) == "T\n\nB\n\n#a"))
 

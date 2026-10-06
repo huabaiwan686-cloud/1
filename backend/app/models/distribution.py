@@ -1,7 +1,7 @@
 """分发数据模型：频道 / 消息模板 / 推送计划 / 快速推送 / 关键字监听。"""
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -22,6 +22,7 @@ class Channel(Base):
     cycle_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 循环 N 天
     anti_scan_mode: Mapped[str] = mapped_column(String(16), default="original")
     # original=原图 / replace_bg=替换背景 / light_perturb=轻量随机扰动
+    variation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # 循环重发变体（防 TG 判重）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -110,3 +111,21 @@ class ListenHit(Base):
               sqlite_where=(result == "claimed"),
               postgresql_where=(result == "claimed")),
     )
+
+
+class PublishRule(Base):
+    """智能频道推荐规则：按关键词/标签/城市/省份/价格区间自动匹配发布频道。"""
+
+    __tablename__ = "publish_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    keyword: Mapped[str] = mapped_column(String(128), default="")  # 标题+正文包含
+    tag: Mapped[str] = mapped_column(String(64), default="")  # 标签匹配
+    city: Mapped[str] = mapped_column(String(64), default="")  # 正文"城市：北京"标注行
+    province: Mapped[str] = mapped_column(String(64), default="")  # 正文"省份：xx"标注行
+    price_min: Mapped[float | None] = mapped_column(Float, nullable=True)  # 价格区间
+    price_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    channel_ids: Mapped[list] = mapped_column(JSON, default=list)  # 命中的频道
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

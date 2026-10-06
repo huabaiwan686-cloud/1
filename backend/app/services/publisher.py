@@ -15,6 +15,23 @@ log = logging.getLogger(__name__)
 
 TG_API = "https://api.telegram.org"
 
+# 分批策略常量（对齐运营代码）
+MAX_ALBUM_SIZE = 10  # 相册上限
+BIG_IMAGE_SIZE = 10_000_000  # 超 10MB 的图片不进相册，单独发 document
+CAPTION_LIMIT = 1024  # caption 上限
+TEXT_SEGMENT = 4000  # 超长正文分段长度
+BATCH_SLEEP = 1  # 批次间隔秒
+
+import threading
+_SEND_LOCKS: dict[str, threading.Lock] = {}
+_send_locks_guard = threading.Lock()
+
+
+def _send_lock(bot_token: str) -> threading.Lock:
+    """按 Bot 取发送锁，全局串行化同一 Bot 的发送（防并发撞限流）。"""
+    with _send_locks_guard:
+        return _SEND_LOCKS.setdefault(bot_token[-8:], threading.Lock())
+
 # _store 的默认落盘目录（与 media.py 保持一致 → backend/uploads）
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "uploads")))
@@ -74,11 +91,13 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
                      verify_media: list | None = None,
                      anti_scan_mode: str = "original",
                      resume: dict | None = None,
-                     on_step=None) -> dict:
+                     on_step=None,
+                     variation: bool = False) -> dict:
     """发送一组上架内容。返回 {"media_group_id"/"message_id", "video_message_id"}。
 
     分步幂等：resume={"album": True} 时跳过已成功的相册，只发验证视频；
     每步成功后调用 on_step("album") / on_step("video")，由调用方持久化进度。
+    variation=True 时对文本/图片/视频做无意义微调（防 TG 判重），仅循环重发时用。
 
     show_media: [{"url":...}] 展示图（混合媒体），最多取 10 张（TG 相册上限）
     verify_media: [{"url":...}] 验证视频，取第 1 个单独发送
@@ -92,46 +111,117 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     verify_media = verify_media or []
     caption = build_caption(title, body, tags)
     result: dict = {}
+    if variation:
+        from app.services.variation import vary_text
+        caption = vary_text(caption)
 
-    # ---- 第 1 条：文字 + 混合媒体打包 ----
+    # ---- 第 1 组：文字 + 混合媒体分批发送 ----
+    # 分批策略（对齐运营代码）：
+    # ① 超 10MB 的图片不进相册，单独以 document 发送
+    # ② 单张媒体用 sendPhoto/sendVideo，不用 mediaGroup
+    # ③ caption 只放第一批并截断 1024 字符
+    # ④ 批次之间 sleep(1)
     resume = resume or {}
-    if show_media and not resume.get("album"):
-        media, files = [], {}
-        for i, m in enumerate(show_media[:10]):
-            if isinstance(m, dict) and "data" in m:
-                # 内存图片（全局抠图已处理好，不落盘）
-                fname, data = m.get("name", "image.jpg"), m["data"]
-                mtype = "photo"
-            else:
-                url = m["url"] if isinstance(m, dict) else m.url
-                mtype_raw = (m.get("media_type") or m.get("type")) if isinstance(m, dict) \
-                    else getattr(m, "media_type", "image")
-                mtype = "video" if mtype_raw == "video" else "photo"
-                fname, data = _media_bytes(url)
-                if mtype == "photo":
-                    data = _apply_anti_scan(data, anti_scan_mode)
-            key = f"media{i}"
-            files[key] = (fname, data)
-            item: dict = {"type": mtype, "media": f"attach://{key}"}
-            if i == 0 and caption:
-                item["caption"] = caption
-            media.append(item)
-        res = _bot_post(bot_token, "sendMediaGroup",
-                        data={"chat_id": chat_id, "media": json.dumps(media, ensure_ascii=False)},
-                        files=files)
-        result["media_group_id"] = res[0].get("media_group_id") if res else None
-        result["message_ids"] = [m.get("message_id") for m in res]
-        if on_step:
-            on_step("album")
-    else:
-        res = _bot_post(bot_token, "sendMessage",
-                        data={"chat_id": chat_id, "text": caption or "(无内容)"})
-        result["message_id"] = res.get("message_id")
+    result["message_ids"] = []
+    with _send_lock(bot_token):
+        if show_media and not resume.get("album"):
+            # 预处理：读字节 + 防扫 + 变体
+            prepared = []
+            for m in show_media:
+                if isinstance(m, dict) and "data" in m:
+                    fname, data = m.get("name", "image.jpg"), m["data"]
+                    mtype = "photo"
+                else:
+                    url = m["url"] if isinstance(m, dict) else m.url
+                    mtype_raw = (m.get("media_type") or m.get("type")) if isinstance(m, dict) \
+                        else getattr(m, "media_type", "image")
+                    mtype = "video" if mtype_raw == "video" else "photo"
+                    fname, data = _media_bytes(url)
+                    if mtype == "photo":
+                        data = _apply_anti_scan(data, anti_scan_mode)
+                    if variation:
+                        from app.services.variation import vary_image, vary_video
+                        try:
+                            data = vary_video(data) if mtype == "video" else vary_image(data)
+                        except Exception:  # noqa: BLE001
+                            pass
+                oversized = mtype == "photo" and len(data) > BIG_IMAGE_SIZE
+                prepared.append({"fname": fname, "data": data, "mtype": mtype,
+                                 "oversized": oversized})
+            # 分批：超大图单独一批，其余每批最多 10 个
+            batches = []
+            buf = []
+            for p in prepared:
+                if p["oversized"]:
+                    if buf:
+                        batches.append(buf)
+                        buf = []
+                    batches.append([p])
+                else:
+                    buf.append(p)
+                    if len(buf) >= MAX_ALBUM_SIZE:
+                        batches.append(buf)
+                        buf = []
+            if buf:
+                batches.append(buf)
+            first_batch = True
+            for bi, batch in enumerate(batches):
+                files = {f"media{i}": (p["fname"], p["data"]) for i, p in enumerate(batch)}
+                cap = caption[:CAPTION_LIMIT] if first_batch and caption else ""
+                if len(batch) == 1:
+                    p = batch[0]
+                    kind = "document" if p["oversized"] else p["mtype"]
+                    method = {"photo": "sendPhoto", "video": "sendVideo",
+                              "document": "sendDocument"}[kind]
+                    payload = {"chat_id": chat_id, kind: "attach://media0"}
+                    if cap:
+                        payload["caption"] = cap
+                    res = _bot_post(bot_token, method, data=payload, files=files)
+                    result["message_ids"].append(res.get("message_id"))
+                else:
+                    media = []
+                    for i, p in enumerate(batch):
+                        item = {"type": p["mtype"], "media": f"attach://media{i}"}
+                        if i == 0 and cap:
+                            item["caption"] = cap
+                        media.append(item)
+                    res = _bot_post(bot_token, "sendMediaGroup",
+                                    data={"chat_id": chat_id,
+                                          "media": json.dumps(media, ensure_ascii=False)},
+                                    files=files)
+                    if bi == 0:
+                        result["media_group_id"] = res[0].get("media_group_id") if res else None
+                    result["message_ids"].extend(m.get("message_id") for m in res)
+                first_batch = False
+                if bi < len(batches) - 1:
+                    import time
+                    time.sleep(BATCH_SLEEP)
+            if on_step:
+                on_step("album")
+        elif not show_media:
+            res = _bot_post(bot_token, "sendMessage",
+                            data={"chat_id": chat_id, "text": caption[:TEXT_SEGMENT] or "(无内容)"})
+            result["message_id"] = res.get("message_id")
+            result["message_ids"].append(res.get("message_id"))
+        # 超长正文（>1024）剩余部分分段补发
+        if len(caption) > CAPTION_LIMIT:
+            remaining = caption[CAPTION_LIMIT:]
+            for i in range(0, len(remaining), TEXT_SEGMENT):
+                res = _bot_post(bot_token, "sendMessage",
+                                data={"chat_id": chat_id,
+                                      "text": remaining[i:i + TEXT_SEGMENT]})
+                result["message_ids"].append(res.get("message_id"))
 
     # ---- 第 2 条：单独验证视频，紧跟其后 ----
     if verify_media and not resume.get("video"):
         v = verify_media[0]
         fname, data = _media_bytes(v["url"] if isinstance(v, dict) else v.url)
+        if variation:
+            from app.services.variation import vary_video
+            try:
+                data = vary_video(data)
+            except Exception:  # noqa: BLE001
+                pass
         res = _bot_post(bot_token, "sendVideo",
                         data={"chat_id": chat_id},
                         files={"video": (fname, data)})
