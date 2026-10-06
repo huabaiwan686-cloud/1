@@ -1,4 +1,5 @@
 <template>
+  <a-config-provider :theme="antdTheme">
   <router-view v-if="isLoginPage" />
   <a-layout v-else style="min-height: 100vh">
     <div v-if="isMobile && !collapsed" class="mobile-sider-mask" @click="collapsed = true" />
@@ -6,7 +7,7 @@
       class="pro-sider"
       collapsible
       v-model:collapsed="collapsed"
-      width="190"
+      width="200"
       :trigger="null"
     >
       <div class="pro-logo" :class="{ collapsed }">
@@ -38,14 +39,13 @@
         </span>
         <span class="pro-app-title">小灰机 · 商家后台</span>
         <div class="pro-header-right">
-          <a-button type="text" @click="toggleTheme" class="theme-btn" :title="theme === 'light' ? '切换夜色' : '切换亮色'">
-            <bulb-outlined v-if="theme === 'light'" />
-            <bulb-filled v-else />
-          </a-button>
+          <span class="vip-badge" @click="router.push('/admin/vip')">VIP</span>
           <span class="pro-username">
             <span class="pro-avatar">{{ username ? username.slice(0, 1).toUpperCase() : 'U' }}</span>
             <span class="uname">{{ username }}</span>
           </span>
+          <span class="pro-version">v1.0.0</span>
+          <span class="pro-doc-link" @click="router.push('/admin/announcements')">使用说明</span>
           <a-button size="small" @click="logout">退出</a-button>
         </div>
       </a-layout-header>
@@ -68,16 +68,42 @@
       <div style="white-space: pre-wrap">{{ annCurrent.content }}</div>
     </a-modal>
   </a-layout>
+  </a-config-provider>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  MenuOutlined, MenuFoldOutlined, BulbOutlined, BulbFilled,
+  MenuOutlined, MenuFoldOutlined,
   HomeOutlined, UploadOutlined, FileTextOutlined, BellOutlined, UserOutlined,
 } from '@ant-design/icons-vue';
 import { authApi, announceApi } from '@/api';
+
+// meiren.pro 主题 token（live browser 逆向确认）
+const antdTheme = {
+  token: {
+    colorPrimary: '#1677ff',
+    colorSuccess: '#52c41a',
+    colorError: '#ff4d4f',
+    colorWarning: '#faad14',
+    colorInfo: '#1677ff',
+    borderRadius: 6,
+    borderRadiusLG: 8,
+    fontFamily: '-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif',
+    colorText: 'rgba(0, 0, 0, 0.88)',
+    colorTextSecondary: 'rgba(0, 0, 0, 0.45)',
+    colorBorder: '#f0f0f0',
+  },
+  components: {
+    Card: { borderRadiusLG: 8 },
+    Modal: { borderRadiusLG: 8 },
+    Table: { headerBg: '#fafafa', borderRadiusLG: 8 },
+    Tag: { borderRadiusSM: 4 },
+    Button: { borderRadius: 6 },
+    Input: { borderRadius: 6 },
+  },
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -92,22 +118,6 @@ const tabItems = [
   { path: '/admin/announcements', title: '消息', icon: BellOutlined },
   { path: '/admin/vip', title: '我的', icon: UserOutlined },
 ];
-// 主题切换：dark（默认）/ light，localStorage 持久化
-const theme = ref('light');
-try {
-  const saved = localStorage.getItem('app_theme');
-  if (saved === 'light' || saved === 'dark') theme.value = saved;
-} catch { /* ignore */ }
-function applyTheme() {
-  try {
-    document.documentElement.setAttribute('data-theme', theme.value);
-    localStorage.setItem('app_theme', theme.value);
-  } catch { /* ignore */ }
-}
-function toggleTheme() {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark';
-  applyTheme();
-}
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
@@ -179,7 +189,6 @@ async function loadUserState() {
 }
 watch(() => route.path, () => { loadUserState(); });
 onMounted(() => {
-  applyTheme();
   loadUserState();
   window.addEventListener('resize', onResize);
 });

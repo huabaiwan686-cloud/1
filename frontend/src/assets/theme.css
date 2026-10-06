@@ -1,67 +1,33 @@
 /* ============================================================
- * meiren.pro 风格浅色主题
- * 主色 #2f55e0（靛蓝）/ 深色 #2546c4 / 浅底 #eef1ff
- * 侧栏 190px 浅色，右边框 #dfe3eb
+ * meiren.pro 1:1 复刻主题（live browser 逆向确认）
+ * 主色 #1677ff / 浅底 #e6f4ff / 页面 #f5f5f5 / 卡片 #ffffff
+ * 表头 #fafafa / 边框 #f0f0f0（卡片/分割线）/#d9d9d9（输入框）
+ * 主文字 rgba(0,0,0,0.88) / 次要 rgba(0,0,0,0.45)
+ * 成功 #52c41a / 危险 #ff4d4f
+ * 圆角：卡片/弹窗 8px，按钮/输入框 6px，标签 4px
  * ============================================================ */
 
 :root {
-  --app-bg: #f5f6fa;
-  --app-sider: #ffffff;
-  --app-topbar: #ffffff;
-  --app-sider-border: #dfe3eb;
-  --app-btn-default: #ffffff;
-  --app-btn-default-hover: #eef1ff;
-  --app-bg-soft: #ffffff;
+  --app-bg: #f5f5f5;
   --app-card: #ffffff;
-  --app-card-hover: #fafbff;
-  --app-input: #ffffff;
-  --app-border: #dfe3eb;
-  --app-border-soft: #eef1ff;
-  --app-text: rgba(0, 0, 0, 0.85);
-  --app-text-secondary: rgba(0, 0, 0, 0.55);
-  --app-text-tertiary: rgba(0, 0, 0, 0.35);
-  --app-accent: #2f55e0;
-  --app-accent-hover: #2546c4;
-  --app-accent-soft: #eef1ff;
-  --app-hover-overlay: rgba(47, 85, 224, 0.06);
-  --app-radius-card: 12px;
-  --app-radius-btn: 8px;
-  --app-radius-input: 8px;
-  --app-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    'Helvetica Neue', Arial, sans-serif;
-  /* 状态色 */
-  --app-success: #22C55E;
-  --app-danger: #F0435A;
-  --app-warning: #F5A623;
-  --app-vip-gold: #E3B341;
-}
-
-/* ---------- 深色主题（meiren 深色版） ---------- */
-[data-theme="dark"] {
-  --app-bg: #0f1420;
-  --app-sider: #141a28;
-  --app-topbar: #141a28;
-  --app-sider-border: rgba(255, 255, 255, 0.08);
-  --app-btn-default: #1c2530;
-  --app-btn-default-hover: #243040;
-  --app-bg-soft: #141a28;
-  --app-card: #1a2233;
-  --app-card-hover: #212b40;
-  --app-input: #1a2233;
-  --app-border: rgba(255, 255, 255, 0.1);
-  --app-border-soft: rgba(255, 255, 255, 0.06);
-  --app-text: #FFFFFF;
-  --app-text-secondary: #8B94A1;
-  --app-text-tertiary: #5B6470;
-  --app-accent: #2f55e0;
-  --app-accent-hover: #4a6ff0;
-  --app-accent-soft: rgba(47, 85, 224, 0.2);
-  --app-hover-overlay: rgba(255, 255, 255, 0.06);
-  --app-success: #22C55E;
-  --app-danger: #F0435A;
-  --app-warning: #F5A623;
-  --app-vip-gold: #E3B341;
+  --app-table-header: #fafafa;
+  --app-border: #f0f0f0;
+  --app-border-input: #d9d9d9;
+  --app-text: rgba(0, 0, 0, 0.88);
+  --app-text-secondary: rgba(0, 0, 0, 0.45);
+  --app-text-tertiary: #8a91a5;
+  --app-primary: #1677ff;
+  --app-primary-hover: #4096ff;
+  --app-primary-active: #0958d9;
+  --app-primary-soft: #e6f4ff;
+  --app-success: #52c41a;
+  --app-danger: #ff4d4f;
+  --app-warning: #faad14;
+  --app-radius-card: 8px;
+  --app-radius-btn: 6px;
+  --app-radius-input: 6px;
+  --app-radius-tag: 4px;
+  --app-font: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 /* ---------- 全局 ---------- */
@@ -70,7 +36,7 @@ body {
   background: var(--app-bg);
   color: var(--app-text);
   font-family: var(--app-font);
-  font-size: 15px;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
@@ -80,890 +46,535 @@ body {
   background: var(--app-bg);
 }
 
-h1, h2, h3, h4, h5 {
-  color: var(--app-text);
+a {
+  color: var(--app-primary);
 }
 
-/* 深色滚动条 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ---------- 布局：侧边栏 ---------- */
+.pro-sider {
+  background: #ffffff !important;
+  border-right: 1px solid var(--app-border);
+  width: 200px !important;
+  max-width: 200px !important;
+  min-width: 200px !important;
+  flex: 0 0 200px !important;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 3px;
+.pro-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* ---------- 滚动隔离：layout 不滚动，内容区独立滚动 ---------- */
-.ant-layout {
-  background: var(--app-bg);
-  overflow: hidden;
-  height: 100vh;
-}
-.ant-layout-sider,
-.ant-layout-header,
-.mobile-tabbar {
-  flex-shrink: 0;
-}
-.ant-layout-content,
-.pro-content {
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-/* 所有滚动容器：触摸滚动优化 + 滚动链隔离 */
-.ant-card-body,
-.ant-modal-body,
-.ant-drawer-body,
-.ant-table-body,
-.ant-menu,
-.note-grid {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+.pro-sider.ant-layout-sider-collapsed {
+  width: 80px !important;
+  max-width: 80px !important;
+  min-width: 80px !important;
+  flex: 0 0 80px !important;
 }
 
-/* ---------- Layout ---------- */
-.ant-layout-sider {
-  background: var(--app-sider);
-}
-.ant-layout-header {
-  background: var(--app-bg);
-}
-.ant-layout-content {
-  background: var(--app-bg);
-}
-
-/* ---------- 顶栏：56px 深色 ---------- */
-.pro-header {
-  background: var(--app-bg);
-  padding: 0 16px 0 4px;
+.pro-logo {
+  height: 60px;
   display: flex;
   align-items: center;
-  height: 56px;
-  min-height: 56px;
-  border-bottom: 1px solid var(--app-border-soft);
-  position: relative;
-  z-index: 10;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--app-border);
+  overflow: hidden;
+  white-space: nowrap;
+  background: #ffffff;
+}
+.pro-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--app-primary);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.pro-logo-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-text);
+  margin-left: 12px;
+}
+.pro-logo-sub {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+  margin-left: 6px;
+}
+
+/* 侧边菜单 */
+.pro-sider .ant-menu {
+  border-right: none;
+  background: #ffffff;
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.pro-sider .ant-menu-item-group-title {
+  font-size: 12px;
+  color: #8a91a5;
+  padding: 8px 12px 4px;
+}
+.pro-sider .ant-menu-item,
+.pro-sider .ant-menu-submenu-title {
+  height: 40px;
+  line-height: 40px;
+  border-radius: 8px;
+  margin: 2px 0;
+  padding-left: 24px !important;
+  color: var(--app-text);
+  font-size: 14px;
+}
+.pro-sider .ant-menu-submenu .ant-menu-item {
+  padding-left: 40px !important;
+}
+.pro-sider .ant-menu-item:hover,
+.pro-sider .ant-menu-submenu-title:hover {
+  background: #f5f5f5 !important;
+  color: var(--app-text);
+}
+.pro-sider .ant-menu-item-selected {
+  background: var(--app-primary-soft) !important;
+  color: var(--app-primary) !important;
+  font-weight: 600;
+}
+.pro-sider .ant-menu-item-selected::after {
+  display: none;
+}
+.pro-sider .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  color: var(--app-primary);
+  font-weight: 600;
+}
+.pro-sider .ant-menu-inline {
+  background: #ffffff;
+}
+
+/* ---------- 布局：顶栏 ---------- */
+.pro-header {
+  height: 60px;
+  line-height: 60px;
+  padding: 0 24px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .pro-header .trigger-btn {
-  font-size: 20px;
-  padding: 0 14px;
-  height: 56px;
-  line-height: 56px;
+  font-size: 18px;
   cursor: pointer;
   color: var(--app-text);
-  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
 }
 .pro-header .trigger-btn:hover {
-  opacity: 0.75;
+  color: var(--app-primary);
 }
 .pro-app-title {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--app-text);
-  letter-spacing: 0.3px;
-  white-space: nowrap;
 }
 .pro-header-right {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  line-height: 1;
+}
+.vip-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--app-success);
+  color: var(--app-success);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+  white-space: nowrap;
+}
+.vip-badge:hover {
+  background: #f6ffed;
 }
 .pro-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--app-text);
+}
+.pro-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.pro-version {
+  font-size: 12px;
+  color: var(--app-text-secondary);
+}
+.pro-doc-link {
+  font-size: 14px;
+  color: var(--app-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pro-doc-link:hover {
+  color: var(--app-primary);
+}
+
+/* ---------- 布局：内容区 ---------- */
+.pro-content {
+  padding: 24px;
+  background: var(--app-bg);
+  min-height: calc(100vh - 60px);
+}
+.page {
+  padding: 0;
+}
+
+/* ---------- 工作台统计卡片 ---------- */
+.stat-card {
+  border-radius: var(--app-radius-card);
+  border: 1px solid var(--app-border);
+}
+.stat-card .ant-card-body {
+  padding: 20px 24px;
+}
+.stat-card .ant-statistic-title {
+  font-size: 14px;
+  color: var(--app-text-secondary);
+  margin-bottom: 8px;
+}
+.stat-card .ant-statistic-content {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+/* ---------- 列表页 ---------- */
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--app-text);
+  margin: 0 0 4px;
+}
+.page-subtitle {
+  font-size: 14px;
+  color: #8a91a5;
+  margin: 0 0 16px;
+}
+.filter-card {
+  margin-bottom: 16px;
+  border-radius: var(--app-radius-card);
+}
+.filter-bar {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--app-text-secondary);
-  font-size: 14px;
-}
-.pro-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--app-accent);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  font-weight: 700;
-}
-.pro-header .ant-btn {
-  border-radius: 8px;
+  flex-wrap: wrap;
 }
 
-/* ---------- 侧边栏 ---------- */
-.pro-sider {
-  background: var(--app-sider) !important;
-}
-.pro-logo {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  background: var(--app-sider);
-  overflow: hidden;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--app-border-soft);
-}
-.pro-logo.collapsed {
-  padding: 0;
-  justify-content: center;
-}
-.pro-logo-badge {
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  border-radius: 10px;
-  background: var(--app-accent);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.pro-logo-title {
-  margin-left: 12px;
-  color: var(--app-text);
-  font-size: 16px;
-  font-weight: 700;
-}
-.pro-logo-sub {
-  display: block;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--app-text-tertiary);
-  letter-spacing: 2px;
-}
-.ant-menu-dark {
-  background: var(--app-sider);
-}
-.ant-menu-dark .ant-menu-item,
-.ant-menu-dark .ant-menu-submenu-title {
-  color: var(--app-text-secondary);
-  border-radius: 8px;
-  margin: 2px 8px;
-  width: calc(100% - 16px);
-}
-.ant-menu-dark .ant-menu-item:hover,
-.ant-menu-dark .ant-menu-submenu-title:hover {
-  color: var(--app-text);
-  background: var(--app-hover-overlay);
-}
-.ant-menu-dark .ant-menu-item-selected {
-  background: var(--app-accent-soft) !important;
-  color: var(--app-accent) !important;
-  font-weight: 600;
-}
-.ant-menu-dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  color: var(--app-text);
-}
-
-/* ---------- 内容区：max-width 768px 居中 ---------- */
-.pro-content {
-  margin: 0 auto;
-  padding: 16px;
-  background: transparent;
-  min-height: calc(100vh - 56px);
-  max-width: 768px;
-  width: 100%;
-}
-
-/* ---------- 卡片：12px 圆角，无大阴影 ---------- */
+/* ---------- antd 全局微调 ---------- */
 .ant-card {
-  background: var(--app-card);
-  border: 1px solid var(--app-border-soft);
   border-radius: var(--app-radius-card);
-  color: var(--app-text);
+  border-color: var(--app-border);
 }
-.ant-card-head {
-  border-bottom: 1px solid var(--app-border-soft);
-  color: var(--app-text);
+.ant-card-bordered {
+  border: 1px solid var(--app-border);
 }
 .ant-card-head-title {
-  font-weight: 700;
   font-size: 16px;
-  color: var(--app-text);
-}
-.ant-card-body {
-  color: var(--app-text);
-}
-.ant-card-hoverable:hover {
-  border-color: var(--app-border);
-}
-
-/* ---------- 按钮 ---------- */
-.ant-btn {
-  border-radius: var(--app-radius-btn);
-  font-size: 15px;
-  min-height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s, transform 0.2s;
-}
-.ant-btn:active {
-  transform: scale(0.98);
-}
-.ant-btn-sm {
-  min-height: 32px;
-  font-size: 13px;
-  border-radius: 8px;
-}
-.ant-btn-default {
-  background: var(--app-btn-default);
-  border-color: var(--app-border);
-  color: var(--app-text);
-}
-.ant-btn-default:hover {
-  background: var(--app-btn-default-hover);
-  border-color: var(--app-border);
-  color: var(--app-text);
-}
-.ant-btn-primary {
-  background: var(--app-accent);
-  border-color: var(--app-accent);
-  color: #fff;
   font-weight: 600;
 }
+.ant-btn {
+  border-radius: var(--app-radius-btn);
+}
+.ant-btn-primary {
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+  box-shadow: none;
+}
 .ant-btn-primary:hover {
-  background: var(--app-accent-hover);
-  border-color: var(--app-accent-hover);
-  color: #fff;
+  background: var(--app-primary-hover);
+  border-color: var(--app-primary-hover);
 }
-.ant-btn-link {
-  color: var(--app-accent);
-  min-height: unset;
+.ant-btn-primary:active {
+  background: var(--app-primary-active);
+  border-color: var(--app-primary-active);
 }
-.ant-btn-link:hover {
-  color: var(--app-accent-hover);
-}
-.ant-btn-text {
-  color: var(--app-text-secondary);
-  min-height: unset;
-}
-.ant-btn-text:hover {
-  color: var(--app-text);
-  background: var(--app-hover-overlay);
-}
-.ant-btn-dangerous {
-  color: #ff8a8a;
-}
-
-/* ---------- 输入框 / 选择器 ---------- */
 .ant-input,
 .ant-input-password,
-.ant-input-number,
-.ant-select-selector,
+.ant-input-affix-wrapper,
+.ant-select .ant-select-selector,
 .ant-picker {
-  border-radius: var(--app-radius-input) !important;
-  background: var(--app-input) !important;
-  border-color: var(--app-border) !important;
-  color: var(--app-text) !important;
-  min-height: 44px;
-  font-size: 15px;
-}
-.ant-input::placeholder,
-.ant-select-selection-placeholder,
-.ant-picker-input > input::placeholder {
-  color: var(--app-text-tertiary);
+  border-radius: var(--app-radius-input);
+  border-color: var(--app-border-input);
 }
 .ant-input:hover,
-.ant-select-selector:hover,
+.ant-input-affix-wrapper:hover,
+.ant-select .ant-select-selector:hover,
 .ant-picker:hover {
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: var(--app-primary-hover);
 }
 .ant-input:focus,
 .ant-input-focused,
-.ant-select-focused .ant-select-selector,
-.ant-picker-focused {
-  border-color: var(--app-accent) !important;
-  box-shadow: 0 0 0 2px var(--app-accent-soft) !important;
-}
-.ant-input-password .ant-input {
-  background: transparent !important;
-  min-height: unset;
-}
-.ant-input-affix-wrapper {
-  background: var(--app-input) !important;
-  border-color: var(--app-border) !important;
-  border-radius: var(--app-radius-input) !important;
-}
-.ant-input-affix-wrapper .ant-input {
-  background: transparent !important;
-}
-textarea.ant-input {
-  min-height: 100px;
-}
-.ant-select-dropdown,
-.ant-picker-dropdown .ant-picker-panel-container {
-  background: var(--app-card);
-  border: 1px solid var(--app-border);
-  border-radius: 10px;
-}
-.ant-select-item {
-  color: var(--app-text);
-  border-radius: 6px;
-}
-.ant-select-item-option-selected,
-.ant-select-item-option-active {
-  background: var(--app-accent-soft) !important;
-}
-.ant-select-item-option-selected .ant-select-item-option-content {
-  color: var(--app-accent);
-  font-weight: 600;
-}
-.ant-select-arrow,
-.ant-picker-suffix {
-  color: var(--app-text-tertiary);
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
 }
 
-/* ---------- 表格 ---------- */
-.ant-table-wrapper {
-  border-radius: var(--app-radius-card);
-  overflow: hidden;
-}
+/* 表格 */
 .ant-table {
-  background: var(--app-card);
-  color: var(--app-text);
+  border-radius: var(--app-radius-card);
   font-size: 14px;
 }
 .ant-table-thead > tr > th {
-  background: var(--app-card-hover);
-  color: var(--app-text-secondary);
+  background: var(--app-table-header);
+  font-size: 14px;
   font-weight: 600;
-  border-bottom: 1px solid var(--app-border-soft);
-}
-.ant-table-thead > tr > th::before {
-  display: none;
+  color: var(--app-text);
+  border-bottom: 1px solid var(--app-border);
+  padding: 12px 16px;
 }
 .ant-table-tbody > tr > td {
-  border-bottom: 1px solid var(--app-border-soft);
+  border-bottom: 1px solid var(--app-border);
+  padding: 12px 16px;
+  height: 54px;
 }
 .ant-table-tbody > tr:hover > td {
-  background: var(--app-card-hover) !important;
-}
-.ant-table-tbody > tr.ant-table-row-selected > td {
-  background: var(--app-accent-soft) !important;
-}
-.ant-table-empty .ant-table-cell {
-  background: var(--app-card);
+  background: #fafafa;
 }
 
-/* ---------- 分页 ---------- */
-.ant-pagination .ant-pagination-item {
-  background: var(--app-btn-default);
-  border-color: var(--app-border);
-  border-radius: 8px;
+/* 标签 */
+.ant-tag {
+  border-radius: var(--app-radius-tag);
+  font-size: 12px;
+  padding: 2px 8px;
+  margin-right: 8px;
 }
-.ant-pagination .ant-pagination-item a {
-  color: var(--app-text-secondary);
+.ant-tag-blue {
+  color: var(--app-primary);
+  background: var(--app-primary-soft);
+  border-color: #91caff;
 }
-.ant-pagination .ant-pagination-item-active {
-  background: var(--app-accent-soft);
-  border-color: var(--app-accent);
+.ant-tag-green {
+  color: var(--app-success);
+  background: #f6ffed;
+  border-color: #b7eb8f;
 }
-.ant-pagination .ant-pagination-item-active a {
-  color: var(--app-accent);
+.ant-tag-red {
+  color: var(--app-danger);
+  background: #fff2f0;
+  border-color: #ffccc7;
 }
-.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
-.ant-pagination .ant-pagination-next .ant-pagination-item-link {
-  background: var(--app-btn-default);
-  border-color: var(--app-border);
-  color: var(--app-text-secondary);
-  border-radius: 8px;
-}
-.ant-pagination .ant-pagination-disabled .ant-pagination-item-link {
-  color: var(--app-text-tertiary);
-  background: var(--app-btn-default);
+.ant-tag-orange {
+  color: #fa8c16;
+  background: #fff7e6;
+  border-color: #ffd591;
 }
 
-/* ---------- 弹窗 / 抽屉 ---------- */
-.ant-modal-content,
-.ant-drawer-content {
-  background: var(--app-card);
-  border-radius: 16px;
-  color: var(--app-text);
+/* 弹窗 */
+.ant-modal {
+  border-radius: var(--app-radius-card);
+  overflow: hidden;
+}
+.ant-modal-content {
+  border-radius: var(--app-radius-card);
+  padding: 0;
 }
 .ant-modal-header {
-  background: var(--app-card);
-  border-bottom: 1px solid var(--app-border-soft);
-  border-radius: 16px 16px 0 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--app-border);
+  margin-bottom: 0;
 }
 .ant-modal-title {
-  color: var(--app-text);
-  font-weight: 700;
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 600;
 }
-.ant-modal-close {
-  color: var(--app-text-tertiary);
-}
-.ant-modal-close:hover {
-  color: var(--app-text);
+.ant-modal-body {
+  padding: 24px;
 }
 .ant-modal-footer {
-  border-top: 1px solid var(--app-border-soft);
+  padding: 12px 24px;
+  border-top: 1px solid var(--app-border);
+  text-align: right;
 }
-.ant-drawer-header {
-  background: var(--app-card);
-  border-bottom: 1px solid var(--app-border-soft);
+.ant-modal-footer .ant-btn + .ant-btn {
+  margin-left: 8px;
 }
-.ant-drawer-title {
+.ant-modal .ant-form-item-label > label {
+  font-size: 14px;
   color: var(--app-text);
 }
-.ant-drawer-close {
-  color: var(--app-text-tertiary);
+.ant-modal .ant-input,
+.ant-modal .ant-input-password,
+.ant-modal .ant-select .ant-select-selector,
+.ant-modal .ant-picker {
+  height: 32px;
+  border-radius: var(--app-radius-input);
 }
 
-/* ---------- 表单 ---------- */
+/* 分页 */
+.ant-pagination {
+  margin-top: 16px;
+  text-align: right;
+}
+
+/* 表单 */
 .ant-form-item-label > label {
-  color: var(--app-text-secondary);
   font-size: 14px;
-}
-.ant-form-item-explain-error {
-  font-size: 13px;
-}
-.ant-checkbox-inner {
-  background: var(--app-input);
-  border-color: var(--app-border);
-  border-radius: 6px;
-  width: 18px;
-  height: 18px;
-}
-.ant-checkbox-checked .ant-checkbox-inner {
-  background: var(--app-accent);
-  border-color: var(--app-accent);
-}
-.ant-radio-inner {
-  background: var(--app-input);
-  border-color: var(--app-border);
-}
-.ant-radio-checked .ant-radio-inner {
-  border-color: var(--app-accent);
-}
-.ant-radio-inner::after {
-  background: var(--app-accent);
-}
-.ant-switch-checked {
-  background: var(--app-accent);
-}
-
-/* ---------- 标签 ---------- */
-.ant-tag {
-  border-radius: 6px;
-  font-size: 13px;
-  padding: 2px 10px;
-}
-
-/* ---------- 空状态 / 加载 ---------- */
-.ant-empty-description {
-  color: var(--app-text-tertiary);
-}
-.ant-spin-dot-item {
-  background: var(--app-accent);
-}
-
-/* ---------- 下拉菜单 ---------- */
-.ant-dropdown-menu {
-  background: var(--app-card);
-  border: 1px solid var(--app-border);
-  border-radius: 10px;
-  padding: 6px;
-}
-.ant-dropdown-menu-item {
-  color: var(--app-text);
-  border-radius: 6px;
-  font-size: 14px;
-}
-.ant-dropdown-menu-item:hover {
-  background: var(--app-hover-overlay);
-}
-.ant-dropdown-menu-item-danger {
-  color: #ff8a8a;
-}
-
-/* ---------- Tabs ---------- */
-.ant-tabs-tab {
-  color: var(--app-text-secondary);
-  font-size: 15px;
-}
-.ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: var(--app-accent) !important;
-  font-weight: 600;
-}
-.ant-tabs-ink-bar {
-  background: var(--app-accent);
-}
-
-/* ---------- Alert ---------- */
-.ant-alert {
-  border-radius: 10px;
-}
-
-/* ---------- 移动端底部 TabBar：5 tab，24px 图标，11px 文字 ---------- */
-.mobile-tabbar {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-  background: rgba(33, 33, 33, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--app-border-soft);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tab-item {
-  flex: 1;
-  text-align: center;
-  padding: 8px 0 6px;
-  color: var(--app-text-tertiary);
-  cursor: pointer;
-  transition: color 0.2s;
-}
-.tab-icon {
-  font-size: 24px;
-  line-height: 1;
-  margin-bottom: 3px;
-}
-.tab-label {
-  font-size: 11px;
-  line-height: 1.2;
-}
-.tab-item.active {
-  color: var(--app-accent);
-  font-weight: 600;
-}
-
-/* ---------- 页面级深色覆盖（scoped 样式兜底） ---------- */
-.note-card {
-  background: var(--app-card) !important;
-  border-color: var(--app-border-soft) !important;
-  border-radius: 12px !important;
-}
-.note-card:hover {
-  border-color: var(--app-border) !important;
-}
-.note-card.selected {
-  border-color: var(--app-accent) !important;
-  background: var(--app-accent-soft) !important;
-}
-.note-title {
-  color: var(--app-text) !important;
-}
-.note-preview {
-  color: var(--app-text-secondary) !important;
-}
-.note-id,
-.note-time,
-.note-meta {
-  color: var(--app-text-tertiary) !important;
-}
-.review-layout,
-.review-container {
-  background: var(--app-card) !important;
-  border-color: var(--app-border-soft) !important;
-}
-
-/* ---------- global.css 工具类深色适配 ---------- */
-.section-title,
-.form-section-title {
-  color: var(--app-text) !important;
-}
-.desc-text {
-  color: var(--app-text-secondary) !important;
-}
-.hint {
-  color: var(--app-text-tertiary) !important;
-}
-.form-row .form-label {
-  color: var(--app-text-secondary) !important;
 }
 
 /* ---------- 登录页 ---------- */
 .pro-login-page {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  background: #f5f7fa;
   padding: 24px;
-  background:
-    radial-gradient(900px 500px at 20% 8%, rgba(217, 119, 87, 0.12), transparent 60%),
-    radial-gradient(800px 500px at 85% 95%, rgba(217, 119, 87, 0.08), transparent 60%),
-    var(--app-bg);
-  position: relative;
-  overflow: hidden;
 }
 .pro-login-card {
-  width: 400px;
-  max-width: 100%;
-  border-radius: 16px;
-  background: var(--app-card);
-  border: 1px solid var(--app-border-soft);
-  position: relative;
-  z-index: 1;
+  width: 320px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  border: none;
 }
 .pro-login-card .ant-card-body {
-  padding: 36px 32px 30px;
+  padding: 32px;
 }
 .pro-login-brand {
   text-align: center;
-  margin-bottom: 8px;
 }
 .pro-login-brand .pro-logo-badge {
-  width: 56px;
-  height: 56px;
-  font-size: 28px;
-  border-radius: 16px;
+  display: flex;
   margin: 0 auto 16px;
 }
 .pro-login-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   color: var(--app-text);
-  margin: 0;
+  text-align: center;
+  margin: 0 0 4px;
 }
 .pro-login-sub {
-  color: var(--app-text-tertiary);
-  font-size: 13px;
-  margin-top: 8px;
-  letter-spacing: 3px;
+  font-size: 14px;
+  color: var(--app-text-secondary);
+  text-align: center;
 }
-.pro-login-card .ant-btn-primary {
-  height: 48px;
-  font-size: 16px;
-  border-radius: var(--app-radius-btn);
+.pro-login-card .ant-form {
+  margin-top: 24px;
 }
 .pro-login-card .ant-input,
 .pro-login-card .ant-input-password {
-  height: 48px;
-  border-radius: var(--app-radius-input);
-  font-size: 15px;
+  height: 40px;
+  border-radius: 6px;
+  border-color: var(--app-border-input);
+}
+.pro-login-card .ant-btn-primary {
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--app-primary);
+  border-color: var(--app-primary);
+  color: #fff;
+  font-size: 16px;
+}
+.pro-login-card .ant-btn-primary:hover {
+  background: var(--app-primary-hover);
+  border-color: var(--app-primary-hover);
 }
 .pro-login-card a {
-  color: var(--app-accent);
+  color: var(--app-primary);
+  font-size: 14px;
 }
 .pro-login-foot {
-  text-align: center;
   margin-top: 24px;
-  color: var(--app-text-tertiary);
   font-size: 12px;
-  position: relative;
-  z-index: 1;
-}
-
-/* ---------- 移动端适配 ---------- */
-@media (max-width: 768px) {
-  body {
-    font-size: 15px;
-  }
-  .pro-content {
-    margin: 0 auto;
-    padding: 12px 12px 88px;
-    min-height: calc(100vh - 56px);
-    max-width: 100%;
-  }
-  .mobile-tabbar {
-    display: flex;
-  }
-  .pro-header {
-    height: 56px;
-    min-height: 56px;
-  }
-  .pro-header .trigger-btn {
-    height: 56px;
-    line-height: 56px;
-  }
-  .pro-app-title {
-    font-size: 15px;
-  }
-  /* 移动端侧边栏：transform 滑入滑出（非 display 切换） */
-  .ant-layout-sider {
-    position: fixed !important;
-    z-index: 1001;
-    height: 100vh;
-    top: 0;
-    left: 0;
-    width: 240px !important;
-    max-width: 240px !important;
-    min-width: 240px !important;
-    flex: 0 0 240px !important;
-    transform: translateX(-100%);
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: transform;
-  }
-  .ant-layout-sider:not(.ant-layout-sider-collapsed) {
-    transform: translateX(0);
-  }
-  .ant-layout-sider-collapsed {
-    transform: translateX(-100%);
-    overflow: hidden;
-  }
-  .mobile-sider-mask {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    opacity: 1;
-    transition: opacity 0.28s;
-  }
-  /* 移动端卡片全宽流 */
-  .ant-card {
-    border-radius: 12px;
-  }
-  .pro-login-card .ant-card-body {
-    padding: 28px 22px;
-  }
-  /* 移动端弹窗全屏化 */
-  .ant-modal {
-    max-width: 100vw;
-    margin: 0;
-    padding: 12px;
-  }
-}
-
-/* ---------- 桌面端 ---------- */
-@media (min-width: 769px) {
-  .pro-content {
-    max-width: 768px;
-  }
-}
-
-/* 主题切换按钮 */
-.theme-btn {
-  font-size: 18px;
   color: var(--app-text-secondary);
-}
-.theme-btn:hover {
-  color: var(--app-accent);
+  text-align: center;
 }
 
-/* 移动端表格横向滚动 */
-@media (max-width: 768px) {
-  .ant-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .ant-table {
-    min-width: 600px;
-  }
+/* ---------- 移动端 ---------- */
+.mobile-sider-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 999;
 }
-
-/* 底部导航栏 */
 .mobile-tabbar {
-  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #ffffff;
+  border-top: 1px solid var(--app-border);
+  display: flex;
+  z-index: 1000;
 }
-@media (max-width: 768px) {
-  .mobile-tabbar {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: var(--app-card);
-    border-top: 1px solid var(--app-border);
-    padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
-  }
-  .tab-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    color: var(--app-text-secondary);
-    font-size: 11px;
-  }
-  .tab-item.active {
-    color: var(--app-accent);
-  }
-  .tab-icon {
-    font-size: 22px;
-  }
-  .pro-content {
-    padding-bottom: 70px;
-  }
-}
-
-/* 笔记卡片封面 */
-.note-cover {
-  position: relative;
-  width: 100%;
-  height: 160px;
-  overflow: hidden;
-  border-radius: 8px 8px 0 0;
-  background: var(--app-bg-soft);
-}
-.note-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.note-status-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #fff;
-  background: #1890ff;
-}
-.note-status-badge.status-published { background: #52c41a; }
-.note-status-badge.status-pending { background: #fa8c16; }
-.note-status-badge.status-offline { background: #8c8c8c; }
-.note-status-badge.status-draft { background: #8c8c8c; }
-.note-check {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-.note-tags {
-  margin-left: 8px;
-  color: var(--app-text-tertiary);
-  font-size: 12px;
-}
-
-/* 侧边栏菜单可滚动 */
-.ant-layout-sider .ant-layout-sider-children {
+.mobile-tabbar .tab-item {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--app-text-secondary);
+  font-size: 11px;
 }
-.ant-layout-sider .ant-menu {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+.mobile-tabbar .tab-item .tab-icon {
+  font-size: 20px;
+}
+.mobile-tabbar .tab-item.active {
+  color: var(--app-primary);
 }
 
-/* 亮色模式：确保零暗色 */
-[data-theme="light"] .pro-header,
-[data-theme="light"] .ant-layout-header {
-  background: #ffffff !important;
+@media (max-width: 768px) {
+  .pro-sider {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 1001;
+  }
+  .pro-content {
+    padding: 16px;
+  }
+  .pro-header {
+    padding: 0 16px;
+  }
+  .pro-username .uname,
+  .pro-version,
+  .pro-doc-link {
+    display: none;
+  }
+  .pro-login-card .ant-card-body {
+    padding: 24px;
+  }
 }
-[data-theme="light"] .pro-sider,
-[data-theme="light"] .ant-layout-sider {
-  background: #ffffff !important;
-}
-[data-theme="light"] .ant-menu-dark {
-  background: #ffffff !important;
-}
-[data-theme="light"] .ant-menu-dark .ant-menu-item,
-[data-theme="light"] .ant-menu-dark .ant-menu-submenu-title {
-  color: rgba(0, 0, 0, 0.65) !important;
-}
-[data-theme="light"] .mobile-tabbar {
-  background: #ffffff !important;
+
+@media (max-width: 576px) {
+  .pro-content {
+    padding: 12px;
+    padding-bottom: 72px;
+  }
+  .ant-modal {
+    max-width: calc(100vw - 32px);
+  }
 }

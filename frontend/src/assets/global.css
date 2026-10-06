@@ -5,16 +5,16 @@
 
 /* ---------- 页面结构 ---------- */
 
-/* 页面根容器：统一内边距（App.vue .content 已有 16px，此处兜底） */
+/* 页面根容器：内容区 padding 由 App.vue .pro-content 统一为 24px，此处不再加 */
 .page {
-  padding: 4px;
+  padding: 0;
 }
 
 /* 顶部工具栏：按钮/筛选控件横向排列，统一间距 */
 .page-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 16px;
 }
