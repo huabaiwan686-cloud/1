@@ -92,10 +92,6 @@ export const botApi = {
   verify: (id: number) => request.post(`/api/bot/tokens/${id}/verify`),
   remove: (id: number) => request.delete(`/api/bot/tokens/${id}`),
   autoCreate: (data: any) => request.post('/api/bot/tokens/auto-create', data),
-  managedStatus: () => request.get('/api/bot/tokens/managed/status'),
-  managedSetup: (token: string) => request.post('/api/bot/tokens/managed/setup', { token }),
-  managedCreate: (data: any) => request.post('/api/bot/tokens/managed/create', data),
-  managedPending: () => request.get('/api/bot/tokens/managed/pending'),
   bindStart: (bot_token_id: number) =>
     request.post('/api/youban-bot/bot/bind/start', { bot_token_id }),
   bindStatus: (session_key: string) =>

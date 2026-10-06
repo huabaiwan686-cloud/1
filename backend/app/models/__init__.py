@@ -13,7 +13,6 @@ from app.models.account import (  # noqa: F401
     CooperationApplication,
     CooperationConfig,
     FriendRelation,
-    ManagedBotRequest,
     PlatformBinding,
     TgAccount,
     TwoWayBot,

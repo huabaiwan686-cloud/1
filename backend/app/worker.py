@@ -97,14 +97,6 @@ async def run() -> None:
                 log.info("轮询：%s", r)
         except Exception:  # noqa: BLE001
             log.exception("轮询异常")
-        # 官方一键创建：拉 manager bot 更新，自动取回 token 入库
-        try:
-            from app.services.managed_bots import poll_once as poll_managed
-            mr = await asyncio.to_thread(poll_managed)
-            if mr.get("processed"):
-                log.info("managed bots：%s", mr)
-        except Exception:  # noqa: BLE001
-            log.exception("managed bots 轮询异常")
     log.info("worker 退出")
 
 
