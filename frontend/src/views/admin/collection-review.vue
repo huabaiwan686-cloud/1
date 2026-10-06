@@ -74,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { CheckCircleOutlined } from '@ant-design/icons-vue';
 import { noteApi } from '@/api';
@@ -167,10 +167,6 @@ function onImgError(e: Event) {
 
 onMounted(() => {
   reload();
-  window.addEventListener('keydown', onKey);
-});
-onUnmounted(() => {
-  window.removeEventListener('keydown', onKey);
 });
 </script>
 

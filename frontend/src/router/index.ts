@@ -43,7 +43,6 @@ export const routes: RouteRecordRaw[] = [
   { path: '/admin/vip', component: () => import('@/views/admin/vip.vue') },
   { path: '/admin/announcements', component: () => import('@/views/admin/announcements.vue') },
   { path: '/admin/dashboard', component: () => import('@/views/admin/dashboard.vue') },
-  { path: '/admin/logs', component: () => import('@/views/admin/logs.vue') },
   { path: '/admin/settings', component: () => import('@/views/admin/settings.vue') },
   { path: '/admin/antidedup', component: () => import('@/views/admin/antidedup.vue') },
   // 全局设置：背景替换 / 混淆 / 循环发布

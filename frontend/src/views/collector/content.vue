@@ -103,9 +103,11 @@ async function load() {
 function onPage(p: number) { page.value = p; load(); }
 function viewDetail(record: any) { detail.value = record; detailVisible.value = true; }
 async function removeNote(id: number) {
-  await noteApi.remove(id);
-  message.success('已删除');
-  load();
+  try {
+    await noteApi.remove(id);
+    message.success('已删除');
+    load();
+  } catch (e: any) { message.error(e.message || '删除失败'); }
 }
 onMounted(load);
 </script>

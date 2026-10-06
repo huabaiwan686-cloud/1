@@ -84,7 +84,8 @@ function openEditor(r?: any) {
 async function save() {
   if (!form.source_chat.trim() || !form.target_chat.trim()) { message.error('源群和目标群不能为空'); return; }
   try {
-    await forwardApi.create(form);
+    if (editId.value) await forwardApi.update(editId.value, form);
+    else await forwardApi.create(form);
     message.success('已保存，worker 将在 1 分钟内自动生效');
     visible.value = false; load();
   } catch (e: any) { message.error(e.message); }

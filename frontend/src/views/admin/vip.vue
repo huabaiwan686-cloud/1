@@ -103,17 +103,19 @@ async function load() {
 }
 
 async function buyPlan(p: any) {
-  buy();
+  await buy(p?.id || 'pro');
 }
 
-async function buy() {
-  const order: any = await vipApi.createOrder();
-  const payInfo: any = await vipApi.payInfo();
-  const addrLine = payInfo.configured
-    ? `请向 TRC20 地址转账：${payInfo.address}`
-    : '收款地址待配置，请联系管理员';
-  Modal.info({ title: '订单已创建', content: `订单号 ${order.orderNo}，金额 ${order.amountUsdt} USDT。${addrLine}` });
-  load();
+async function buy(planId = 'pro') {
+  try {
+    const order: any = await vipApi.createOrder(planId);
+    const payInfo: any = await vipApi.payInfo();
+    const addrLine = payInfo.configured
+      ? `请向 TRC20 地址转账：${payInfo.address}`
+      : '收款地址待配置，请联系管理员';
+    Modal.info({ title: '订单已创建', content: `订单号 ${order.orderNo}，金额 ${order.amountUsdt} USDT。${addrLine}` });
+    load();
+  } catch (e: any) { message.error(e.message || '下单失败'); }
 }
 
 async function genCode() {

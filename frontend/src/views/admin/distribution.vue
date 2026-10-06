@@ -101,9 +101,12 @@ async function load() {
   try {
     const r: any = await channelApi.publishRules();
     rules.value = r.list || r || [];
-    tags.value = await metaApi.tags();
-    channels.value = await channelApi.list(true);
-  } finally { loading.value = false; }
+    const tr: any = await metaApi.tags();
+    tags.value = tr.list || tr || [];
+    const chr: any = await channelApi.list(true);
+    channels.value = chr.list || chr || [];
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
 async function save() {
   if (!form.name.trim()) { message.warning('请输入规则名称'); return; }
@@ -126,9 +129,11 @@ async function saveAdvanced() {
   } catch (e: any) { message.error(e.message); } finally { saving.value = false; }
 }
 async function removeRule(id: number) {
-  await channelApi.deletePublishRule(id);
-  message.success('已删除');
-  load();
+  try {
+    await channelApi.deletePublishRule(id);
+    message.success('已删除');
+    load();
+  } catch (e: any) { message.error(e.message || '删除失败'); }
 }
 onMounted(load);
 </script>

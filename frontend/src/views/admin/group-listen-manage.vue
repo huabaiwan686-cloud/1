@@ -130,27 +130,33 @@ async function loadHits() {
 async function save() {
   if (!editing.name?.trim()) { message.warning('请输入名称'); return; }
   try {
-    await listenApi.create({
+    const payload = {
       name: editing.name,
       bot_id: editing.bot_id,
       target_chat_id: editing.target_chat_id,
       keywords_str: editing.keywords_str,
       account_id: editing.account_id,
-    });
+    };
+    if (editing.id) await listenApi.update(editing.id, payload);
+    else await listenApi.create(payload);
     message.success('已保存');
     visible.value = false;
     load();
   } catch (e: any) { message.error(e.message); }
 }
 async function togglePlan(id: number, enabled: boolean) {
-  await listenApi.toggle(id, enabled);
-  message.success(enabled ? '已启用' : '已停用');
-  load();
+  try {
+    await listenApi.toggle(id, enabled);
+    message.success(enabled ? '已启用' : '已停用');
+    load();
+  } catch (e: any) { message.error(e.message || '操作失败'); }
 }
 async function remove(id: number) {
-  await listenApi.remove(id);
-  message.success('已删除');
-  load();
+  try {
+    await listenApi.remove(id);
+    message.success('已删除');
+    load();
+  } catch (e: any) { message.error(e.message || '删除失败'); }
 }
 onMounted(() => { load(); loadHits(); });
 </script>

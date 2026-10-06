@@ -12,9 +12,6 @@
         <template v-if="column.key === 'status'">
           <a-tag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '运行中' : '停用' }}</a-tag>
         </template>
-        <template v-if="column.dataIndex === 'enabled'">
-          <a-switch :checked="record.enabled" size="small" @change="(v) => toggleEnabled(record, v)" />
-        </template>
         <a-space v-if="column.key === 'action'">
           <a @click="verify(record.id)">验证</a>
           <a @click="copyToken(record.id)">复制</a>
@@ -103,6 +100,9 @@ async function copyToken(id: number) {
     message.success('Token 已复制到剪贴板');
   } catch (e: any) { message.error(e.message || '复制失败'); }
 }
-async function remove(id: number) { await botApi.remove(id); message.success('已删除'); load(); }
+async function remove(id: number) {
+  try { await botApi.remove(id); message.success('已删除'); load(); }
+  catch (e: any) { message.error(e.message || '删除失败'); }
+}
 onMounted(load);
 </script>

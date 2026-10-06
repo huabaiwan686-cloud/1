@@ -1,5 +1,5 @@
 <template>
-  <a-config-provider :theme="antdTheme">
+  <a-config-provider :theme="antdTheme" :locale="zhCN">
   <router-view v-if="isLoginPage" />
   <a-layout v-else style="min-height: 100vh">
     <!-- 移动端遮罩 -->
@@ -63,6 +63,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { MenuOutlined } from '@ant-design/icons-vue';
+import zhCN from 'ant-design-vue/es/locale/zh_CN';
 import { authApi, announceApi } from '@/api';
 
 // antd v5 默认主题 token（REVERSE_ENGINEERING.md 实测值）
@@ -154,11 +155,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/dashboard': '小灰机管理平台',
   '/admin/vip': 'VIP 会员',
   '/admin/users': '用户管理',
-  '/admin/channels-up': '上架频道',
-  '/admin/channels-down': '下架频道',
-  '/admin/accounts/protocol': '协议号',
+  '/admin/channels/up': '上架频道',
+  '/admin/channels/down': '下架频道',
+  '/admin/tg': '协议号',
   '/admin/relay': '自动转发',
-  '/admin/logs': '发送记录',
+  '/admin/records': '发送记录',
   '/admin/group-listen': '关键词监控',
   '/admin/global/confuse': '防扫图',
   '/admin/settings': '系统设置',

@@ -36,8 +36,8 @@ import { formatDateTime } from '@/utils/date';
 const columns = [
   { title: '内容编号', dataIndex: 'id', width: 90 },
   { title: '操作', dataIndex: 'action', width: 140 },
-  { title: '频道类型', key: 'chtype', width: 100 },
-  { title: '频道ID', key: 'chid', width: 100 },
+  { title: '频道类型', key: 'chtype', width: 100, customRender: () => '—' },
+  { title: '频道ID', key: 'chid', width: 100, customRender: () => '—' },
   { title: '来源', dataIndex: 'executor', width: 120 },
   { title: '状态', key: 'status', width: 90 },
   { title: '详细信息', dataIndex: 'detail' },
@@ -55,7 +55,8 @@ async function load() {
       result: result.value || undefined, page: page.value, page_size: pageSize.value,
     });
     list.value = data.list || []; total.value = data.total || 0;
-  } finally { loading.value = false; }
+  } catch (e: any) { message.error(e.message || '加载失败'); }
+  finally { loading.value = false; }
 }
 function reload() { page.value = 1; load(); }
 async function clearAll() {

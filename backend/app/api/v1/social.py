@@ -37,6 +37,29 @@ class CoopConfigIn(BaseModel):
 
 
 # ---- 双向机器人 ----
+@router.patch("/two_way_bots/{bot_id}")
+def update_two_way(bot_id: int, body: dict, user: User = Depends(require_member),
+                   db: Session = Depends(get_db)):
+    b = db.query(TwoWayBot).filter(TwoWayBot.id == bot_id).first()
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "双向机器人不存在")
+    if "enabled" in body:
+        b.status = "active" if body["enabled"] else "inactive"
+    db.commit()
+    return ok(msg="已更新")
+
+
+@router.delete("/two_way_bots/{bot_id}")
+def delete_two_way(bot_id: int, user: User = Depends(require_member),
+                   db: Session = Depends(get_db)):
+    b = db.query(TwoWayBot).filter(TwoWayBot.id == bot_id).first()
+    if not b:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "双向机器人不存在")
+    db.delete(b)
+    db.commit()
+    return ok(msg="已删除")
+
+
 @router.get("/two_way_bots")
 def list_two_way(user: User = Depends(require_member), db: Session = Depends(get_db)):
     bs = db.query(TwoWayBot).order_by(TwoWayBot.id.desc()).all()

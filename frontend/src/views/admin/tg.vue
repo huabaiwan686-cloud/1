@@ -123,15 +123,19 @@ async function refreshAll() {
 }
 async function startPhone() {
   if (!phone.value) { message.error('请填写手机号'); return; }
-  const r: any = await tgApi.loginStart(phone.value);
-  sessionKey.value = r.sessionKey;
-  phoneVisible.value = false; codeVisible.value = true;
-  message.success('验证码已发送');
+  try {
+    const r: any = await tgApi.loginStart(phone.value);
+    sessionKey.value = r.sessionKey;
+    phoneVisible.value = false; codeVisible.value = true;
+    message.success('验证码已发送');
+  } catch (e: any) { message.error(e.message || '发送验证码失败'); }
 }
 async function verifyCode() {
   if (!code.value) { message.error('请输入验证码'); return; }
-  await tgApi.loginVerify(sessionKey.value, code.value, password.value);
-  message.success('登录成功'); codeVisible.value = false; load();
+  try {
+    await tgApi.loginVerify(sessionKey.value, code.value, password.value);
+    message.success('登录成功'); codeVisible.value = false; load();
+  } catch (e: any) { message.error(e.message || '登录失败，请检查验证码'); }
 }
 async function openQr() {
   qrVisible.value = true; qrLoading.value = true; qrStage.value = 'waiting';

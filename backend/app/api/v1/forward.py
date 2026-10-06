@@ -54,6 +54,23 @@ def create_rule(body: ForwardRuleIn, user: User = Depends(require_member),
     return ok(_out(r), msg="转发规则已创建，worker 将在 1 分钟内自动生效")
 
 
+@router.put("/rules/{rule_id}")
+def update_rule(rule_id: int, body: ForwardRuleIn,
+                user: User = Depends(require_member), db: Session = Depends(get_db)):
+    r = db.query(AutoForwardRule).filter(AutoForwardRule.id == rule_id).first()
+    if not r:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "规则不存在")
+    if not body.source_chat.strip() or not body.target_chat.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "源群和目标群不能为空")
+    r.name = body.name.strip()
+    r.account_id = body.account_id
+    r.source_chat = body.source_chat.strip()
+    r.target_chat = body.target_chat.strip()
+    r.enabled = body.enabled
+    db.commit()
+    return ok(_out(r), msg="转发规则已更新")
+
+
 @router.put("/rules/{rule_id}/enabled")
 def toggle_rule(rule_id: int, enabled: bool,
                 user: User = Depends(require_member), db: Session = Depends(get_db)):

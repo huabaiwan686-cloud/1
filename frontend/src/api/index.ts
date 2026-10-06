@@ -28,6 +28,7 @@ export const noteApi = {
   reject: (id: number) => request.post(`/api/note/${id}/reject`),
   batch: (ids: number[], op: string, params: any = {}) =>
     request.post('/api/note/batch', { ids, op, params }),
+  remove: (id: number) => request.post('/api/note/batch', { ids: [id], op: 'delete' }),
   dedupScan: (threshold = 5, limit = 500) =>
     request.post('/api/note/dedup-scan', { threshold, limit }),
 };
@@ -84,6 +85,7 @@ export const listenApi = {
   plans: (keyword = '') =>
     request.get('/api/listen/plans', { params: { keyword } }),
   create: (data: any) => request.post('/api/listen/plans', data),
+  update: (id: number, data: any) => request.put(`/api/listen/plans/${id}`, data),
   remove: (id: number) => request.delete(`/api/listen/plans/${id}`),
   toggle: (id: number, enabled: boolean) =>
     request.put(`/api/listen/plans/${id}/enabled`, { enabled }),
@@ -127,6 +129,8 @@ export const botApi = {
 export const socialApi = {
   twoWayBots: () => request.get('/api/social/two_way_bots'),
   createTwoWay: (data: any) => request.post('/api/social/two_way_bots', data),
+  updateTwoWay: (id: number, data: any) => request.patch(`/api/social/two_way_bots/${id}`, data),
+  removeTwoWay: (id: number) => request.delete(`/api/social/two_way_bots/${id}`),
   friends: (direction = '') =>
     request.get('/api/social/friends', { params: { direction } }),
   applyFriend: (username: string) =>
@@ -148,7 +152,7 @@ export const vipApi = {
   plans: () => request.get('/api/vip/plans'),
   subscription: () => request.get('/api/vip/subscription'),
   orders: () => request.get('/api/vip/orders'),
-  createOrder: () => request.post('/api/vip/orders'),
+  createOrder: (plan_id = 'pro') => request.post('/api/vip/orders', { plan_id }),
   payInfo: () => request.get('/api/vip/pay/info'),
   payWatch: () => request.post('/api/vip/pay/watch'),
   quota: () => request.get('/api/vip/quota'),
@@ -209,6 +213,7 @@ export const metaApi = {
 export const forwardApi = {
   rules: () => request.get('/api/forward/rules'),
   create: (data: any) => request.post('/api/forward/rules', data),
+  update: (id: number, data: any) => request.put(`/api/forward/rules/${id}`, data),
   toggle: (id: number, enabled: boolean) =>
     request.put(`/api/forward/rules/${id}/enabled`, null, { params: { enabled } }),
   remove: (id: number) => request.delete(`/api/forward/rules/${id}`),

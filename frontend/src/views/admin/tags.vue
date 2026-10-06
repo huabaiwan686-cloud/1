@@ -70,10 +70,12 @@ async function load() {
 }
 async function create() {
   if (!name.value.trim()) { message.warning('请输入标签名'); return; }
-  await metaApi.createTag(name.value.trim());
-  message.success('标签已创建');
-  name.value = '';
-  load();
+  try {
+    await metaApi.createTag(name.value.trim());
+    message.success('标签已创建');
+    name.value = '';
+    load();
+  } catch (e: any) { message.error(e.message || '创建失败'); }
 }
 async function removeTag(id: number) {
   message.info('删除功能开发中');

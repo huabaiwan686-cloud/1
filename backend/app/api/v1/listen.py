@@ -49,6 +49,18 @@ def create_plan(body: ListenPlanIn, user: User = Depends(require_member), db: Se
     return ok(_out(p), msg="监听计划已创建")
 
 
+@router.put("/plans/{plan_id}")
+def update_plan(plan_id: int, body: ListenPlanIn,
+                user: User = Depends(require_member), db: Session = Depends(get_db)):
+    p = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()
+    if not p:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "监听计划不存在")
+    for k, v in body.model_dump().items():
+        setattr(p, k, v)
+    db.commit()
+    return ok(_out(p), msg="监听计划已更新")
+
+
 @router.delete("/plans/{plan_id}")
 def delete_plan(plan_id: int, user: User = Depends(require_member), db: Session = Depends(get_db)):
     p = db.query(ListenPlan).filter(ListenPlan.id == plan_id).first()

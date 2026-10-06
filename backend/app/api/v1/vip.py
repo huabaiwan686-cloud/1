@@ -80,14 +80,19 @@ def list_orders(user: User = Depends(get_current_user), db: Session = Depends(ge
 
 
 @router.post("/orders")
-def create_order(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_order(body: dict | None = None, user: User = Depends(get_current_user),
+                 db: Session = Depends(get_db)):
     from app.services.tron_watch import pay_address, pay_configured
+    plan_id = (body or {}).get("plan_id", "pro")
+    plan = next((p for p in PLANS if p["id"] == plan_id and p["price"] > 0), None)
+    if not plan:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "无效的套餐")
     order_no = f"VIP{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
-    o = VipOrder(order_no=order_no, plan="pro", amount_usdt=PRO_PRICE_USDT, days=PRO_DAYS,
+    o = VipOrder(order_no=order_no, plan=plan["id"], amount_usdt=plan["price"], days=plan["days"],
                  user_id=user.id)
     db.add(o)
     db.commit()
-    return ok({"id": o.id, "orderNo": o.order_no, "amountUsdt": PRO_PRICE_USDT,
+    return ok({"id": o.id, "orderNo": o.order_no, "amountUsdt": float(plan["price"]),
                "status": "pending",
                "payAddress": pay_address() if pay_configured() else "",
                "payConfigured": pay_configured()},

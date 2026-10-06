@@ -85,11 +85,18 @@ async function save() {
   load();
 }
 async function toggleEnabled(record: any, enabled: boolean) {
-  record.enabled = enabled;
-  message.success(enabled ? '已启用' : '已停用');
+  try {
+    await socialApi.updateTwoWay(record.id, { enabled });
+    record.enabled = enabled;
+    message.success(enabled ? '已启用' : '已停用');
+  } catch (e: any) { message.error(e.message || '操作失败'); }
 }
 async function remove(id: number) {
-  message.info('删除功能开发中');
+  try {
+    await socialApi.removeTwoWay(id);
+    message.success('已删除');
+    load();
+  } catch (e: any) { message.error(e.message || '删除失败'); }
 }
 onMounted(load);
 </script>

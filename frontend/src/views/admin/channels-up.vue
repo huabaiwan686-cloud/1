@@ -71,7 +71,7 @@ async function load() {
   } finally { loading.value = false; }
 }
 function openEditor(r?: any) {
-  Object.assign(editing, { name: '', username: '', tg_channel_id: '', is_active: true, is_default: false, bot_id: null });
+  Object.assign(editing, { id: 0, name: '', username: '', tg_channel_id: '', is_active: true, is_default: false, bot_id: null });
   if (r) {
     editing.id = r.id;
     editing.name = r.name ?? '';
