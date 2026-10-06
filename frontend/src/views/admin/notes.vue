@@ -1,6 +1,8 @@
 <template>
-  <div class="notes-page">
-    <a-card class="toolbar-card" :bordered="false">
+  <div class="page">
+    <div class="page-title">笔记管理</div>
+    <div class="page-subtitle">创建、发布、下架你的内容笔记</div>
+    <a-card class="filter-card" :bordered="true" style="margin-top: 16px">
       <div class="toolbar">
         <a-input-search v-model:value="keyword" placeholder="搜索标题 / 正文关键词" @search="onSearch" style="width: 240px" allow-clear />
         <a-select v-model:value="status" style="width: 120px" @change="onSearch" placeholder="状态">
@@ -226,9 +228,9 @@ onMounted(() => { load(); loadChannels(); });
 </script>
 
 <style scoped>
-.notes-page { padding: 4px; }
 .toolbar-card { margin-bottom: 12px; }
-.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.filter-card { margin-bottom: 16px; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .list-card { min-height: 400px; }
 .note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .note-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px; background: #fff; transition: all 0.2s; }

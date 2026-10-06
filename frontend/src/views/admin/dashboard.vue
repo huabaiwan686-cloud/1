@@ -1,127 +1,169 @@
 <template>
   <div class="page">
+    <!-- 3 张统计卡片 -->
     <a-row :gutter="16">
-      <a-col :span="6" v-for="s in statCards" :key="s.label">
-        <a-card class="stat-card"><a-statistic :title="s.label" :value="s.value" /></a-card>
+      <a-col :span="8">
+        <a-card :bordered="true">
+          <a-statistic title="资料总数" :value="stats.notesTotal || 0" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card :bordered="true">
+          <a-statistic title="采集源" :value="stats.collectSources || 0" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card :bordered="true">
+          <a-statistic title="推送频道" :value="stats.channelsActive || 0" />
+        </a-card>
       </a-col>
     </a-row>
-    <a-card title="资料状态分布" class="mt-16">
-      <div class="tag-group">
-        <a-tag v-for="(v, k) in stats.notesByStatus" :key="k" color="blue">{{ k }}: {{ v }}</a-tag>
+
+    <!-- 系统健康 -->
+    <a-card :bordered="true" title="系统健康" style="margin-top: 16px">
+      <a-row :gutter="16">
+        <a-col :span="6">
+          <a-statistic title="在线协议号" :value="stats.tgOnline || 0" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="今日推送" :value="stats.todayPublishes || 0" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="今日成功率" :value="successRate" />
+        </a-col>
+        <a-col :span="6">
+          <a-statistic title="24h 失败" :value="stats.publishFailed24h || 0" value-style="color: #0ca678" />
+        </a-col>
+      </a-row>
+      <a-divider orientation="left" style="margin: 12px 0">近 7 天推送趋势</a-divider>
+      <div class="trend-bars">
+        <div v-for="(d, i) in trend7" :key="i" class="trend-bar-item">
+          <div class="trend-bar-value">{{ d.value }}</div>
+          <div class="trend-bar" :style="{ height: barHeight(d.value) + 'px' }"></div>
+          <div class="trend-bar-date">{{ d.date }}</div>
+        </div>
       </div>
     </a-card>
-    <a-card title="数据趋势" class="mt-16">
-      <template #extra>
-        <a-range-picker v-model:value="dateRange" @change="loadTrend" size="small" />
-      </template>
-      <a-spin :spinning="trendLoading">
-        <div class="legend">
-          <span v-for="s in trend.series" :key="s.name" class="legend-item">
-            <i :style="{ background: seriesColor(s.name) }"></i>{{ s.name }}
-          </span>
-        </div>
-        <svg :viewBox="`0 0 ${W} ${H}`" class="trend-svg">
-          <!-- 网格线 -->
-          <g v-for="i in 4" :key="i">
-            <line :x1="padL" :x2="W - padR" :y1="yFor(i / 4)" :y2="yFor(i / 4)" stroke="#f0f0f0" />
-            <text :x="padL - 8" :y="yFor(i / 4) + 4" text-anchor="end" font-size="10" fill="#999">{{ Math.round(maxV * i / 4) }}</text>
-          </g>
-          <!-- 折线 -->
-          <polyline v-for="s in trend.series" :key="s.name"
-            :points="pointsFor(s.data)" fill="none"
-            :stroke="seriesColor(s.name)" stroke-width="2" />
-          <circle v-for="(p, i) in dotPoints" :key="i" :cx="p.x" :cy="p.y" r="3" :fill="p.color">
-            <title>{{ p.label }}</title>
-          </circle>
-          <!-- X 轴日期 -->
-          <text v-for="(d, i) in xLabels" :key="i" :x="d.x" :y="H - 6" text-anchor="middle" font-size="10" fill="#999">{{ d.label }}</text>
-        </svg>
-      </a-spin>
+
+    <!-- 客服卡片 -->
+    <a-card :bordered="true" style="margin-top: 16px">
+      <div class="service-row">
+        <span class="service-icon">!</span>
+        <span class="service-text">遇到问题？联系客服获取帮助</span>
+        <a-button type="primary" @click="contactService">联系客服</a-button>
+      </div>
     </a-card>
+
+    <!-- 按省市分布 -->
+    <a-collapse style="margin-top: 16px">
+      <a-collapse-panel key="1" header="按省市分布">
+        <div class="tag-group">
+          <a-tag v-for="(v, k) in stats.notesByCity" :key="k" color="blue">{{ k }}: {{ v }}</a-tag>
+          <span v-if="!stats.notesByCity || Object.keys(stats.notesByCity).length === 0" class="empty-text">暂无数据</span>
+        </div>
+      </a-collapse-panel>
+    </a-collapse>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import dayjs, { Dayjs } from 'dayjs';
 import request from '@/utils/request';
 
-const stats = ref<any>({ notesByStatus: {} });
-const statCards = computed(() => {
-  const byStatus = stats.value.notesByStatus || {};
-  const total = stats.value.notesTotal || 0;
-  const published = byStatus.published || byStatus['已上架'] || 0;
-  const failed = stats.value.todayPublishes !== undefined ? (stats.value.publishFailed || 0) : 0;
-  const successRate = total > 0 ? Math.round((published / total) * 100) + '%' : '0%';
-  return [
-    { label: '资料总数', value: total },
-    { label: '已上架', value: published },
-    { label: '待上架', value: (byStatus.draft || byStatus['待上架'] || 0) },
-    { label: '发布失败', value: failed },
-    { label: '上架账号', value: stats.value.tgAccounts || 0 },
-    { label: '在线协议号', value: stats.value.tgAccounts || 0 },
-    { label: '可用频道', value: stats.value.channelsActive || 0 },
-    { label: '发布成功率', value: successRate },
-  ];
+const stats = ref<any>({ notesByCity: {} });
+const trend7 = ref<{ date: string; value: number }[]>([]);
+
+const successRate = computed(() => {
+  const total = stats.value.todayPublishes || 0;
+  const failed = stats.value.publishFailed24h || 0;
+  if (total <= 0) return '0%';
+  return Math.round(((total - failed) / total) * 100) + '%';
 });
 
-// 趋势图
-const W = 800, H = 260, padL = 44, padR = 16, padT = 12, padB = 28;
-const trend = ref<{ dates: string[]; series: { name: string; data: number[] }[] }>({ dates: [], series: [] });
-const trendLoading = ref(false);
-const dateRange = ref<[Dayjs, Dayjs]>([dayjs().subtract(13, 'day'), dayjs()]);
-
-const maxV = computed(() => {
+const maxTrend = computed(() => {
   let m = 0;
-  for (const s of trend.value.series) for (const v of s.data) m = Math.max(m, v);
+  for (const d of trend7.value) m = Math.max(m, d.value);
   return m || 1;
 });
-function yFor(ratio: number) { return padT + (H - padT - padB) * (1 - ratio); }
-function xFor(i: number, n: number) { return n <= 1 ? padL : padL + (W - padL - padR) * (i / (n - 1)); }
-function pointsFor(data: number[]) {
-  const n = data.length;
-  return data.map((v, i) => `${xFor(i, n)},${yFor(v / maxV.value)}`).join(' ');
+function barHeight(v: number) {
+  return Math.max(4, Math.round((v / maxTrend.value) * 90));
 }
-const COLORS: Record<string, string> = { '新增资料': '#1890ff', '发布成功': '#52c41a', '下架资料': '#faad14', '发布失败': '#f5222d' };
-function seriesColor(name: string) { return COLORS[name] || '#888'; }
-const dotPoints = computed(() => {
-  const pts: any[] = [];
-  const n = trend.value.dates.length;
-  trend.value.series.forEach(s => {
-    s.data.forEach((v, i) => {
-      pts.push({ x: xFor(i, n), y: yFor(v / maxV.value), color: seriesColor(s.name), label: `${trend.value.dates[i]} ${s.name}: ${v}` });
-    });
-  });
-  return pts;
-});
-const xLabels = computed(() => {
-  const n = trend.value.dates.length;
-  const step = Math.max(1, Math.floor(n / 8));
-  return trend.value.dates.map((d, i) => ({ x: xFor(i, n), label: i % step === 0 ? d.slice(5) : '' })).filter(d => d.label);
-});
 
-async function loadTrend() {
-  trendLoading.value = true;
-  try {
-    const [s, e] = dateRange.value;
-    const data: any = await request.get('/api/dashboard/trend', {
-      params: { startDate: s.format('YYYY-MM-DD'), endDate: e.format('YYYY-MM-DD') },
-    });
-    trend.value = data.data || data;
-  } finally { trendLoading.value = false; }
+function contactService() {
+  window.open('https://t.me/lingjuli', '_blank');
 }
 
 onMounted(async () => {
-  stats.value = await request.get('/api/dashboard/stats');
-  loadTrend();
+  try {
+    const r: any = await request.get('/api/dashboard/stats');
+    stats.value = r.data || r;
+  } catch { /* ignore */ }
+  try {
+    const r: any = await request.get('/api/dashboard/trend', {
+      params: { days: 7 },
+    });
+    const data = r.data || r;
+    // 兼容：取发布成功系列或第一条系列
+    const dates: string[] = data.dates || [];
+    let series: number[] = [];
+    const ss: any[] = data.series || [];
+    const ok = ss.find((s: any) => s.name === '发布成功') || ss[0];
+    if (ok) series = ok.data || [];
+    trend7.value = dates.slice(-7).map((d: string, i: number) => ({
+      date: (d || '').slice(5),
+      value: series[series.length - 7 + i] || 0,
+    }));
+  } catch { /* ignore */ }
 });
 </script>
 
 <style scoped>
-.mt-16 { margin-top: 16px; }
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 90px;
+}
+.trend-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.trend-bar-value {
+  font-size: 11px;
+  color: #5a6276;
+}
+.trend-bar {
+  width: 22px;
+  background: #2f55e0;
+  border-radius: 4px 4px 0 0;
+  margin-top: 2px;
+}
+.trend-bar-date {
+  font-size: 10px;
+  color: #9aa1ad;
+  margin-top: 4px;
+}
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.service-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #1677ff;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+}
+.service-text { flex: 1; font-size: 14px; }
 .tag-group { display: flex; flex-wrap: wrap; gap: 8px; }
-.legend { display: flex; gap: 16px; margin-bottom: 8px; }
-.legend-item { font-size: 12px; color: #666; }
-.legend-item i { display: inline-block; width: 12px; height: 3px; margin-right: 4px; vertical-align: middle; }
-.trend-svg { width: 100%; height: auto; }
+.empty-text { color: #8a91a5; font-size: 14px; }
 </style>

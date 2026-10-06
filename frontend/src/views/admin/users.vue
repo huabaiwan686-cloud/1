@@ -1,6 +1,8 @@
 <template>
   <div class="page">
-    <a-card title="超级管理员 · 用户管控" class="page-card">
+    <div class="page-title">用户管理</div>
+    <div class="page-subtitle">管理所有会员与用户账号</div>
+    <a-card title="超级管理员 · 用户管控" class="page-card" style="margin-top: 16px">
       <div class="desc-text">可管理所有会员/用户账号：新增、删除、开关管理员权限、禁用/启用、重置密码</div>
     </a-card>
     <a-card title="邀请码" class="page-card">

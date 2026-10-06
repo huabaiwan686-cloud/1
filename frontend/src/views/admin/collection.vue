@@ -1,6 +1,8 @@
 <template>
   <div class="page">
-    <a-button type="primary" @click="openEditor()" class="mb-16">新建采集规则</a-button>
+    <div class="page-title">采集源管理</div>
+    <div class="page-subtitle">配置 Telegram 采集源规则</div>
+    <div style="margin: 16px 0"><a-button type="primary" @click="openEditor()">新建采集规则</a-button></div>
     <a-table :columns="columns" :data-source="rules" row-key="id" :loading="loading">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">

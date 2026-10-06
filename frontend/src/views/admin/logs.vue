@@ -1,13 +1,17 @@
 <template>
-  <div>
-    <a-space style="margin-bottom: 16px">
-      <a-input-search v-model:value="keyword" placeholder="搜索详情" @search="load" style="width: 240px" />
-      <a-select v-model:value="result" style="width: 130px" @change="load" allow-clear placeholder="结果">
+  <div class="page">
+    <div class="page-title">发送记录</div>
+    <div class="page-subtitle">查看所有推送发送记录</div>
+    <a-card class="filter-card" :bordered="true" style="margin-top: 16px">
+      <div class="filter-bar">
+      <a-input-search v-model:value="keyword" placeholder="搜索详情" @search="load" style="width: 200px" />
+      <a-select v-model:value="result" style="width: 120px" @change="load" allow-clear placeholder="结果">
         <a-select-option value="success">成功</a-select-option>
         <a-select-option value="failed">失败</a-select-option>
         <a-select-option value="processing">处理中</a-select-option>
       </a-select>
-    </a-space>
+      </div>
+    </a-card>
     <a-table :columns="columns" :data-source="list" row-key="id" :loading="loading"
       :pagination="{ total, current: page, pageSize, onChange: (p: number) => { page = p; load(); } }">
       <template #bodyCell="{ column, record }">

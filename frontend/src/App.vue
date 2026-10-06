@@ -11,11 +11,7 @@
       :trigger="null"
     >
       <div class="pro-logo" :class="{ collapsed }">
-        <span class="pro-logo-badge">灰</span>
-        <span v-if="!collapsed" style="margin-left: 12px">
-          <span class="pro-logo-title">小灰机</span>
-          <span class="pro-logo-sub">商家后台</span>
-        </span>
+        <span v-if="!collapsed" class="pro-logo-title">小灰机管理平台</span>
       </div>
       <a-menu
         v-model:selectedKeys="selected"
@@ -23,11 +19,10 @@
         theme="light"
         @click="onMenu"
       >
-        <template v-for="m in menus" :key="m.path">
-          <a-sub-menu v-if="m.children" :key="m.path" :title="m.title">
-            <a-menu-item v-for="c in m.children" :key="c.path">{{ c.title }}</a-menu-item>
-          </a-sub-menu>
-          <a-menu-item v-else :key="m.path">{{ m.title }}</a-menu-item>
+        <template v-for="g in menus" :key="g.title">
+          <a-menu-item-group :title="g.title">
+            <a-menu-item v-for="c in g.children" :key="c.path">{{ c.title }}</a-menu-item>
+          </a-menu-item-group>
         </template>
       </a-menu>
     </a-layout-sider>
@@ -37,16 +32,15 @@
           <menu-outlined v-if="collapsed" />
           <menu-fold-outlined v-else />
         </span>
-        <span class="pro-app-title">小灰机 · 商家后台</span>
+        <span class="pro-app-title">小灰机管理平台</span>
         <div class="pro-header-right">
           <span class="vip-badge" @click="router.push('/admin/vip')">VIP</span>
           <span class="pro-username">
-            <span class="pro-avatar">{{ username ? username.slice(0, 1).toUpperCase() : 'U' }}</span>
-            <span class="uname">{{ username }}</span>
+            <span class="uname">{{ username || '主账号' }}</span>
           </span>
           <span class="pro-version">v1.0.0</span>
           <span class="pro-doc-link" @click="router.push('/admin/announcements')">使用说明</span>
-          <a-button size="small" @click="logout">退出</a-button>
+          <span class="pro-doc-link" @click="logout">退出</span>
         </div>
       </a-layout-header>
       <a-layout-content class="pro-content">
@@ -118,6 +112,54 @@ const tabItems = [
   { path: '/admin/announcements', title: '消息', icon: BellOutlined },
   { path: '/admin/vip', title: '我的', icon: UserOutlined },
 ];
+// meiren.pro 1:1 菜单（24 项，3 分组）
+// 路由复用现有页面，不存在的指向占位页
+const MEIREN_MENUS = [
+  {
+    title: '运营管理',
+    children: [
+      { path: '/admin/dashboard', title: '工作台' },
+      { path: '/admin/users', title: '用户管理' },
+      { path: '/admin/customer', title: '客户管理' },
+      { path: '/admin/message-push', title: '群发管理' },
+      { path: '/admin/logs', title: '发送记录' },
+      { path: '/admin/dedup', title: '去重记录' },
+    ],
+  },
+  {
+    title: '配置管理',
+    children: [
+      { path: '/admin/city', title: '城市管理' },
+      { path: '/collector/content', title: '资料库' },
+      { path: '/admin/phrases', title: '话术库' },
+      { path: '/admin/accounts/protocol', title: '协议号管理' },
+      { path: '/admin/collection', title: '采集源管理' },
+      { path: '/admin/sensitive', title: '敏感词管理' },
+      { path: '/admin/message-push', title: '消息推送配置' },
+      { path: '/admin/global/loop', title: '定时任务管理' },
+      { path: '/admin/accounts/protocol', title: 'TG 账号管理' },
+      { path: '/admin/tg-groups', title: 'TG 群组管理' },
+      { path: '/admin/announcements', title: '公告管理' },
+    ],
+  },
+  {
+    title: '内容管理',
+    children: [
+      { path: '/admin/ads', title: '广告管理' },
+      { path: '/admin/accounts/two-way-bots', title: '自动回复管理' },
+      { path: '/admin/collection/review', title: '采集审核' },
+      { path: '/admin/group-listen', title: '关键词管理' },
+      { path: '/admin/blacklist', title: '黑名单管理' },
+      { path: '/admin/global/confuse', title: '系统配置' },
+      { path: '/admin/logs', title: '操作日志' },
+    ],
+  },
+];
+// 会员不可见
+const MEMBER_HIDDEN = ['/admin/users'];
+// 普通用户仅可见
+const USER_ONLY = ['/admin/notes'];
+
 const menus = ref<any[]>([]);
 const selected = ref<string[]>([]);
 const username = ref('');
@@ -181,9 +223,19 @@ async function loadUserState() {
   if (isLoginPage.value) return;
   if (!localStorage.getItem('access_token')) return;
   try {
-    menus.value = await authApi.menu();
     const me: any = await authApi.current();
     username.value = me.username;
+    // 按权限过滤 meiren 菜单（前端静态，不再依赖后端 /menu/all）
+    if (me.isAdmin) {
+      menus.value = MEIREN_MENUS;
+    } else if (me.isMember) {
+      menus.value = MEIREN_MENUS.map(g => ({
+        ...g,
+        children: g.children.filter((c: any) => !MEMBER_HIDDEN.includes(c.path)),
+      })).filter(g => g.children.length > 0);
+    } else {
+      menus.value = [{ title: '运营管理', children: [{ path: '/admin/notes', title: '上下架' }] }];
+    }
     loadAnnouncements();
   } catch { /* 401 由 request 拦截器跳登录 */ }
 }

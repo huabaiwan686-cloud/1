@@ -82,9 +82,9 @@ async def upload_material(
         chunks.append(chunk)
     data = b"".join(chunks)
     suffix = os.path.splitext(file.filename or "")[1].lower() or ".jpg"
-    # 背景素材仅允许图片格式（抠图背景替换用）
-    if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材仅支持 JPG/PNG/WebP 图片格式")
+    # 素材上传：图片（背景/展示图）+ MP4（验证视频）
+    if suffix not in (".jpg", ".jpeg", ".png", ".webp", ".mp4"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "仅支持 JPG/PNG/WebP/MP4 格式")
     _, web_path = _store(data, suffix=suffix)
     m = BackgroundMaterial(name=name, url=web_path, category=category)
     db.add(m)

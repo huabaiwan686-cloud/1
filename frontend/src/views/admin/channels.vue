@@ -1,6 +1,8 @@
 <template>
   <div class="page">
-    <a-card title="全局抠图模式" class="page-card">
+    <div class="page-title">频道配置</div>
+    <div class="page-subtitle">管理推送频道与全局抠图模式</div>
+    <a-card title="全局抠图模式" class="page-card" style="margin-top: 16px">
       <a-space>
         <a-switch v-model:checked="gm.enabled" @change="saveGm" />
         <span class="desc-text">开启后，所有发往频道的资料按所选背景自动抠图后发送；服务器只保留原图，处理图不留存，每次循环重新处理</span>

@@ -36,6 +36,15 @@ export const routes: RouteRecordRaw[] = [
   // 旧路由兼容重定向
   { path: '/admin/backgrounds', redirect: '/admin/global/bg-replace' },
   { path: '/admin/publish-config', redirect: '/admin/global/loop' },
+  // meiren.pro 1:1 菜单占位页（功能逐步复刻中）
+  { path: '/admin/customer', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '客户管理' } },
+  { path: '/admin/dedup', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '去重记录' } },
+  { path: '/admin/city', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '城市管理' } },
+  { path: '/admin/phrases', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '话术库' } },
+  { path: '/admin/sensitive', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '敏感词管理' } },
+  { path: '/admin/tg-groups', component: () => import('@/views/admin/placeholder.vue'), meta: { title: 'TG 群组管理' } },
+  { path: '/admin/ads', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '广告管理' } },
+  { path: '/admin/blacklist', component: () => import('@/views/admin/placeholder.vue'), meta: { title: '黑名单管理' } },
 ];
 
 const router = createRouter({ history: createWebHistory(), routes });
