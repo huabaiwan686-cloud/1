@@ -1,0 +1,81 @@
+"""分发数据模型：频道 / 消息模板 / 推送计划 / 快速推送 / 关键字监听。"""
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+
+
+class Channel(Base):
+    """频道配置：上架/下架分组，绑定推送 Bot。"""
+
+    __tablename__ = "channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128))
+    username: Mapped[str] = mapped_column(String(128), default="")  # @username
+    tg_channel_id: Mapped[str] = mapped_column(String(64), default="")
+    bot_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 推送 Bot
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # 上架/下架
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)  # 默认选中
+    cycle_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 循环 N 天
+    anti_scan_mode: Mapped[str] = mapped_column(String(16), default="original")
+    # original=原图 / replace_bg=替换背景 / light_perturb=轻量随机扰动
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class MessageTemplate(Base):
+    """消息模板：群聊推送文案。"""
+
+    __tablename__ = "message_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True)  # 模板代码
+    name: Mapped[str] = mapped_column(String(128), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    media: Mapped[list] = mapped_column(JSON, default=list)  # [{url, type}]
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PushPlan(Base):
+    """推送计划：按天/时间点自动推送。"""
+
+    __tablename__ = "push_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 推送账号
+    template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("message_templates.id"), nullable=True)
+    target_groups: Mapped[list] = mapped_column(JSON, default=list)  # 目标群组
+    interval_days: Mapped[int] = mapped_column(Integer, default=1)  # 执行间隔 X 天
+    times: Mapped[list] = mapped_column(JSON, default=list)  # 执行时间点 ["09:00"]
+    multi_interval_seconds: Mapped[int] = mapped_column(Integer, default=0)  # 多次间隔 X 秒
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class QuickPushTarget(Base):
+    """快速推送目标：Bot 内一键群推。"""
+
+    __tablename__ = "quick_push_targets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128))
+    target: Mapped[str] = mapped_column(String(255), default="")  # 群组标识
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ListenPlan(Base):
+    """关键字监听计划。"""
+
+    __tablename__ = "listen_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128))
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 监听账号
+    targets: Mapped[list] = mapped_column(JSON, default=list)  # 监听群聊/频道
+    keywords: Mapped[list] = mapped_column(JSON, default=list)  # 关键词
+    bind_id: Mapped[str] = mapped_column(String(16), default="")  # 8 位绑定 ID
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -7,4 +7,11 @@ from app.models.content import (  # noqa: F401
     Tag,
     TaskLog,
 )
+from app.models.distribution import (  # noqa: F401
+    Channel,
+    ListenPlan,
+    MessageTemplate,
+    PushPlan,
+    QuickPushTarget,
+)
 from app.models.user import User  # noqa: F401
