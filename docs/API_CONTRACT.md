@@ -70,23 +70,24 @@ Base URL（开发期）：`http://localhost:8000/api`
 
 奖励规则（页面观测）：绑定 TG 送 1 天；邀请好友绑定 TG 送 3 天；好友首次付费开月卡送 30 天。
 
-## 6. 业务模块（待实现，路径已确认）
+## 6. 业务模块（已实现；复刻版使用直观路径，无需逻辑→真实路径改写）
 
-| 逻辑前缀 | 真实前缀 | 模块 |
+| 路径前缀 | 模块 | 主要接口 |
 |---|---|---|
-| `/api/account/` | `/api/youban_publish/publish/account/` | 账号资料 |
-| `/api/channel/` | `/api/youban_publish/publish/channel/` | 频道配置 |
-| `/api/profile/` | `/api/youban_publish/publish/profile/` | 资料 |
-| `/api/media/` | `/api/youban_publish/publish/media/` | 媒体/图片处理 |
-| `/api/task/` | `/api/youban_publish/publish/task/` | 任务记录 |
-| `/api/record/` | `/api/youban_publish/publish/record/` | 记录 |
-| `/api/note/` | `/api/youban_publish/publish/note/` | 笔记（资料库） |
-| `/api/follow/` | `/api/youban_publish/publish/follow/` | 好友关注 |
-| `/api/tag/` | `/api/youban_publish/publish/tag/` | 标签 |
-| `/api/city/` | `/api/youban_publish/publish/city/` | 城市 |
-| `/api/collect/` | `/api/youban_publish/publish/collect/` | 代理采集 |
-| `/api/dashboard/` | `/api/youban_publish/publish/dashboard/` | 工作台 |
-| `/api/telegram/` | `/api/youban_publish/telegram/` | Telegram 集成 |
+| `/api/note/` | 笔记（资料库） | list/get/create/{id}/publish/batch（10 项批量操作） |
+| `/api/collect/` | 代理采集 | rules CRUD、channels CRUD |
+| `/api/tag/`, `/api/city/` | 标签/城市 | list/create、tree |
+| `/api/task/` | 任务记录 | logs（筛选/分页）、logs/clear |
+| `/api/channel/` | 频道配置 | list/create/update/delete、check、push_all、clear_queue |
+| `/api/message/` | 群聊推送 | templates CRUD+push、plans CRUD、quick_targets |
+| `/api/listen/` | 关键字监听 | plans CRUD（8 位绑定 ID） |
+| `/api/tg/` | TG 协议号 | accounts、登录流程见 §4 |
+| `/api/bot/` | Bot Token | tokens CRUD+verify、绑定流程见 §4 |
+| `/api/social/` | 双向机器人/好友/平台 | two_way_bots、friends、bindings、cooperations、cooperation_config |
+| `/api/vip/` | VIP | plans、subscription、orders、quota |
+| `/api/invite/` | 邀请 | info/list/generate/reward（另挂 `/api/publish/invite/*` 兼容原站） |
+| `/api/media/` | 图片处理 | materials CRUD、process、jobs |
+| `/api/dashboard/` | 工作台 | stats（真实聚合） |
 
 ## 7. 图片处理额度（VIP）
 
