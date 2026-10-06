@@ -21,6 +21,7 @@ class TgAccount(Base):
     status: Mapped[str] = mapped_column(String(16), default="offline")  # online/offline/expired
     user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # 所属人（空=公共）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 最后检测时间
 
 
 class BotToken(Base):

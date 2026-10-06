@@ -53,6 +53,7 @@ def _out(a: TgAccount, db: Session | None = None, mask_phone: bool = False) -> d
         "tgUserId": a.tg_user_id, "phone": phone, "status": a.status,
         "userId": a.user_id, "owner": owner,
         "createdAt": a.created_at.isoformat() if a.created_at else None,
+        "lastcheck": a.last_checked.isoformat() if a.last_checked else None,
     }
 
 
@@ -114,6 +115,7 @@ async def refresh_status(account_id: int, user: User = Depends(require_member), 
         raise HTTPException(status.HTTP_404_NOT_FOUND, "账号不存在")
     if tg_configured() and a.phone:
         a.status = await tg_refresh_status(f"acct_{a.id}", a.phone)
+        a.last_checked = datetime.utcnow()
         db.commit()
     return ok(_out(a))
 

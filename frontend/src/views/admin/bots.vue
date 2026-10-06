@@ -84,7 +84,12 @@ async function save() {
   catch (e: any) { message.error(e.message); } finally { saving.value = false; }
 }
 async function verify(id: number) {
-  const r: any = await botApi.verify(id); message.info(r.msg);
+  try {
+    const r: any = await botApi.verify(id);
+    message.success(r.msg || '验证成功');
+  } catch (e: any) {
+    message.error(e.message || '验证失败');
+  }
 }
 async function toggleEnabled(record: any, enabled: boolean) {
   try {
