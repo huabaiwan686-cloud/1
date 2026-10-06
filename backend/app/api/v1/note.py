@@ -199,7 +199,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
         for m in show:
             try:
                 fname, data = _media_bytes(m["url"])
-                data = matt_for_publish(data, gm["bg_data"], db, user)
+                data = matt_for_publish(data, gm["bg_data"], db, user, gm.get("mode", "replace_bg"))
                 processed.append({"data": data, "name": fname})
             except Exception:  # noqa: BLE001  单张失败用原图，不中断整组
                 processed.append(m)

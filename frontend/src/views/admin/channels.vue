@@ -103,7 +103,6 @@
             <a-select-option value="original">原图</a-select-option>
             <a-select-option value="replace_bg">替换背景</a-select-option>
             <a-select-option value="blur_bg">背景虚化（人像模式）</a-select-option>
-            <a-select-option value="light_perturb">轻量随机扰动</a-select-option>
           </a-select>
         </a-form-item>
         <a-space>

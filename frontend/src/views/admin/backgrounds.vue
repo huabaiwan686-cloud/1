@@ -29,7 +29,15 @@
         <a-form-item label="启用全局抠图">
           <a-switch v-model:checked="matting.enabled" />
         </a-form-item>
-        <a-form-item label="默认背景">
+        <a-form-item label="抠图模式">
+          <a-select v-model:value="matting.mode" style="width: 180px">
+            <a-select-option value="replace_bg">替换背景</a-select-option>
+            <a-select-option value="blur_bg">背景虚化（人像模式）</a-select-option>
+            <a-select-option value="light_perturb">混淆（轻量随机扰动）</a-select-option>
+            <a-select-option value="original">原图（不处理）</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="默认背景" v-if="matting.mode === 'replace_bg'">
           <a-select v-model:value="matting.backgroundId" style="width: 200px" placeholder="选择背景" allow-clear>
             <a-select-option v-for="m in list" :key="m.id" :value="m.id">{{ m.name }}</a-select-option>
           </a-select>
@@ -38,7 +46,7 @@
           <a-button type="primary" @click="saveMatting">保存</a-button>
         </a-form-item>
       </a-form>
-      <div class="hint">开启后，所有发往频道的图片将自动抠图并替换为所选背景（表格图除外）</div>
+      <div class="hint">开启后，所有发往频道的图片将按所选模式自动处理（表格图走轻量扰动除外）</div>
     </a-card>
   </div>
 </template>
@@ -50,7 +58,7 @@ import { mediaApi } from '@/api';
 
 const list = ref<any[]>([]);
 const loading = ref(false);
-const matting = ref({ enabled: false, backgroundId: null as number | null });
+const matting = ref({ enabled: false, mode: 'replace_bg', backgroundId: null as number | null });
 
 async function load() {
   loading.value = true;
@@ -65,7 +73,7 @@ async function loadMatting() {
   try {
     const data: any = await mediaApi.mattingGlobal();
     const d = data.data || data;
-    matting.value = { enabled: !!d.enabled, backgroundId: d.backgroundId || null };
+    matting.value = { enabled: !!d.enabled, mode: d.mode || 'replace_bg', backgroundId: d.backgroundId || null };
   } catch { /* ignore */ }
 }
 
@@ -97,6 +105,7 @@ async function saveMatting() {
   try {
     await mediaApi.setMattingGlobal({
       enabled: matting.value.enabled,
+      mode: matting.value.mode,
       background_id: matting.value.backgroundId,
     });
     message.success('已保存');

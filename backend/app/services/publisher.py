@@ -264,9 +264,12 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     return result
 
 
-def matt_for_publish(data: bytes, bg_data: bytes, db, user=None) -> bytes:
+def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "replace_bg") -> bytes:
     """全局抠图（发布时用）：内存中处理，**不落盘**；服务器只保留原图。
 
+    mode: replace_bg | blur_bg | light_perturb | original
+    - original：直接返回原图
+    - light_perturb：轻量扰动，不扣额度
     - 表格/自评表：走轻量扰动，不扣额度（与手动处理一致）
     - 抠图服务未配置：返回原图，不中断上架
     - 额度：同一原图首次成功扣 1 次，重复图不重复扣（与手动处理共用去重规则）；
@@ -278,9 +281,13 @@ def matt_for_publish(data: bytes, bg_data: bytes, db, user=None) -> bytes:
     from PIL import Image as PILImage
 
     from app.models.media import ImageJob
-    from app.services.image_pipeline import light_perturb, replace_background
+    from app.services.image_pipeline import blur_background, light_perturb, replace_background
     from app.services.matting import is_table_image
 
+    if mode == "original":
+        return data
+    if mode == "light_perturb":
+        return light_perturb(data)
     src_hash = hashlib.sha256(data).hexdigest()
     try:
         probe = PILImage.open(io.BytesIO(data)).convert("RGB")
@@ -300,13 +307,16 @@ def matt_for_publish(data: bytes, bg_data: bytes, db, user=None) -> bytes:
 
         if not quota_available(db, 1, user):
             # 额度不足 → 降级轻量扰动，不扣费、不中断上架
-            db.add(ImageJob(mode="replace_bg", status="success", source="publish",
+            db.add(ImageJob(mode=mode, status="success", source="publish",
                             result_url="", quota_consumed=False, fallback=True,
                             detail=f"quota_exhausted:{src_hash}"))
             db.flush()
             return light_perturb(data)
     try:
-        out = replace_background(data, bg_data)
+        if mode == "blur_bg":
+            out = blur_background(data, {})
+        else:
+            out = replace_background(data, bg_data)
     except NotImplementedError:
         return data
     quota_consumed = False
@@ -314,7 +324,7 @@ def matt_for_publish(data: bytes, bg_data: bytes, db, user=None) -> bytes:
         from app.api.v1.vip import consume_quota
         ok_q, _ = consume_quota(db, 1, user)
         quota_consumed = ok_q
-    db.add(ImageJob(mode="replace_bg", status="success", source="publish",
+    db.add(ImageJob(mode=mode, status="success", source="publish",
                     result_url="", quota_consumed=quota_consumed,
                     detail=f"publish_matting:{src_hash}"))
     db.flush()
