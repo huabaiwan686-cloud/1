@@ -139,19 +139,6 @@ def _apply_perturbation(img: Image.Image, opts: dict | None = None) -> Image.Ima
     return img
 
 
-def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
-    """轻量随机扰动：改变图片像素特征，降低原图匹配概率。
-
-    注意：不再作为独立 API 模式，仅保留函数供内部混淆层调用。
-    独立模式已移除，扰动已内置到 replace_bg/blur_bg 流程中。
-    """
-    o = opts or {}
-    img = _open(data)
-    # 转为内置扰动层处理
-    img = _apply_perturbation(img, {**o, "perturb": True, "perturb_noise": o.get("noise", True)})
-    return _encode(img, quality=int(o.get("quality", random.randint(88, 92))))
-
-
 def _apply_random_margin(
     mask: Image.Image,
     img_size: tuple[int, int],

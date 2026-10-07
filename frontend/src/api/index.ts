@@ -24,6 +24,7 @@ export const noteApi = {
   get: (id: number) => request.get(`/api/note/${id}`),
   create: (data: any) => request.post('/api/note/create', data),
   publish: (id: number) => request.post(`/api/note/${id}/publish`),
+  unpublish: (id: number) => request.post(`/api/note/${id}/unpublish`),
   approve: (id: number) => request.post(`/api/note/${id}/approve`),
   reject: (id: number) => request.post(`/api/note/${id}/reject`),
   batch: (ids: number[], op: string, params: any = {}) =>

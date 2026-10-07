@@ -199,5 +199,5 @@ def consume_quota(db: Session, n: int = 1, user=None) -> tuple[bool, str]:
         q.extra_used += n
         db.flush()
         return True, "quota"
-    # 额度用完 → 自动切换轻量随机扰动（不扣费）
-    return False, "light_perturb"
+    # 额度用完 → 返回原图（不扣费）
+    return False, "original"

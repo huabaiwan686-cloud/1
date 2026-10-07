@@ -32,6 +32,7 @@
           <template v-if="column.key === 'action'">
             <a-space>
               <a @click="viewDetail(record)">查看</a>
+              <a v-if="record.status === 'published'" @click="unpublishNote(record.id)">下架</a>
               <a-popconfirm title="确认删除？" @confirm="removeNote(record.id)"><a>删除</a></a-popconfirm>
             </a-space>
           </template>
@@ -109,6 +110,13 @@ async function removeNote(id: number) {
     message.success('已删除');
     load();
   } catch (e: any) { message.error(e.message || '删除失败'); }
+}
+async function unpublishNote(id: number) {
+  try {
+    await noteApi.unpublish(id);
+    message.success('已下架');
+    load();
+  } catch (e: any) { message.error(e.message || '下架失败'); }
 }
 onMounted(load);
 </script>

@@ -46,8 +46,44 @@ def list_channels(is_active: bool | None = None, user: User = Depends(require_me
 def create_channel(body: ChannelIn, user: User = Depends(require_member), db: Session = Depends(get_db)):
     c = Channel(**body.model_dump())
     db.add(c)
+    db.flush()
+    # 绑定时强制验证 Bot 权限
+    if c.bot_id and (c.tg_channel_id or c.username):
+        ok_verify, msg = _verify_bot_channel(db, c)
+        if not ok_verify:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"频道绑定验证失败：{msg}")
     db.commit()
-    return ok(_out(c), msg="频道已添加")
+    return ok(_out(c), msg="频道已添加（Bot 权限验证通过）")
+
+
+def _verify_bot_channel(db, c) -> tuple[bool, str]:
+    """验证 Bot 能否访问频道。返回 (是否通过, 消息)。"""
+    import httpx
+    from app.api.v1.bots import _dec
+    from app.models.account import BotToken
+    chat = c.tg_channel_id or c.username
+    if not chat:
+        return False, "未配置频道地址"
+    bot = db.query(BotToken).filter(BotToken.id == c.bot_id).first()
+    if not bot:
+        return False, "绑定的 Bot 不存在"
+    token = _dec(bot.token_enc)
+    try:
+        r = httpx.get(f"https://api.telegram.org/bot{token}/getChat",
+                      params={"chat_id": chat}, timeout=15).json()
+        if not r.get("ok"):
+            return False, f"频道不可达：{r.get('description', '')}"
+        me = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15).json()
+        bot_id = (me.get("result") or {}).get("id")
+        m = httpx.get(f"https://api.telegram.org/bot{token}/getChatMember",
+                      params={"chat_id": chat, "user_id": bot_id}, timeout=15).json()
+        status = ((m.get("result") or {}).get("status")) if m.get("ok") else ""
+        if status in ("administrator", "creator"):
+            return True, "验证通过"
+        return False, f"Bot 在频道中身份为[{status or '未知'}]，请设为管理员"
+    except Exception as e:
+        return False, f"验证异常：{e}"
 
 
 @router.put("/{channel_id}")
@@ -57,8 +93,15 @@ def update_channel(channel_id: int, body: ChannelIn, user: User = Depends(requir
         raise HTTPException(status.HTTP_404_NOT_FOUND, "频道不存在")
     for k, v in body.model_dump().items():
         setattr(c, k, v)
+    db.flush()
+    # 更新绑定时同样强制验证
+    if c.bot_id and (c.tg_channel_id or c.username):
+        ok_verify, msg = _verify_bot_channel(db, c)
+        if not ok_verify:
+            db.rollback()
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"频道绑定验证失败：{msg}")
     db.commit()
-    return ok(_out(c), msg="频道已更新")
+    return ok(_out(c), msg="频道已更新（Bot 权限验证通过）")
 
 
 @router.delete("/{channel_id}")

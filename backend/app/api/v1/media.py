@@ -281,7 +281,7 @@ def thumb(
 class MattingGlobalIn(BaseModel):
     enabled: bool
     background_id: int | None = None
-    mode: str = "replace_bg"  # replace_bg | blur_bg | light_perturb | original
+    mode: str = "replace_bg"  # replace_bg | blur_bg | original
 
 
 def _get_setting(db: Session, key: str, default: str = "") -> str:
@@ -302,7 +302,7 @@ def get_matting_global(db: Session) -> dict | None:
     if _get_setting(db, "matting_global_enabled") != "1":
         return None
     mode = _get_setting(db, "matting_global_mode", "replace_bg")
-    if mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+    if mode not in ("replace_bg", "blur_bg", "original"):
         mode = "replace_bg"
     bg_id, bg_data = None, None
     if mode == "replace_bg":
@@ -346,7 +346,7 @@ def get_matting_global_ep(user: User = Depends(require_member), db: Session = De
 @router.post("/matting-global")
 def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(require_member),
                           db: Session = Depends(get_db)):
-    if body.mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+    if body.mode not in ("replace_bg", "blur_bg", "original"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "不支持的抠图模式")
     if body.enabled and body.mode == "replace_bg":
         if not body.background_id:

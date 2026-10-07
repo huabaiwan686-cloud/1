@@ -70,7 +70,6 @@ def _apply_anti_scan(data: bytes, mode: str, db=None) -> bytes:
     若全局防扫图配置启用且 forceBeforeSendEnabled，则叠加全局配置处理。
     """
     out = data
-    # light_perturb 已移除，不再作为独立模式
     # 全局防扫图配置
     if db is not None:
         try:
@@ -279,13 +278,12 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
 def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "replace_bg") -> bytes:
     """全局抠图（发布时用）：内存中处理，**不落盘**；服务器只保留原图。
 
-    mode: replace_bg | blur_bg | light_perturb | original
+    mode: replace_bg | blur_bg | original
     - original：直接返回原图
-    - light_perturb：轻量扰动，不扣额度
-    - 表格/自评表：走轻量扰动，不扣额度（与手动处理一致）
+    - 表格/自评表：返回原图，不扣额度（与手动处理一致）
     - 抠图服务未配置：返回原图，不中断上架
     - 额度：同一原图首次成功扣 1 次，重复图不重复扣（与手动处理共用去重规则）；
-      额度不足时按产品规则降级为轻量扰动（不推理、不扣费），不中断上架
+      额度不足时返回原图（不推理、不扣费），不中断上架
     - 写 ImageJob 审计行（result_url 为空，表示处理图未留存）
     """
     import hashlib
@@ -293,18 +291,16 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
     from PIL import Image as PILImage
 
     from app.models.media import ImageJob
-    from app.services.image_pipeline import blur_background, light_perturb, replace_background
+    from app.services.image_pipeline import blur_background, replace_background
     from app.services.matting import is_table_image
 
     if mode == "original":
         return data
-    if mode == "light_perturb":
-        return light_perturb(data)
     src_hash = hashlib.sha256(data).hexdigest()
     try:
         probe = PILImage.open(io.BytesIO(data)).convert("RGB")
         if is_table_image(probe):
-            return light_perturb(data)
+            return data
     except Exception:  # noqa: BLE001
         pass
     # 去重扣额度（与 /api/media/process 共用规则）

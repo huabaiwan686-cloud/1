@@ -154,6 +154,23 @@ def create_note(body: NoteIn, user: User = Depends(require_member), db: Session 
     return ok(_note_out(n, db=db), msg="已保存草稿")
 
 
+@router.post("/{note_id}/unpublish")
+def unpublish_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """单条下架：入删帖队列，同步系统状态。"""
+    n = db.query(Note).filter(Note.id == note_id).first()
+    if not n:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
+    if n.status != "published":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态为[{n.status}]，只有已发布的内容可以下架")
+
+    n.status = "offline"
+    _queue_removal(db, n.id)
+    db.add(TaskLog(note_id=n.id, action="unpublish", executor=user.username, result="success",
+                   detail="单条下架，已入删帖队列"))
+    db.commit()
+    return ok(msg="已下架（删帖任务已入队）")
+
+
 @router.post("/{note_id}/publish")
 def publish_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     n = db.query(Note).filter(Note.id == note_id).first()
@@ -193,10 +210,13 @@ def _send_to_channels(n: Note, user: User, db: Session,
     一组 =（文字+混合媒体）打包发送，紧跟一条单独验证视频。
     channel_ids：覆盖发送目标（push_all 全量推送时只发指定频道）。
     返回 (成功频道名, 失败原因)。
+
+    发布前预检：每个频道先验证 Bot 权限，失败的直接记入 failed，不尝试发送。
     """
     from app.api.v1.bots import _dec
     from app.api.v1.media import get_matting_global
     from app.services.publisher import _media_bytes, matt_for_publish, send_listing_set
+    from app.api.v1.channel import _verify_bot_channel
 
     media = db.query(NoteMedia).filter(NoteMedia.note_id == n.id).order_by(NoteMedia.sort_order).all()
     show = [{"url": m.url, "media_type": m.media_type} for m in media if m.kind == "show"]
@@ -224,6 +244,11 @@ def _send_to_channels(n: Note, user: User, db: Session,
             failed.append(f"频道#{cid}：频道不存在（可能已被删除）")
             continue
         if not ch.is_active:
+            continue
+        # 发布前预检：验证 Bot 权限
+        ok_v, msg_v = _verify_bot_channel(db, ch)
+        if not ok_v:
+            failed.append(f"{ch.name}：发布前预检失败 - {msg_v}")
             continue
         chat = ch.tg_channel_id or ch.username
         if not chat:
