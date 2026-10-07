@@ -160,19 +160,30 @@ def publish_note(note_id: int, user: User = Depends(get_current_user), db: Sessi
     if not n:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
     _check_verify_video(db, n.id)  # 硬校验：必须且只能 1 个 MP4 验证视频
-    n.status = "published"
-    n.published_at = datetime.utcnow()
-    db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="success", detail="手动发布"))
-    db.commit()
     # 定时上架：时间未到只改状态，等后台 worker 到点发送
     if n.scheduled_at and n.scheduled_at > datetime.utcnow():
+        n.status = "published"
+        n.published_at = datetime.utcnow()
+        db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="success", detail="定时发布（到点自动发送）"))
+        db.commit()
         return ok(msg="已发布（定时，到点自动发送到频道）")
+    # 立即发送：先实际发送到 Telegram，成功后才标记状态
     sent, failed = _send_to_channels(n, user, db)
-    n.scheduled_sent = True  # 立即发送成功后标记，防 worker 重复发送
-    db.commit()
+    n.scheduled_sent = True
     if failed and not sent:
-        return ok(msg=f"已发布，但发送失败：{failed[0]}")
-    return ok(msg="已发布" + (f"，已发送到 {sent} 个频道" if sent else ""))
+        # 全部失败：标记为失败，保存错误详情
+        n.status = "publish_failed"
+        db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="fail",
+                       detail=f"Telegram 发送失败：{failed[0]}"))
+        db.commit()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Telegram 发布失败：{failed[0]}")
+    # 至少部分成功
+    n.status = "published"
+    n.published_at = datetime.utcnow()
+    db.add(TaskLog(note_id=n.id, action="publish", executor=user.username, result="success",
+                   detail=f"手动发布，已发送到 {len(sent)} 个频道" + (f"；{len(failed)} 个失败：{failed[0]}" if failed else "")))
+    db.commit()
+    return ok(msg="已发布" + (f"，已发送到 {len(sent)} 个频道" if sent else "") + (f"（{len(failed)} 个频道失败）" if failed else ""))
 
 
 def _send_to_channels(n: Note, user: User, db: Session,

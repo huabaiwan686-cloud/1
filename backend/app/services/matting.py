@@ -19,9 +19,11 @@ def _resolve_model_path() -> str:
     repo_root = os.path.dirname(os.path.dirname(here))  # backend/app/services → backend → repo
     candidates = [
         os.environ.get("RMBG_MODEL_PATH", ""),
-        os.path.join(repo_root, "..", "models", "rmbg-1.4.onnx"),
+        os.path.join(repo_root, "models", "rmbg-1.4.onnx"),
+        os.path.join(os.path.dirname(repo_root), "models", "rmbg-1.4.onnx"),
         os.path.join(os.getcwd(), "models", "rmbg-1.4.onnx"),
         "/srv/models/rmbg-1.4.onnx",  # docker
+        "/opt/content-platform/models/rmbg-1.4.onnx",  # 生产服务器
     ]
     for p in candidates:
         if p and os.path.exists(p):
