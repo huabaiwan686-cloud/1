@@ -54,8 +54,11 @@ with TestClient(app) as c:
     r = c.get("/api/note/list", headers=H, params={"tag": "热门", "page": 2, "page_size": 20})
     check("标签过滤空页", r.json()["data"]["total"] == 1 and r.json()["data"]["list"] == [])
 
-    # 4. 正式审核 API
-    r = c.post("/api/note/create", headers=H, json={"title": "待审", "tags": []})
+    # 4. 正式审核 API（审核通过要求：必须且只能有 1 个 MP4 验证视频）
+    r = c.post("/api/note/create", headers=H, json={
+        "title": "待审", "tags": [],
+        "media": [{"url": "/uploads/verify_test.mp4", "media_type": "video",
+                   "kind": "verify", "sort_order": 0}]})
     pid = r.json()["data"]["id"]
     r = c.post(f"/api/note/{pid}/approve", headers=H)
     check("审核通过", r.status_code == 200)
@@ -77,13 +80,13 @@ with TestClient(app) as c:
     with open("uploads/results/cache_seed.jpg", "wb") as f:
         f.write(b"cached-result")
     db = SessionLocal()
-    db.add(ImageJob(mode="blur_bg", status="success", result_url="/uploads/results/cache_seed.jpg",
-                    quota_consumed=True, detail=f"blur_bg:{h}:r12.0"))
+    db.add(ImageJob(mode="背景虚化", status="success", result_url="/uploads/results/cache_seed.jpg",
+                    quota_consumed=True, detail=f"背景虚化:{h}:r12.0"))
     db.commit()
     db.close()
     r = c.post("/api/media/process", headers=H,
                files={"file": ("b.bin", io.BytesIO(data), "application/octet-stream")},
-               data={"mode": "blur_bg", "blur_radius": "12"})
+               data={"mode": "背景虚化", "blur_radius": "12"})
     d = r.json()["data"]
     check("缓存命中复用", d["cacheHit"] is True and d["resultUrl"] == "/uploads/results/cache_seed.jpg")
     check("缓存命中不扣额度", d["quotaConsumed"] is False)

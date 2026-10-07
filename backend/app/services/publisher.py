@@ -66,7 +66,7 @@ def _media_bytes(url: str) -> tuple[str, bytes]:
 
 
 def _apply_anti_scan(data: bytes, mode: str, db=None) -> bytes:
-    """按频道防扫图模式处理展示图。original=原图；replace_bg/blur_bg=AI处理（含随机保护区）。
+    """按频道防扫图模式处理展示图。原图=原图；替换背景/背景虚化=AI处理（含动态随机保护区与内置混淆扰动）。
     若全局防扫图配置启用且 forceBeforeSendEnabled，则叠加全局配置处理。
     """
     out = data

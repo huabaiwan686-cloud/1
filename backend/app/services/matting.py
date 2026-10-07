@@ -1,7 +1,7 @@
 """人像抠图提供者：自建 RMBG-1.4（ONNX/CPU）/ 占位 / 表格识别跳过。
 
 - 有模型文件 → RmbgMattingProvider：本地推理，零边际成本，图片不出服务器
-- 无模型文件 → StubMattingProvider：抛错，上层自动降级轻量扰动
+- 无模型文件 → StubMattingProvider：抛错，上层返回原图
 - is_table_image：表格/自评表等截图本地识别，直接跳过抠图（对齐原站）
 """
 import logging
@@ -44,7 +44,7 @@ class MattingProvider:
 
 
 class StubMattingProvider(MattingProvider):
-    """占位：未配置抠图服务时抛错，调用方应降级为轻量扰动。"""
+    """占位：未配置抠图服务时抛错，调用方返回原图。"""
 
     def get_mask(self, img: Image.Image) -> Image.Image:
         raise NotImplementedError(
@@ -109,7 +109,7 @@ def get_default_provider() -> MattingProvider:
 def is_table_image(img: Image.Image) -> bool:
     """表格/自评表等截图识别：大面积白色 + 高边缘密度 → 跳过抠图。
 
-    这类图抠人像没有意义，直接走轻量扰动（对齐原站行为）。
+    这类图抠人像没有意义，直接返回原图（对齐原站行为）。
     """
     g = img.convert("L").resize((256, 256))
     a = np.asarray(g).astype(np.float32)

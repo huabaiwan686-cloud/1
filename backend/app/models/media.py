@@ -26,13 +26,13 @@ class ImageJob(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     mode: Mapped[str] = mapped_column(String(16), default="替换背景")
-    # replace_bg=背景替换 / blur_bg=背景虚化 / original=原图
+    # mode 取值：原图 / 替换背景 / 背景虚化
     status: Mapped[str] = mapped_column(String(16), default="processing")
     source: Mapped[str] = mapped_column(String(512), default="")  # 原图标识/URL
     result_url: Mapped[str] = mapped_column(String(512), default="")
     background_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     quota_consumed: Mapped[bool] = mapped_column(Boolean, default=False)
-    fallback: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否降级为轻量扰动
+    fallback: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否降级为原图直发（未配置抠图/额度不足）
     detail: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

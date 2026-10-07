@@ -226,7 +226,7 @@
 | POST | `/api/media/materials` | 上传素材图片 | 会员 |
 | GET | `/api/media/materials` | 素材库列表 | 会员 |
 | DELETE | `/api/media/materials/{id}` | 删除素材 | 会员 |
-| POST | `/api/media/process` | 图片处理（replace_bg/blur_bg/light_perturb/original） | 会员 |
+| POST | `/api/media/process` | 图片处理（原图/替换背景/背景虚化；混淆扰动为内置层，非独立模式） | 会员 |
 | GET | `/api/media/jobs` | 处理任务列表 | 会员 |
 | GET | `/api/media/thumb` | 缩略图（公开，UUID 防猜） | 公开 |
 | GET | `/api/media/matting-global` | 全局抠图配置 | 会员 |
@@ -347,15 +347,16 @@
 - 位置：服务器 `/opt/content-platform/models/rmbg-1.4.onnx`（`MODEL_PATH`，可经 `RMBG_MODEL_PATH` 环境变量覆盖）
 - 推理：onnxruntime CPU，1024×1024 预处理 + ImageNet 归一化，输出 L 模式人物 mask
 - 单例 + 线程锁（模型约 170MB）
-- 无模型时降级为 `StubMattingProvider`（抛错，上层降级为轻量扰动）
+- 无模型时降级为 `StubMattingProvider`（抛错，上层返回原图）
 
 ### 3.2 处理模式（`POST /api/media/process`，`mode` 参数）
 | mode | 功能 | 说明 |
 |------|------|------|
-| `replace_bg` | 抠图换背景 | RMBG 抠图 + 合成到指定背景（background_id） |
-| `blur_bg` | 人物背景模糊 | 抠图 + 背景高斯模糊（blur_radius 参数） |
-| `light_perturb` | 轻量扰动 | 不抠图，防扫图轻量处理 |
-| `original` | 原图 | 不处理 |
+| `原图` | 原图 | 不处理 |
+| `替换背景` | 抠图换背景 | RMBG 抠图 + 合成到指定背景（background_id） |
+| `背景虚化` | 人物背景虚化 | 抠图 + 背景高斯模糊（blur_radius 参数） |
+
+> 混淆扰动层（`_apply_perturbation`）与动态随机保护区（`_apply_random_margin`）已内置于 替换背景/背景虚化 流程，不再作为独立模式暴露。
 
 ### 3.3 任务队列
 - `ImageJob` 表：mode / source / status / result
@@ -367,7 +368,7 @@
 - 发布时内存处理，不落盘；每次循环拿原图重新处理
 
 ### 3.5 相关服务函数
-- `image_pipeline.py`: `light_perturb`, `replace_background`, `blur_background`, `apply_anti_scan_config`
+- `image_pipeline.py`: `replace_background`, `blur_background`, `apply_anti_scan_config`（内置 `_apply_perturbation` 混淆扰动层 + `_apply_random_margin` 动态随机保护区）
 - `watermark.py`: `add_text_watermark`, `add_qr_watermark`, `apply_watermark`, `apply_author_watermark`
 - `dedup.py`: `dhash`, `hamming_distance`, `find_duplicates`, `is_duplicate`
 - `variation.py`: `vary_text`, `vary_image`, `vary_video`（防去重变体）

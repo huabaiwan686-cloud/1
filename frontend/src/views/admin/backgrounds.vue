@@ -45,7 +45,7 @@
           <a-button type="primary" @click="saveMatting">保存</a-button>
         </a-form-item>
       </a-form>
-      <div class="hint">开启后，所有发往频道的图片将按所选模式自动处理（表格图走轻量扰动除外）</div>
+      <div class="hint">开启后，所有发往频道的图片将按所选模式自动处理（表格图直接原图发送除外）</div>
     </a-card>
   </div>
 </template>

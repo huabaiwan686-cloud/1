@@ -25,7 +25,7 @@
     <a-card class="page-card" :bordered="false" title="混淆/防扫说明">
       <div class="desc-text">
         图片混淆（防扫）是按频道配置的：进入「频道配置」页，点击频道卡片的「编辑」，
-        在「防扫模式」中选择：原图 / 轻量扰动 / 背景虚化 / 背景替换。
+        在「防扫模式」中选择：原图 / 替换背景 / 背景虚化。
       </div>
       <div class="hint" style="margin-top: 8px">
         全局抠图开关在「背景素材管理」页。发布时按频道防扫模式 + 全局抠图设置自动处理。

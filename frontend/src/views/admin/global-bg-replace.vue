@@ -14,7 +14,7 @@
           <a-button type="primary" @click="saveMatting" :loading="saving">保存</a-button>
         </a-form-item>
       </a-form>
-      <div class="hint">开启后，所有发往频道的图片自动抠图并替换为所选背景；服务器只保留原图，处理图不留存（表格图走轻量扰动除外）</div>
+      <div class="hint">开启后，所有发往频道的图片自动抠图并替换为所选背景；服务器只保留原图，处理图不留存（表格图直接原图发送除外）</div>
     </a-card>
 
     <a-card class="page-card" :bordered="false" title="背景素材管理">
