@@ -27,7 +27,7 @@ from app.services.matting import is_table_image
 
 router = APIRouter(prefix="/media", tags=["media"])
 
-MATTING_MODES = {"replace_bg", "blur_bg"}
+MATTING_MODES = {"替换背景", "背景虚化"}
 
 UPLOAD_DIR = os.environ.get(
     "UPLOAD_DIR",
@@ -124,13 +124,13 @@ def delete_material(material_id: int, user: User = Depends(require_member), db: 
 @router.post("/process")
 async def process_image(
     file: UploadFile = File(...),
-    mode: str = Form("replace_bg"),  # replace_bg/blur_bg/original
+    mode: str = Form("替换背景"),  # replace_bg/blur_bg/original
     background_id: int | None = Form(None),
     blur_radius: float = Form(12),
     user: User = Depends(require_member),
     db: Session = Depends(get_db),
 ):
-    if mode not in ("replace_bg", "blur_bg", "original"):
+    if mode not in ("替换背景", "背景虚化", "原图"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知处理模式：{mode}")
     # 分块读取 + 大小上限（200MB）
     chunks, total = [], 0
@@ -150,11 +150,11 @@ async def process_image(
     reuse_result: str | None = None  # 缓存命中时直接复用，不重新推理
 
     try:
-        if mode == "original":
+        if mode == "原图":
             out = data
         elif mode in MATTING_MODES:
             bg_data = None
-            if mode == "replace_bg":
+            if mode == "替换背景":
                 bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == background_id).first()
                 if not bg:
                     raise HTTPException(status.HTTP_400_BAD_REQUEST, "背景素材不存在")
@@ -164,7 +164,7 @@ async def process_image(
                 with open(bg_fs, "rb") as f:
                     bg_data = f.read()
             # 缓存键：模式 + 原图哈希 + 参数（虚化半径/背景 id）；先查缓存，命中则连 PIL 解码都省了
-            cache_key = f"{mode}:{src_hash}:r{blur_radius}" if mode == "blur_bg" else f"{mode}:{src_hash}:bg{background_id}"
+            cache_key = f"{mode}:{src_hash}:r{blur_radius}" if mode == "背景虚化" else f"{mode}:{src_hash}:bg{background_id}"
             hit = db.query(ImageJob).filter(
                 ImageJob.status == "success",
                 ImageJob.detail.contains(cache_key),
@@ -195,7 +195,7 @@ async def process_image(
                         job.detail = f"quota_exhausted:{src_hash}"
                     else:
                         try:
-                            if mode == "blur_bg":
+                            if mode == "背景虚化":
                                 out, margin_info = blur_background(data, {"blur_radius": blur_radius})
                             else:
                                 out, margin_info = replace_background(data, bg_data)
@@ -281,7 +281,7 @@ def thumb(
 class MattingGlobalIn(BaseModel):
     enabled: bool
     background_id: int | None = None
-    mode: str = "replace_bg"  # replace_bg | blur_bg | original
+    mode: str = "替换背景"  # replace_bg | blur_bg | original
 
 
 def _get_setting(db: Session, key: str, default: str = "") -> str:
@@ -301,11 +301,11 @@ def get_matting_global(db: Session) -> dict | None:
     """全局抠图配置：启用返回 {"mode", "background_id", "bg_data"}，否则 None。"""
     if _get_setting(db, "matting_global_enabled") != "1":
         return None
-    mode = _get_setting(db, "matting_global_mode", "replace_bg")
-    if mode not in ("replace_bg", "blur_bg", "original"):
-        mode = "replace_bg"
+    mode = _get_setting(db, "matting_global_mode", "替换背景")
+    if mode not in ("替换背景", "背景虚化", "原图"):
+        mode = "替换背景"
     bg_id, bg_data = None, None
-    if mode == "replace_bg":
+    if mode == "替换背景":
         try:
             bg_id = int(_get_setting(db, "matting_global_background_id") or 0)
         except ValueError:
@@ -332,7 +332,7 @@ def _media_bytes_local(url: str) -> tuple[str, bytes]:
 @router.get("/matting-global")
 def get_matting_global_ep(user: User = Depends(require_member), db: Session = Depends(get_db)):
     enabled = _get_setting(db, "matting_global_enabled") == "1"
-    mode = _get_setting(db, "matting_global_mode", "replace_bg")
+    mode = _get_setting(db, "matting_global_mode", "替换背景")
     try:
         bg_id = int(_get_setting(db, "matting_global_background_id") or 0) or None
     except ValueError:
@@ -346,9 +346,9 @@ def get_matting_global_ep(user: User = Depends(require_member), db: Session = De
 @router.post("/matting-global")
 def set_matting_global_ep(body: MattingGlobalIn, user: User = Depends(require_member),
                           db: Session = Depends(get_db)):
-    if body.mode not in ("replace_bg", "blur_bg", "original"):
+    if body.mode not in ("替换背景", "背景虚化", "原图"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "不支持的抠图模式")
-    if body.enabled and body.mode == "replace_bg":
+    if body.enabled and body.mode == "替换背景":
         if not body.background_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "请先选择抠图背景素材")
         bg = db.query(BackgroundMaterial).filter(BackgroundMaterial.id == body.background_id).first()

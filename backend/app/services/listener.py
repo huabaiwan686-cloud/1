@@ -78,7 +78,7 @@ def _prepare_show_media(note, db) -> list:
             fname, data = _media_bytes(m.url)
             if gm and m.media_type == "image":
                 try:
-                    data = matt_for_publish(data, gm["bg_data"], db, None, gm.get("mode", "replace_bg"))
+                    data = matt_for_publish(data, gm["bg_data"], db, None, gm.get("mode", "替换背景"))
                 except Exception:  # noqa: BLE001
                     pass  # 单张失败用原图
             bio = io.BytesIO(data)

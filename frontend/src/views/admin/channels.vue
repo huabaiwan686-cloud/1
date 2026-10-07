@@ -102,9 +102,9 @@
         </a-form-item>
         <a-form-item label="防扫图模式">
           <a-select v-model:value="editing.anti_scan_mode">
-            <a-select-option value="original">原图</a-select-option>
-            <a-select-option value="replace_bg">替换背景</a-select-option>
-            <a-select-option value="blur_bg">背景虚化（人像模式）</a-select-option>
+            <a-select-option value="原图">原图</a-select-option>
+            <a-select-option value="替换背景">替换背景</a-select-option>
+            <a-select-option value="背景虚化">背景虚化（人像模式）</a-select-option>
           </a-select>
         </a-form-item>
         <a-space>
@@ -235,14 +235,14 @@ async function saveGm() {
   } catch (e: any) { message.error(e.message); load(); }
 }
 function openEditor(r?: any) {
-  Object.assign(editing, { name: '', username: '', tg_channel_id: '', anti_scan_mode: 'original', is_active: true, is_default: false, bot_id: null });
+  Object.assign(editing, { name: '', username: '', tg_channel_id: '', anti_scan_mode: '原图', is_active: true, is_default: false, bot_id: null });
   if (r) {
     // 后端返回 camelCase，表单用 snake_case，逐个映射避免编辑时静默重置
     editing.id = r.id;
     editing.name = r.name ?? '';
     editing.username = r.username ?? '';
     editing.tg_channel_id = r.tgChannelId ?? '';
-    editing.anti_scan_mode = r.antiScanMode ?? 'original';
+    editing.anti_scan_mode = r.antiScanMode ?? '原图';
     editing.is_active = r.isActive ?? true;
     editing.is_default = r.isDefault ?? false;
     editing.bot_id = r.botId ?? null;

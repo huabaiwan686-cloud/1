@@ -200,4 +200,4 @@ def consume_quota(db: Session, n: int = 1, user=None) -> tuple[bool, str]:
         db.flush()
         return True, "quota"
     # 额度用完 → 返回原图（不扣费）
-    return False, "original"
+    return False, "原图"

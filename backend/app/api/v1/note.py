@@ -230,7 +230,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
         for m in show:
             try:
                 fname, data = _media_bytes(m["url"])
-                data = matt_for_publish(data, gm["bg_data"], db, user, gm.get("mode", "replace_bg"))
+                data = matt_for_publish(data, gm["bg_data"], db, user, gm.get("mode", "替换背景"))
                 processed.append({"data": data, "name": fname})
             except Exception:  # noqa: BLE001  单张失败用原图，不中断整组
                 processed.append(m)
@@ -282,7 +282,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 title=n.title, body=n.body, tags=n.tags,
                 show_media=show, verify_media=verify,
                 # 全局抠图已处理则不再叠加频道防扫图
-                anti_scan_mode="original" if gm else (ch.anti_scan_mode or "original"),
+                anti_scan_mode="原图" if gm else (ch.anti_scan_mode or "原图"),
                 resume=ch_progress, on_step=_mark_step,
                 variation=use_variation,
                 author_user_id=user.id,  # 个人水印（P1-14）：按作者设置叠加

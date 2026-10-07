@@ -100,7 +100,7 @@ def push_template(tpl_id: int, body: TemplatePushIn | None = None,
             continue
         try:
             send_listing_set(_dec(bot.token_secret), chat, body=t.content,
-                             show_media=t.media or [], anti_scan_mode="original",
+                             show_media=t.media or [], anti_scan_mode="原图",
                              author_user_id=user.id)
             sent.append(ch.name)
         except Exception as e:  # noqa: BLE001

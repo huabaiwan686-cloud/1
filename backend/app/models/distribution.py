@@ -20,7 +20,7 @@ class Channel(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # 上架/下架
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)  # 默认选中
     cycle_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 循环 N 天
-    anti_scan_mode: Mapped[str] = mapped_column(String(16), default="original")
+    anti_scan_mode: Mapped[str] = mapped_column(String(16), default="原图")
     # original=原图 / replace_bg=替换背景 / blur_bg=背景虚化
     variation_enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # 循环重发变体（防 TG 判重）
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

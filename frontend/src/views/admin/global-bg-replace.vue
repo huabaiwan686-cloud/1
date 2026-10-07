@@ -68,7 +68,7 @@ async function loadMatting() {
     const d = data.data || data;
     // 只关注 replace_bg 模式：如果是该模式则显示启用状态
     matting.value = {
-      enabled: !!d.enabled && (d.mode === 'replace_bg' || !d.mode),
+      enabled: !!d.enabled && (d.mode === '替换背景' || !d.mode),
       backgroundId: d.backgroundId || null,
     };
   } catch { /* ignore */ }
@@ -111,7 +111,7 @@ async function saveMatting() {
   try {
     await mediaApi.setMattingGlobal({
       enabled: matting.value.enabled,
-      mode: 'replace_bg',
+      mode: '替换背景',
       background_id: matting.value.backgroundId,
     });
     message.success('已保存，全局背景替换已' + (matting.value.enabled ? '开启' : '关闭'));

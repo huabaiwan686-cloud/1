@@ -25,7 +25,7 @@ class ImageJob(Base):
     __tablename__ = "image_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    mode: Mapped[str] = mapped_column(String(16), default="replace_bg")
+    mode: Mapped[str] = mapped_column(String(16), default="替换背景")
     # replace_bg=背景替换 / blur_bg=背景虚化 / original=原图
     status: Mapped[str] = mapped_column(String(16), default="processing")
     source: Mapped[str] = mapped_column(String(512), default="")  # 原图标识/URL

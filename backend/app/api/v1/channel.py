@@ -21,7 +21,7 @@ class ChannelIn(BaseModel):
     is_active: bool = True
     is_default: bool = False
     cycle_days: int | None = None
-    anti_scan_mode: str = "original"
+    anti_scan_mode: str = "原图"
 
 
 def _out(c: Channel) -> dict:

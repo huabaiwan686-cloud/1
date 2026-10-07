@@ -99,7 +99,7 @@ def _bot_post(token: str, method: str, data: dict | None = None,
 def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = "",
                      tags: list | None = None, show_media: list | None = None,
                      verify_media: list | None = None,
-                     anti_scan_mode: str = "original",
+                     anti_scan_mode: str = "原图",
                      resume: dict | None = None,
                      on_step=None,
                      variation: bool = False,
@@ -275,7 +275,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     return result
 
 
-def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "replace_bg") -> bytes:
+def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "替换背景") -> bytes:
     """全局抠图（发布时用）：内存中处理，**不落盘**；服务器只保留原图。
 
     mode: replace_bg | blur_bg | original
@@ -294,7 +294,7 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
     from app.services.image_pipeline import blur_background, replace_background
     from app.services.matting import is_table_image
 
-    if mode == "original":
+    if mode == "原图":
         return data
     src_hash = hashlib.sha256(data).hexdigest()
     try:
@@ -305,7 +305,7 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
         pass
     # 去重扣额度（与 /api/media/process 共用规则）
     dup = db.query(ImageJob).filter(
-        ImageJob.mode.in_(["replace_bg", "blur_bg"]),
+        ImageJob.mode.in_(["替换背景", "背景虚化"]),
         ImageJob.status == "success",
         ImageJob.quota_consumed.is_(True),
         ImageJob.detail.contains(src_hash),
@@ -321,7 +321,7 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
             db.flush()
             return data
     try:
-        if mode == "blur_bg":
+        if mode == "背景虚化":
             out, margin_info = blur_background(data, {})
         else:
             out, margin_info = replace_background(data, bg_data)

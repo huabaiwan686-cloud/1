@@ -31,12 +31,12 @@
         </a-form-item>
         <a-form-item label="抠图模式">
           <a-select v-model:value="matting.mode" style="width: 180px">
-            <a-select-option value="replace_bg">替换背景</a-select-option>
-            <a-select-option value="blur_bg">背景虚化（人像模式）</a-select-option>
-            <a-select-option value="original">原图（不处理）</a-select-option>
+            <a-select-option value="替换背景">替换背景</a-select-option>
+            <a-select-option value="背景虚化">背景虚化（人像模式）</a-select-option>
+            <a-select-option value="原图">原图（不处理）</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="默认背景" v-if="matting.mode === 'replace_bg'">
+        <a-form-item label="默认背景" v-if="matting.mode === '替换背景'">
           <a-select v-model:value="matting.backgroundId" style="width: 200px" placeholder="选择背景" allow-clear>
             <a-select-option v-for="m in list" :key="m.id" :value="m.id">{{ m.name }}</a-select-option>
           </a-select>
@@ -57,7 +57,7 @@ import { mediaApi } from '@/api';
 
 const list = ref<any[]>([]);
 const loading = ref(false);
-const matting = ref({ enabled: false, mode: 'replace_bg', backgroundId: null as number | null });
+const matting = ref({ enabled: false, mode: '替换背景', backgroundId: null as number | null });
 
 async function load() {
   loading.value = true;
@@ -72,7 +72,7 @@ async function loadMatting() {
   try {
     const data: any = await mediaApi.mattingGlobal();
     const d = data.data || data;
-    matting.value = { enabled: !!d.enabled, mode: d.mode || 'replace_bg', backgroundId: d.backgroundId || null };
+    matting.value = { enabled: !!d.enabled, mode: d.mode || '替换背景', backgroundId: d.backgroundId || null };
   } catch { /* ignore */ }
 }
 
