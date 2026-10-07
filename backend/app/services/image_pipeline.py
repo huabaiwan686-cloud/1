@@ -1,14 +1,18 @@
 """图片处理管线：人像背景替换 / 人像背景虚化 / 原图。
 
 模式：
-- replace_bg：人物分割 + 动态随机保护区 + 背景替换
-- blur_bg：人物分割 + 动态随机保护区 + 背景模糊
+- replace_bg：人物分割 + 动态随机保护区 + 背景替换 + 内置混淆扰动
+- blur_bg：人物分割 + 动态随机保护区 + 背景模糊 + 内置混淆扰动
 - original：原图直出
 
 保护区（margin）机制：
 每次处理时，根据人物主体 bounding box 和图片尺寸动态计算合理的
 min_margin/max_margin 范围，然后随机生成本次的 margin。
 目的是在视觉自然范围内产生变化，用于对抗去重检测。
+
+混淆扰动层：
+在背景处理完成后，叠加轻量像素扰动（色彩微扰 ±2%、极轻噪点、
+JPEG quality 88-92 随机），进一步增加像素级差异。
 
 抠图服务：优先自建 RMBG-1.4（见 app/services/matting.py），无模型时抛错由上层处理。
 """
@@ -89,36 +93,42 @@ def _random_margin(min_m: int, max_m: int) -> int:
     return random.randint(min_m, max_m)
 
 
-def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
-    """轻量随机扰动：改变图片像素特征，降低原图匹配概率。"""
+def _apply_perturbation(img: Image.Image, opts: dict | None = None) -> Image.Image:
+    """内置混淆扰动层：在背景处理后的图片上叠加轻量像素扰动。
+
+    目的：在随机保护区的基础上，进一步增加像素级差异，提升去重对抗能力。
+    强度控制在视觉无感知的范围内。
+
+    包括：
+    - 色彩微扰：亮度/对比度/饱和度 ±2%
+    - 噪点：极低强度高斯噪点
+    - 质量微调：JPEG quality 在 88-92 之间随机
+    """
     o = opts or {}
-    img = _open(data)
-    w, h = img.size
+    if not o.get("perturb", True):
+        return img
 
-    # 1. 轻微裁剪：裁掉边缘 1% 像素
-    cx, cy = max(1, int(w * 0.01)), max(1, int(h * 0.01))
-    img = img.crop((cx, cy, w - cx, h - cy))
-
-    # 2. 尺寸微调：按比例重采样
-    nw, nh = int(img.width * 0.99), int(img.height * 0.99)
-    img = img.resize((nw, nh), Image.LANCZOS).resize((w - 2 * cx, h - 2 * cy), Image.LANCZOS)
-
-    # 3. 色彩扰动：亮度/对比度/饱和度 ±5%
+    # 色彩微扰（比独立模式更轻）
     for enhancer, lo, hi in (
-        (ImageEnhance.Brightness, 0.96, 1.04),
-        (ImageEnhance.Contrast, 0.96, 1.04),
-        (ImageEnhance.Color, 0.95, 1.05),
+        (ImageEnhance.Brightness, 0.98, 1.02),
+        (ImageEnhance.Contrast, 0.98, 1.02),
+        (ImageEnhance.Color, 0.97, 1.03),
     ):
-        if o.get("color_jitter", True):
-            img = enhancer(img).enhance(random.uniform(lo, hi))
+        img = enhancer(img).enhance(random.uniform(lo, hi))
 
-    # 4. 噪点扰动：低强度高斯噪点
-    if o.get("noise", True):
+    # 极轻噪点
+    if o.get("perturb_noise", True):
         px = img.load()
-        strength = int(o.get("noise_strength", 6))
-        for y in range(0, h - 2 * cy, 4):
-            for x in range(0, w - 2 * cx, 4):
-                r, g, b = px[x, y]
+        w, h = img.size
+        strength = int(o.get("perturb_noise_strength", 3))
+        # 稀疏采样，避免性能问题
+        for y in range(0, h, 6):
+            for x in range(0, w, 6):
+                r, g, b = px[x, y][:3] if isinstance(px[x, y], tuple) else (px[x, y],) * 3
+                if isinstance(px[x, y], tuple):
+                    r, g, b = px[x, y][:3]
+                else:
+                    r = g = b = px[x, y]
                 n = int(random.gauss(0, strength))
                 px[x, y] = (
                     max(0, min(255, r + n)),
@@ -126,23 +136,20 @@ def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
                     max(0, min(255, b + n)),
                 )
 
-    # 5. 轻模糊 / 轻锐化二选一
-    if o.get("soft_blur", False):
-        img = img.filter(ImageFilter.GaussianBlur(0.6))
-    elif o.get("sharpen", False):
-        img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=60))
+    return img
 
-    # 6. 低透明文案水印（可选）
-    wm_text = o.get("watermark_text", "")
-    if wm_text:
-        overlay = Image.new("RGBA", img.size, (255, 255, 255, 0))
-        d = ImageDraw.Draw(overlay)
-        alpha = int(255 * float(o.get("watermark_alpha", 0.12)))
-        d.text((10, 10), wm_text, fill=(255, 255, 255, alpha))
-        img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
-    # 7. 重编码输出
-    return _encode(img, quality=int(o.get("quality", 90)))
+def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
+    """轻量随机扰动：改变图片像素特征，降低原图匹配概率。
+
+    注意：不再作为独立 API 模式，仅保留函数供内部混淆层调用。
+    独立模式已移除，扰动已内置到 replace_bg/blur_bg 流程中。
+    """
+    o = opts or {}
+    img = _open(data)
+    # 转为内置扰动层处理
+    img = _apply_perturbation(img, {**o, "perturb": True, "perturb_noise": o.get("noise", True)})
+    return _encode(img, quality=int(o.get("quality", random.randint(88, 92))))
 
 
 def _apply_random_margin(
@@ -232,7 +239,13 @@ def replace_background(
     if alpha > 0:
         composed = Image.blend(composed, img.convert("RGBA"), alpha)
 
-    out = _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    # 内置混淆扰动层
+    final_img = _apply_perturbation(composed.convert("RGB"), o)
+    # JPEG quality 随机微调
+    quality = int(o.get("quality", random.randint(88, 92)))
+    out = _encode(final_img, quality=quality)
+    margin_info["perturb_applied"] = bool(o.get("perturb", True))
+    margin_info["jpeg_quality"] = quality
     return out, margin_info
 
 
@@ -263,7 +276,12 @@ def blur_background(
 
     blurred = img.filter(ImageFilter.GaussianBlur(float(o.get("blur_radius", 12))))
     composed = Image.composite(img.convert("RGBA"), blurred.convert("RGBA"), mask)
-    out = _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    # 内置混淆扰动层
+    final_img = _apply_perturbation(composed.convert("RGB"), o)
+    quality = int(o.get("quality", random.randint(88, 92)))
+    out = _encode(final_img, quality=quality)
+    margin_info["perturb_applied"] = bool(o.get("perturb", True))
+    margin_info["jpeg_quality"] = quality
     return out, margin_info
 
 
