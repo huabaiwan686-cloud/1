@@ -23,7 +23,7 @@
       <a-form-item label="城市">
         <a-cascader v-model:value="form.city" :options="cities" :field-names="{ label: 'name', value: 'id', children: 'children' }" placeholder="选择城市" style="width: 100%" />
       </a-form-item>
-      <a-form-item label="展示资料" name="show" :rules="[{ required: true, message: '请上传展示图片' }]">
+      <a-form-item label="展示资料">
         <div class="file-grid">
           <a-upload list-type="picture-card" :before-upload="() => false" v-model:file-list="showList" multiple>
             <div><plus-outlined /><div>上传</div></div>
@@ -175,6 +175,7 @@ async function resetForm() {
   showList.value = []; verifyList.value = [];
 }
 async function onSubmit() {
+  if (!showList.value.length) { message.warning('请上传展示图片'); return; }
   loading.value = true;
   try {
     await noteApi.create(await buildPayload());
@@ -183,6 +184,7 @@ async function onSubmit() {
   } catch (e: any) { message.error(e.message); } finally { loading.value = false; }
 }
 async function onPublish() {
+  if (!showList.value.length) { message.warning('请上传展示图片'); return; }
   loading.value = true;
   try {
     const n: any = await noteApi.create(await buildPayload());
