@@ -68,7 +68,7 @@ def _verify_bot_channel(db, c) -> tuple[bool, str]:
     bot = db.query(BotToken).filter(BotToken.id == c.bot_id).first()
     if not bot:
         return False, "绑定的 Bot 不存在"
-    token = _dec(bot.token_enc)
+    token = _dec(bot.token_secret)
     try:
         r = httpx.get(f"https://api.telegram.org/bot{token}/getChat",
                       params={"chat_id": chat}, timeout=15).json()
