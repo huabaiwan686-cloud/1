@@ -1,0 +1,99 @@
+diff --git a/backend/app/api/v1/note.py b/backend/app/api/v1/note.py
+index 33f6317..f9e867a 100644
+--- a/backend/app/api/v1/note.py
++++ b/backend/app/api/v1/note.py
+@@ -156,19 +156,25 @@ def create_note(body: NoteIn, user: User = Depends(require_member), db: Session
+ 
+ @router.post("/{note_id}/unpublish")
+ def unpublish_note(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+-    """单条下架：入删帖队列，同步系统状态。"""
++    """单条下架（语义 B）：入删帖队列，Telegram 实际删帖确认后才翻 offline。"""
+     n = db.query(Note).filter(Note.id == note_id).first()
+     if not n:
+         raise HTTPException(status.HTTP_404_NOT_FOUND, "资料不存在")
+     if n.status != "published":
+         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"当前状态为[{n.status}]，只有已发布的内容可以下架")
+ 
+-    n.status = "offline"
+-    _queue_removal(db, n.id)
+-    db.add(TaskLog(note_id=n.id, action="unpublish", executor=user.username, result="success",
+-                   detail="单条下架，已入删帖队列"))
++    state = _queue_removal(db, n.id)
++    if state == "none":
++        # 频道里没有任何待删回执：直接翻 offline，状态与 Telegram 实际一致
++        n.status = "offline"
++        db.add(TaskLog(note_id=n.id, action="unpublish", executor=user.username, result="success",
++                       detail="单条下架：无待删回执，已直接转为 offline"))
++        db.commit()
++        return ok(msg="已下架（频道无待删帖子）")
++    db.add(TaskLog(note_id=n.id, action="unpublish", executor=user.username, result="queued",
++                   detail="单条下架已入删帖队列，等待 Telegram 删帖确认后转为 offline"))
+     db.commit()
+-    return ok(msg="已下架（删帖任务已入队）")
++    return ok(msg="下架任务已入队，Telegram 确认删帖后状态转为 offline")
+ 
+ 
+ @router.post("/{note_id}/publish")
+@@ -325,22 +331,24 @@ def _check_verify_video(db, note_id: int):
+         raise HTTPException(status.HTTP_400_BAD_REQUEST, "验证视频必须是 MP4 格式")
+ 
+ 
+-def _queue_removal(db, note_id: int):
+-    """资料下架时入删帖队列：有未删回执且无进行中任务才入队。"""
++def _queue_removal(db, note_id: int) -> str:
++    """资料下架时入删帖队列：有未删回执且无进行中任务才入队。
++    返回 "queued"(本次入队)/"pending"(已有进行中任务)/"none"(无待删回执)。"""
+     from app.models.content import PublishReceipt, RemovalQueue
+     has_receipts = db.query(PublishReceipt).filter(
+         PublishReceipt.note_id == note_id, PublishReceipt.deleted.is_(False)).first()
+     if not has_receipts:
+-        return
++        return "none"
+     running = db.query(RemovalQueue).filter(
+         RemovalQueue.note_id == note_id,
+         RemovalQueue.status.in_(["queued", "running"])).first()
+     if running:
+-        return
++        return "pending"
+     upto = db.query(PublishReceipt.id).filter(
+         PublishReceipt.note_id == note_id).order_by(PublishReceipt.id.desc()).first()
+     db.add(RemovalQueue(note_id=note_id, upto=upto[0] if upto else 0))
+     db.flush()
++    return "queued"
+ 
+ 
+ def _review_note(note_id: int, approve: bool, user: User, db: Session):
+@@ -407,8 +415,10 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
+                         publish_details.append(f"笔记#{n.id}: 频道未激活或未绑定Bot")
+             count += 1
+         elif op == "unpublish":
+-            n.status = "offline"
+-            _queue_removal(db, n.id)
++            # 语义 B：状态保持 published，由删帖 worker 在 Telegram 确认删除后翻 offline；
++            # 无待删回执时直接 offline（与 Telegram 实际一致）
++            if _queue_removal(db, n.id) == "none":
++                n.status = "offline"
+         elif op == "delete":
+             # 同步删磁盘文件（与素材删除一致），避免 uploads 残留
+             from app.api.v1.media import _fs_path
+diff --git a/backend/app/worker.py b/backend/app/worker.py
+index cd43b76..683ad12 100644
+--- a/backend/app/worker.py
++++ b/backend/app/worker.py
+@@ -154,7 +154,15 @@ def sweep_removals() -> dict:
+         db.add(TaskLog(note_id=q.note_id, action="removal", executor="scheduler",
+                        result="success" if not fail_count else "failed",
+                        detail=f"下架删帖：成功 {ok_count} 条，失败 {fail_count} 条"))
+-        q.status = "done" if not fail_count else "failed"
++        note = db.query(Note).filter(Note.id == q.note_id).first()
++        if not fail_count:
++            # Telegram 已确认删除：状态翻 offline（语义 B）
++            if note is not None:
++                note.status = "offline"
++            q.status = "done"
++        else:
++            # 删帖失败：保持 published，状态与 Telegram 实际一致，失败不报成功
++            q.status = "failed"
+         q.detail = f"成功 {ok_count} 条，失败 {fail_count} 条"
+         db.commit()
+         return {"done": ok_count, "failed": fail_count}

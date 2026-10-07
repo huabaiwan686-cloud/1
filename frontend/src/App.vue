@@ -103,47 +103,32 @@ const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : f
 // 路由复用现有页面
 const MEIREN_MENUS = [
   {
-    title: '运营管理',
+    title: '上下架',
     children: [
-      { path: '/admin/dashboard', title: '首页' },
-      { path: '/admin/users', title: '用户管理' },
-      { path: '/admin/channels/up', title: '上架频道' },
-      { path: '/admin/channels/down', title: '下架频道' },
-      { path: '/admin/tg', title: '协议号' },
-      { path: '/admin/relay', title: '自动转发' },
-      { path: '/admin/records', title: '发送记录' },
-    ],
-  },
-  {
-    title: '配置管理',
-    children: [
-      { path: '/admin/group-listen', title: '关键词监控' },
-      { path: '/admin/global/confuse', title: '防扫图' },
-      { path: '/admin/settings', title: '系统设置' },
-      { path: '/admin/collection', title: '代理采集' },
-      { path: '/admin/antidedup', title: '防去重' },
-      { path: '/admin/dedup', title: '去重记录' },
-    ],
-  },
-  {
-    title: '内容管理',
-    children: [
-      { path: '/collector/content', title: '资料库' },
-      { path: '/admin/collection/review', title: '采集审核' },
-      { path: '/admin/message-push', title: '消息推送' },
-      { path: '/admin/friends', title: '好友关注' },
-      { path: '/admin/tags', title: '标签库' },
       { path: '/collector/upload', title: '素材上传' },
-      { path: '/admin/distribution', title: '分发规则' },
-      { path: '/admin/bots', title: 'Bot 管理' },
-      { path: '/admin/group-listen-manage', title: '群监听' },
-      { path: '/admin/accounts/two-way-bots', title: '双向机器人' },
+      { path: '/collector/content', title: '资料库' },
+      { path: '/collector/records', title: '采集记录' },
+      { path: '/admin/channels', title: '上架频道' },
+      { path: '/admin/records', title: '发送记录' },
+      { path: '/admin/notes', title: '上下架管理' },
     ],
   },
   {
-    title: '财务',
+    title: '协议号',
     children: [
-      { path: '/admin/vip', title: 'VIP 会员' },
+      { path: '/admin/tg', title: '协议号管理' },
+    ],
+  },
+  {
+    title: '全局抠图',
+    children: [
+      { path: '/admin/global/bg-replace', title: '全局抠图' },
+    ],
+  },
+  {
+    title: '全局循环',
+    children: [
+      { path: '/admin/global/loop', title: '全局循环' },
     ],
   },
 ];

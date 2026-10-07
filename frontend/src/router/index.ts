@@ -69,6 +69,28 @@ router.beforeEach(async (to) => {
   if (to.path !== '/login' && !localStorage.getItem('access_token')) {
     return '/login';
   }
+  // 功能裁剪：只允许 4 个核心模块的路由
+  const ALLOWED_PATHS = [
+    '/login',
+    '/',
+    '/collector/upload',
+    '/collector/content',
+    '/collector/records',
+    '/admin/channels',
+    '/admin/records',
+    '/admin/notes',
+    '/admin/tg',
+    '/admin/global/bg-replace',
+    '/admin/global/loop',
+    '/admin/backgrounds',  // 重定向到 bg-replace
+    '/admin/publish-config',  // 重定向到 loop
+  ];
+  // 允许重定向目标
+  const isAllowed = ALLOWED_PATHS.some(p => to.path === p || to.path.startsWith(p + '?'));
+  if (!isAllowed && to.path !== '/login') {
+    // 未授权页面重定向到资料库
+    return '/collector/content';
+  }
   // 三级权限：普通用户仅允许 /admin/notes（上下架），会员不允许 /admin/users，超管全部
   if (to.path.startsWith('/admin/')) {
     try {
