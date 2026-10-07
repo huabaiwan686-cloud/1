@@ -1,11 +1,10 @@
 """图片处理接口：/api/media/*（素材库 / 处理任务）。
 
-模式对齐原站：
-- replace_bg：人像背景替换（扣额度；额度不足/抠图异常 → 自动降级 light_perturb）
-- blur_bg：人像背景虚化（扣额度；同上降级规则）
-- light_perturb：轻量随机扰动（不扣额度）
+模式：
+- replace_bg：人像背景替换（含动态随机保护区，扣额度）
+- blur_bg：人像背景虚化（含动态随机保护区，扣额度）
 - original：原图
-表格/自评表类截图本地识别后直接走轻量扰动，不扣额度。
+表格/自评表类截图本地识别后直接返回原图，不扣额度。
 """
 import hashlib
 import io
@@ -23,7 +22,7 @@ from app.api.v1.vip import consume_quota, quota_available
 from app.core.database import get_db
 from app.models.media import BackgroundMaterial, GlobalSetting, ImageJob
 from app.models.user import User
-from app.services.image_pipeline import blur_background, light_perturb, replace_background
+from app.services.image_pipeline import blur_background, replace_background
 from app.services.matting import is_table_image
 
 router = APIRouter(prefix="/media", tags=["media"])
@@ -125,13 +124,13 @@ def delete_material(material_id: int, user: User = Depends(require_member), db: 
 @router.post("/process")
 async def process_image(
     file: UploadFile = File(...),
-    mode: str = Form("light_perturb"),  # replace_bg/blur_bg/light_perturb/original
+    mode: str = Form("replace_bg"),  # replace_bg/blur_bg/original
     background_id: int | None = Form(None),
     blur_radius: float = Form(12),
     user: User = Depends(require_member),
     db: Session = Depends(get_db),
 ):
-    if mode not in ("replace_bg", "blur_bg", "light_perturb", "original"):
+    if mode not in ("replace_bg", "blur_bg", "original"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"未知处理模式：{mode}")
     # 分块读取 + 大小上限（200MB）
     chunks, total = [], 0
@@ -178,8 +177,8 @@ async def process_image(
             else:
                 probe = PILImage.open(io.BytesIO(data)).convert("RGB")
                 if is_table_image(probe):
-                    # 表格/自评表：本地识别，直接轻量扰动，不扣额度
-                    out = light_perturb(data)
+                    # 表格/自评表：本地识别，直接返回原图，不扣额度
+                    out = data
                     job.detail = f"table_skipped:{src_hash}"
                 else:
                     # 去重：同一原图首次成功才扣额度，重复图不重复扣
@@ -190,27 +189,27 @@ async def process_image(
                         ImageJob.detail.contains(src_hash),
                     ).first()
                     if not dup and not quota_available(db, 1, user):
-                        # 额度不足 → 按产品规则降级轻量扰动（不推理、不扣费）
-                        out = light_perturb(data)
+                        # 额度不足 → 返回原图（不推理、不扣费）
+                        out = data
                         fallback = True
                         job.detail = f"quota_exhausted:{src_hash}"
                     else:
                         try:
                             if mode == "blur_bg":
-                                out = blur_background(data, {"blur_radius": blur_radius})
+                                out, margin_info = blur_background(data, {"blur_radius": blur_radius})
                             else:
-                                out = replace_background(data, bg_data)
+                                out, margin_info = replace_background(data, bg_data)
                             # 首次成功抠图才扣额度；缓存命中/重复图不重复扣
                             if not dup:
                                 ok_q, _ = consume_quota(db, 1, user)
                                 quota_consumed = ok_q
-                            job.detail = cache_key
+                            job.detail = f"{cache_key}|margin:{margin_info['actual_margin']}|bbox:{margin_info['bbox']}"
                         except NotImplementedError:
-                            # 抠图服务未配置 → 自动降级轻量扰动（不扣额度）
-                            out = light_perturb(data)
+                            # 抠图服务未配置 → 返回原图（不扣额度）
+                            out = data
                             fallback = True
-        else:  # light_perturb
-            out = light_perturb(data)
+                            job.detail = f"matting_unavailable:{src_hash}"
+        # original 模式在上方已处理（out = data）
 
         if reuse_result:
             job.status = "success"

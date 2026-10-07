@@ -66,13 +66,11 @@ def _media_bytes(url: str) -> tuple[str, bytes]:
 
 
 def _apply_anti_scan(data: bytes, mode: str, db=None) -> bytes:
-    """按频道防扫图模式处理展示图。original=原图；light_perturb=轻量扰动（免费）。
+    """按频道防扫图模式处理展示图。original=原图；replace_bg/blur_bg=AI处理（含随机保护区）。
     若全局防扫图配置启用且 forceBeforeSendEnabled，则叠加全局配置处理。
     """
     out = data
-    if mode == "light_perturb":
-        from app.services.image_pipeline import light_perturb
-        out = light_perturb(out)
+    # light_perturb 已移除，不再作为独立模式
     # 全局防扫图配置
     if db is not None:
         try:
@@ -320,17 +318,17 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
         from app.api.v1.vip import quota_available
 
         if not quota_available(db, 1, user):
-            # 额度不足 → 降级轻量扰动，不扣费、不中断上架
+            # 额度不足 → 返回原图，不扣费、不中断上架
             db.add(ImageJob(mode=mode, status="success", source="publish",
                             result_url="", quota_consumed=False, fallback=True,
                             detail=f"quota_exhausted:{src_hash}"))
             db.flush()
-            return light_perturb(data)
+            return data
     try:
         if mode == "blur_bg":
-            out = blur_background(data, {})
+            out, margin_info = blur_background(data, {})
         else:
-            out = replace_background(data, bg_data)
+            out, margin_info = replace_background(data, bg_data)
     except NotImplementedError:
         return data
     quota_consumed = False

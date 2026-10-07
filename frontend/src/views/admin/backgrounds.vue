@@ -33,7 +33,6 @@
           <a-select v-model:value="matting.mode" style="width: 180px">
             <a-select-option value="replace_bg">替换背景</a-select-option>
             <a-select-option value="blur_bg">背景虚化（人像模式）</a-select-option>
-            <a-select-option value="light_perturb">混淆（轻量随机扰动）</a-select-option>
             <a-select-option value="original">原图（不处理）</a-select-option>
           </a-select>
         </a-form-item>

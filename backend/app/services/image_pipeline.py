@@ -1,12 +1,16 @@
-"""图片处理管线：轻量随机扰动（本地全实现）/ 人像背景替换 / 人像背景虚化。
+"""图片处理管线：人像背景替换 / 人像背景虚化 / 原图。
 
-对齐原站行为：
-- replace_bg / blur_bg：抠图（扣额度，缓存命中不重复扣；表格类截图本地识别跳过）；
-  额度不足/抠图异常 → 自动降级 light_perturb
-- light_perturb：本地轻量随机扰动，不扣额度
+模式：
+- replace_bg：人物分割 + 动态随机保护区 + 背景替换
+- blur_bg：人物分割 + 动态随机保护区 + 背景模糊
 - original：原图直出
 
-抠图服务：优先自建 RMBG-1.4（见 app/services/matting.py），无模型时抛错由上层降级。
+保护区（margin）机制：
+每次处理时，根据人物主体 bounding box 和图片尺寸动态计算合理的
+min_margin/max_margin 范围，然后随机生成本次的 margin。
+目的是在视觉自然范围内产生变化，用于对抗去重检测。
+
+抠图服务：优先自建 RMBG-1.4（见 app/services/matting.py），无模型时抛错由上层处理。
 """
 import io
 import random
@@ -24,6 +28,65 @@ def _encode(img: Image.Image, quality: int = 90) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=quality)  # 不写 EXIF = 去拍摄设备/时间元信息
     return buf.getvalue()
+
+
+def _calc_person_bbox(mask: Image.Image, threshold: int = 128) -> tuple[int, int, int, int] | None:
+    """从分割 mask 计算人物主体的 bounding box。
+    返回 (left, top, right, bottom)，找不到人物时返回 None。
+    """
+    import numpy as np
+    arr = np.array(mask.convert("L"))
+    ys, xs = np.where(arr > threshold)
+    if len(xs) == 0:
+        return None
+    return (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max()))
+
+
+def _calc_margin_range(
+    img_size: tuple[int, int],
+    bbox: tuple[int, int, int, int] | None,
+) -> tuple[int, int, tuple[int, int, int, int] | None]:
+    """根据图片尺寸和人物主体动态计算合理的 margin 范围。
+
+    原则：
+    - min_margin：尽量接近人物边缘（小值，如人物尺寸的 1-2%）
+    - max_margin：只比人物边缘多留合理安全区（人物尺寸的 5-8%，且不超过图片短边的 10%）
+    - 不允许出现大面积空白，不允许裁切人物
+
+    返回 (min_margin, max_margin, bbox)
+    """
+    w, h = img_size
+    if bbox is None:
+        # 找不到人物：使用保守的小范围
+        base = min(w, h)
+        return (2, max(4, int(base * 0.02)), None)
+
+    left, top, right, bottom = bbox
+    person_w = right - left
+    person_h = bottom - top
+    person_size = max(person_w, person_h)
+
+    # 人物到图片边缘的可用空间（限制最大值）
+    space_left = left
+    space_top = top
+    space_right = w - right
+    space_bottom = h - bottom
+    min_space = min(space_left, space_top, space_right, space_bottom)
+
+    # min：人物尺寸的 1%，至少 2px
+    min_m = max(2, int(person_size * 0.01))
+    # max：人物尺寸的 6%，且不超过可用空间的 50%，且不超过图片短边的 8%
+    max_m = int(person_size * 0.06)
+    max_m = min(max_m, int(min_space * 0.5) if min_space > 0 else max_m)
+    max_m = min(max_m, int(min(w, h) * 0.08))
+    max_m = max(max_m, min_m + 2)  # 确保 max > min
+
+    return (min_m, max_m, bbox)
+
+
+def _random_margin(min_m: int, max_m: int) -> int:
+    """在 [min_m, max_m] 范围内随机生成本次的 margin。"""
+    return random.randint(min_m, max_m)
 
 
 def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
@@ -82,19 +145,73 @@ def light_perturb(data: bytes, opts: dict | None = None) -> bytes:
     return _encode(img, quality=int(o.get("quality", 90)))
 
 
+def _apply_random_margin(
+    mask: Image.Image,
+    img_size: tuple[int, int],
+    opts: dict | None = None,
+) -> tuple[Image.Image, dict]:
+    """对分割 mask 应用动态随机保护区。
+
+    流程：
+    1. 计算人物主体 bbox
+    2. 根据图片尺寸和人物大小动态计算 min/max margin 范围
+    3. 随机生成本次 margin
+    4. 对 mask 做膨胀（dilate），在人物边缘外扩 margin 像素
+
+    返回 (处理后的 mask, margin_info dict)
+    margin_info 包含：bbox, min_margin, max_margin, actual_margin, img_size
+    """
+    o = opts or {}
+
+    # 如果调用方指定了固定 margin（测试用），直接使用
+    fixed = o.get("fixed_margin")
+    if fixed is not None:
+        margin = int(fixed)
+        min_m, max_m = margin, margin
+        bbox = _calc_person_bbox(mask)
+    else:
+        bbox = _calc_person_bbox(mask)
+        min_m, max_m, bbox = _calc_margin_range(img_size, bbox)
+        margin = _random_margin(min_m, max_m)
+
+    # 对 mask 做膨胀：在人物边缘外扩 margin 像素
+    # 使用 MaxFilter 实现形态学膨胀
+    if margin > 0:
+        # MaxFilter 的 size 必须是奇数
+        filter_size = margin * 2 + 1
+        expanded = mask.filter(ImageFilter.MaxFilter(filter_size))
+    else:
+        expanded = mask
+
+    info = {
+        "bbox": bbox,
+        "min_margin": min_m,
+        "max_margin": max_m,
+        "actual_margin": margin,
+        "img_size": img_size,
+    }
+    return expanded, info
+
+
 def replace_background(
     data: bytes,
     bg_data: bytes,
     opts: dict | None = None,
     mask_provider: MattingProvider | None = None,
-) -> bytes:
-    """人像背景替换：抠出人物 → 羽化边缘 → 合成到新背景。"""
+) -> tuple[bytes, dict]:
+    """人像背景替换：抠出人物 → 动态随机保护区 → 羽化边缘 → 合成到新背景。
+
+    返回 (处理后的图片 bytes, margin_info dict)
+    """
     o = opts or {}
     provider = mask_provider or get_default_provider()
     img = _open(data)
     bg = _open(bg_data).resize(img.size, Image.LANCZOS)
 
-    mask = provider.get_mask(img).convert("L").resize(img.size, Image.LANCZOS)
+    raw_mask = provider.get_mask(img).convert("L").resize(img.size, Image.LANCZOS)
+    # 应用动态随机保护区
+    mask, margin_info = _apply_random_margin(raw_mask, img.size, o)
+
     # 保留柔和边缘：在人物外沿做羽化
     feather = int(o.get("feather", 3))
     if feather > 0:
@@ -115,30 +232,39 @@ def replace_background(
     if alpha > 0:
         composed = Image.blend(composed, img.convert("RGBA"), alpha)
 
-    return _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    out = _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    return out, margin_info
 
 
 def blur_background(
     data: bytes,
     opts: dict | None = None,
     mask_provider: MattingProvider | None = None,
-) -> bytes:
+) -> tuple[bytes, dict]:
     """人像背景虚化（手机人像模式）：人物保持清晰，背景高斯模糊。
 
+    含动态随机保护区。
+
     opts: blur_radius（模糊强度，默认 12）、feather（边缘羽化，默认 3）
+
+    返回 (处理后的图片 bytes, margin_info dict)
     """
     o = opts or {}
     provider = mask_provider or get_default_provider()
     img = _open(data)
 
-    mask = provider.get_mask(img).convert("L").resize(img.size, Image.BILINEAR)
+    raw_mask = provider.get_mask(img).convert("L").resize(img.size, Image.BILINEAR)
+    # 应用动态随机保护区
+    mask, margin_info = _apply_random_margin(raw_mask, img.size, o)
+
     feather = int(o.get("feather", 3))
     if feather > 0:
         mask = mask.filter(ImageFilter.GaussianBlur(feather))
 
     blurred = img.filter(ImageFilter.GaussianBlur(float(o.get("blur_radius", 12))))
     composed = Image.composite(img.convert("RGBA"), blurred.convert("RGBA"), mask)
-    return _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    out = _encode(composed.convert("RGB"), quality=int(o.get("quality", 92)))
+    return out, margin_info
 
 
 def apply_anti_scan_config(data: bytes, cfg: dict) -> bytes:
