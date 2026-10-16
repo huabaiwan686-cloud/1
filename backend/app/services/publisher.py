@@ -389,15 +389,9 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
     except Exception:  # noqa: BLE001
         pass
     # VIP 已删，额度无限，不查 ImageJob
-    try:
-        return _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash)
-    finally:
-        # 必须在 finally 里卸载：任何异常/提前返回都不能漏，否则内存越积越多卡爆服务器
-        try:
-            from app.services.matting import unload_provider
-            unload_provider()
-        except Exception:
-            pass
+    # 模型常驻内存：反复加载/卸载太慢（每次 30-60 秒），导致发布超时
+    # 模型只加载一次，后续发布直接用，不卸载
+    return _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash)
 
 def _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash):
     from app.services.image_pipeline import replace_background
