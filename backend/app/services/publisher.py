@@ -440,11 +440,7 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
             pass
         db.flush()
         raise  # 抛错，由上层报告失败，不得静默返回原图
-    quota_consumed = False
-    if not dup:
-        # VIP 已删除，额度无限
-        ok_q = True
-        quota_consumed = ok_q
+    # VIP 已删除，额度无限
     db.flush()
     # 自动清理：用完模型立即卸载，释放内存（不用等用户提醒）
     # API 进程常驻，不清理会一直占 ~170MB，越积越多卡爆服务器
