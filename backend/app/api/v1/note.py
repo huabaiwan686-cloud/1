@@ -336,7 +336,9 @@ def _send_to_channels(n: Note, user: User, db: Session,
 
     # 全局抠图模式：开启后所有发往频道的展示图按所选背景自动抠图（内存处理，不落盘）；
     # 服务器只保留原图，每次循环都拿原图重新处理再发送
-    gm = get_matting_global(user, db)
+    _gm_raw = get_matting_global(user, db)
+    _gm = _gm_raw.get("data") if isinstance(_gm_raw, dict) and "data" in _gm_raw else _gm_raw
+    gm = _gm if isinstance(_gm, dict) and _gm.get("enabled") else None
     if gm:
         processed = []
         for m in show:
@@ -348,7 +350,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 processed.append({"data": data, "name": fname})
                 continue
             # 抠图失败必须报错，不得悄悄发原图（用户明确要求）
-            data = matt_for_publish(data, gm["bg_data"], db, user, gm.get("mode", "替换背景"), gm.get("background_id"))
+            data = matt_for_publish(data, None, db, user, "替换背景", None)
             processed.append({"data": data, "name": fname})
         show = processed
 
