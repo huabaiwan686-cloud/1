@@ -207,9 +207,10 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
         if db is not None and note_id is not None:
             try:
                 from app.models.content import TaskLog
+                # 计数所有成功发送（首发 push_send + 循环 loop_send），否则循环次数永远是 2，文字不变
                 publish_count = db.query(TaskLog).filter(
                     TaskLog.note_id == note_id,
-                    TaskLog.action == "push_send",
+                    TaskLog.action.in_(["push_send", "loop_send"]),
                     TaskLog.result == "success",
                 ).count() + 1
             except Exception:
