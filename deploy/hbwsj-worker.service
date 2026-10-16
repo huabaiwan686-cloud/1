@@ -1,0 +1,15 @@
+[Unit]
+Description=HBWSJ Rebuild Worker (scheduler)
+After=network.target hbwsj-api.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/content-platform
+EnvironmentFile=/opt/content-platform/.env
+ExecStart=/opt/content-platform/venv/bin/python -m app.worker
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

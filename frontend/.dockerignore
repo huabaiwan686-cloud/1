@@ -1,0 +1,10 @@
+# Docker 构建排除：防止敏感文件打进镜像
+node_modules/
+.env
+.env.*
+!.env.example
+.git/
+.gitignore
+dist/
+*.log
+.DS_Store

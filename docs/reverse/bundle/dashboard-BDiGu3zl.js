@@ -1,0 +1,1 @@
+import{g as e}from"./api-DsDgxEmJ.js";var t=``,n=`/publish-admin`;async function r(){return e.get(`${n}/dashboard/overview`)}async function i(t){return e.get(`${n}/dashboard/trend`,{params:t})}async function a(){return e.get(`${t}/dashboard/overview`)}async function o(n){return e.get(`${t}/dashboard/trend`,{params:n})}export{o as i,i as n,a as r,r as t};

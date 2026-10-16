@@ -1,0 +1,181 @@
+"""内容流数据模型：标签 / 城市 / 笔记 / 媒体 / 采集规则 / 采集频道 / 任务日志。"""
+from datetime import datetime
+
+from sqlalchemy import BigInteger, JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+
+
+
+
+class Note(Base):
+    """笔记/资料：内容库核心。status: draft/pending/published/offline"""
+
+    __tablename__ = "notes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    tags: Mapped[list] = mapped_column(JSON, default=list)  # 标签名列表
+    city_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 城市 ID（City 表已删，不再外键约束）
+    status: Mapped[str] = mapped_column(String(16), default="draft", index=True)
+    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual/collect
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 所属上架账号
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)  # 创建人（采集端内容/记录用）
+    channel_ids: Mapped[list] = mapped_column(JSON, default=list)  # 目标频道 id 列表
+    service_remark: Mapped[str] = mapped_column(Text, default="")  # 客服备注（仅后台可见）
+    number_code: Mapped[str] = mapped_column(String(64), default="")  # 编号/标识
+    fee_text: Mapped[str] = mapped_column(String(255), default="")  # 介绍费文案
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)  # 定时上架
+    scheduled_sent: Mapped[bool] = mapped_column(Boolean, default=False)  # 定时已由 worker 发送（幂等）
+    send_progress: Mapped[dict] = mapped_column(JSON, default=dict)  # 分步幂等：{channel_id: {"album": true, "video": false}}
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    collect_rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("collect_rules.id"), nullable=True)
+    source_channel_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # 采集来源频道 id（仅采集笔记）
+    source_msg_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # 来源消息 id（相册取首条消息 id）
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 采集硬去重：同一来源频道 + 同一消息只入库一次（NULL 互不冲突，手动笔记不受影响）
+    __table_args__ = (
+        UniqueConstraint("source_channel_id", "source_msg_id", name="uq_notes_collect_src"),
+    )
+
+
+class NoteMedia(Base):
+    """笔记媒体：展示资料(show)/验证资料(verify)，可拖拽排序。"""
+
+    __tablename__ = "note_media"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    url: Mapped[str] = mapped_column(String(512))
+    media_type: Mapped[str] = mapped_column(String(16), default="image")  # image/video
+    kind: Mapped[str] = mapped_column(String(16), default="show")  # show/verify
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LoopTask(Base):
+    """循环发布任务：按间隔重复发布笔记，每次从原始素材重新处理。"""
+
+    __tablename__ = "loop_tasks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    interval_seconds: Mapped[int] = mapped_column(Integer, default=259200)  # 循环间隔（秒），默认 3 天
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否启用
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 上次执行
+    next_run_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)  # 下次执行（Worker 每分钟轮询，需索引）
+    run_count: Mapped[int] = mapped_column(Integer, default=0)  # 已执行次数
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # 所属用户（多租户隔离）
+
+
+class CollectRule(Base):
+    """代理采集规则：文案处理 / 文本替换 / 图文去重 / 屏蔽规则。"""
+
+    __tablename__ = "collect_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128))
+    target_channels: Mapped[list] = mapped_column(JSON, default=list)  # 目标频道 id
+    global_apply: Mapped[bool] = mapped_column(Boolean, default=False)  # 全局应用
+    need_review: Mapped[bool] = mapped_column(Boolean, default=True)  # 采集后需审核
+    # 文案处理
+    prefix_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    prefix_text: Mapped[str] = mapped_column(Text, default="")
+    suffix_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    suffix_text: Mapped[str] = mapped_column(Text, default="")
+    # 文本替换
+    replace_rules: Mapped[list] = mapped_column(JSON, default=list)  # [{from, to}]
+    clean_identifiers: Mapped[bool] = mapped_column(Boolean, default=False)  # 清理编号和介绍费标识
+    fee_suffix_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    fee_suffix_text: Mapped[str] = mapped_column(String(255), default="")
+    delete_texts: Mapped[list] = mapped_column(JSON, default=list)  # 命中删除的文本
+    delete_line_keywords: Mapped[list] = mapped_column(JSON, default=list)  # 命中删整行的关键词
+    # 图文去重
+    dedup_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    dedup_window_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    dedup_days: Mapped[int] = mapped_column(Integer, default=30)
+    # 屏蔽规则
+    block_links: Mapped[bool] = mapped_column(Boolean, default=True)
+    block_usernames: Mapped[bool] = mapped_column(Boolean, default=True)
+    block_plain_text: Mapped[bool] = mapped_column(Boolean, default=True)
+    block_texts: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CollectChannel(Base):
+    """采集频道：来源为账号/BOT/好友关注。"""
+
+    __tablename__ = "collect_channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128))
+    source_type: Mapped[str] = mapped_column(String(16), default="account")  # account/bot/friend
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 采集账号
+    source_target: Mapped[str] = mapped_column(String(255), default="")  # 来源频道/群
+    rule_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("collect_rules.id"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_msg_id: Mapped[int] = mapped_column(BigInteger, default=0)  # 采集水位：已处理的最大消息 id
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TaskLog(Base):
+    """任务记录：推送/采集/上下架等动作日志。"""
+
+    __tablename__ = "task_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("notes.id"), nullable=True)
+    action: Mapped[str] = mapped_column(String(32), index=True)  # publish/offline/collect/push/...
+    executor: Mapped[str] = mapped_column(String(64), default="")  # 执行方
+    result: Mapped[str] = mapped_column(String(16), default="success")  # success/fail/processing
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class Announcement(Base):
+    """系统公告：登录后弹窗展示。"""
+
+    __tablename__ = "announcements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PublishReceipt(Base):
+    """发送回执：每次真实发送记录 message_id，用于下架时自动删帖。"""
+
+    __tablename__ = "publish_receipts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    bot_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 推送 Bot（Bot 通道）
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 协议号（协议号通道）
+    chat_id: Mapped[str] = mapped_column(String(64), default="")
+    message_id: Mapped[int] = mapped_column(BigInteger, default=0)
+    part: Mapped[str] = mapped_column(String(16), default="ordinary")  # ordinary=相册/正文 / video=验证视频
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否已删帖
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RemovalQueue(Base):
+    """删帖队列：资料下架/归档时自动入队，worker 逐条删帖。"""
+
+    __tablename__ = "removal_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    note_id: Mapped[int] = mapped_column(Integer, ForeignKey("notes.id"), index=True)
+    channel_id: Mapped[int] = mapped_column(Integer, default=0)  # 0=全部频道
+    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued/running/done/failed
+    detail: Mapped[str] = mapped_column(Text, default="")
+    upto: Mapped[int] = mapped_column(Integer, default=0)  # 处理到的 receipt id 上限
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 开始处理时间（用于判断卡死）

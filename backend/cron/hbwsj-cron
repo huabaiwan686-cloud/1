@@ -1,0 +1,9 @@
+# hbwsj 定时任务（替代长驻 hbwsj-worker.service）
+# 安装：cp backend/cron/hbwsj-cron /etc/cron.d/hbwsj-cron && chmod 644 /etc/cron.d/hbwsj-cron
+# 要求：/opt/content-platform 为部署目录，venv 在 /opt/content-platform/venv
+#
+# 每 5 分钟运行一轮：扫定时发布、循环发布、推送计划、采集、删帖队列、USDT 到账。
+# 无任务时不加载抠图模型；有抠图任务时按需加载 FP32 ONNX，处理完卸载并退出进程，内存归零。
+# 日志：/var/log/hbwsj-cron.log（cron 自身会追加；也可改用 logger 走 syslog）
+
+*/5 * * * * root cd /opt/content-platform && ./venv/bin/python -m app.cron_worker >> /var/log/hbwsj-cron.log 2>&1

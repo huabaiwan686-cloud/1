@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: xh
+      POSTGRES_PASSWORD: xh
+      POSTGRES_DB: xiaohuiji
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xh"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      APP_ENV: prod
+      TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
+      TG_API_ID: ${TG_API_ID:-}
+      TG_API_HASH: ${TG_API_HASH:-}
+      TG_SESSION_DIR: /srv/data/tg_sessions
+      USDT_TRC20_ADDRESS: ${USDT_TRC20_ADDRESS:-}
+      TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
+    volumes:
+      - uploads:/srv/uploads
+      - tg_sessions:/srv/data/tg_sessions
+      - ./models:/srv/models:ro  # RMBG-1.4 抠图模型（手动下载，不进 git）
+    expose:
+      - "8000"
+
+  worker:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://xh:xh@db:5432/xiaohuiji
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      APP_ENV: prod
+      TOKEN_FERNET_KEY: ${TOKEN_FERNET_KEY:-}
+      TG_API_ID: ${TG_API_ID:-}
+      TG_API_HASH: ${TG_API_HASH:-}
+      TG_SESSION_DIR: /srv/data/tg_sessions
+      USDT_TRC20_ADDRESS: ${USDT_TRC20_ADDRESS:-}
+      TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
+    volumes:
+      - uploads:/srv/uploads
+      - tg_sessions:/srv/data/tg_sessions
+      - ./models:/srv/models:ro
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  uploads:
+  tg_sessions:
