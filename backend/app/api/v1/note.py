@@ -636,7 +636,6 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
         elif op == "delete":
             # 同步删磁盘文件（与素材删除一致），避免 uploads 残留
             # 先查文件是否被其他笔记共享，共享的不删
-            from app.api.v1.media import _fs_path
             for m in db.query(NoteMedia).filter(NoteMedia.note_id == n.id).all():
                 try:
                     # 检查其他笔记是否引用同一文件
@@ -644,7 +643,9 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
                         NoteMedia.url == m.url,
                         NoteMedia.note_id != n.id).first()
                     if not shared:
-                        fp = _fs_path(m.url)
+                        # URL /uploads/xxx → 文件系统路径
+                        _up = os.environ.get("UPLOAD_DIR", os.path.join(os.getcwd(), "uploads"))
+                        fp = os.path.join(_up, os.path.basename(m.url))
                         if os.path.exists(fp):
                             os.remove(fp)
                 except Exception:
