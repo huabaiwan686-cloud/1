@@ -390,6 +390,17 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
         pass
     # VIP 已删，额度无限，不查 ImageJob
     try:
+        return _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash)
+    finally:
+        # 必须在 finally 里卸载：任何异常/提前返回都不能漏，否则内存越积越多卡爆服务器
+        try:
+            from app.services.matting import unload_provider
+            unload_provider()
+        except Exception:
+            pass
+
+def _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash):
+    try:
         import random
         # 镜像：强制交替（用户要求：按发布次数，第 1 次不镜像，第 2 次镜像，第 3 次不镜像…）
         # 用资料发布次数判断镜像交替
@@ -442,11 +453,4 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
         raise  # 抛错，由上层报告失败，不得静默返回原图
     # VIP 已删除，额度无限
     db.flush()
-    # 自动清理：用完模型立即卸载，释放内存（不用等用户提醒）
-    # API 进程常驻，不清理会一直占 ~170MB，越积越多卡爆服务器
-    try:
-        from app.services.matting import unload_provider
-        unload_provider()
-    except Exception:
-        pass
     return out
