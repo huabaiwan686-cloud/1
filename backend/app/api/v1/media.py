@@ -53,4 +53,5 @@ async def upload_file(file: UploadFile = File(...), user: User = Depends(require
     content = await file.read()
     with open(fpath, "wb") as f:
         f.write(content)
-    return {"url": f"/uploads/{fname}"}
+    from app.api.deps import ok
+    return ok({"url": f"/uploads/{fname}"})
