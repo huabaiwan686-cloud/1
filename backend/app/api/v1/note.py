@@ -388,8 +388,13 @@ def _send_to_channels(n: Note, user: User, db: Session,
             failed.append(f"{ch.name}：推送 Bot 不存在")
             continue
         # 分步幂等：读已有进度，断点续发（相册成功/视频失败时只重发视频）
+        # 新发送周期：若上次已全部完成（album+video 都 True），重置为空，避免下次循环跳过视频
         progress = dict(n.send_progress or {})
-        ch_progress = dict(progress.get(str(cid), {}))
+        _prev = dict(progress.get(str(cid), {}))
+        if _prev.get("album") and _prev.get("video"):
+            _prev = {}
+            progress[str(cid)] = _prev
+        ch_progress = dict(_prev)
 
         def _mark_step(step: str):
             ch_progress[step] = True
@@ -437,7 +442,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
             failed.append(detail)
     if not failed:
         n.send_progress = {}  # 全部频道发送完成，清空断点进度
-        db.flush()
+        db.commit()  # 必须 commit，否则 flush 不落库，下次循环读到旧进度会跳过视频
     return sent, failed
 
 
