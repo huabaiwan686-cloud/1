@@ -70,6 +70,7 @@ function selectCustom(id: number) {
 async function load() {
   loading.value = true;
   try {
+    const data: any = await mediaApi.mattingGlobal();
     list.value = data.list || data || [];
   } catch (e: any) { message.error(e.message || '加载失败'); }
   finally { loading.value = false; }
