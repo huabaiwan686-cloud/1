@@ -418,22 +418,7 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
                 "color_temp": True,
                 "feather": feather,
             }
-        # 背景选择逻辑：
-        # - 如果用户在后台指定了自定义背景（background_id 对应 category='custom'）→ 固定用那张
-        # - 否则 → 从默认8张白色里随机
-        use_fixed = False
-        if background_id:
-            if bg_rec and bg_rec.category == "custom":
-                use_fixed = True  # 用户指定的自定义背景，固定使用
-        if not use_fixed:
-            # 随机从默认白色背景里选
-            if bgs:
-                bg_choice = random.choice(bgs)
-                try:
-                    from app.api.v1.media import _media_bytes_local
-                    _, bg_data = _media_bytes_local(bg_choice.url)
-                except Exception:
-                    pass  # 用传入的默认背景
+        # 背景：纯白（bg_data=None 时 replace_background 用纯白）
         # force_mirror 已在上方按发布次数奇偶计算
         # mirror_only: 只镜像不位移，人物画质零损失
         out, margin_info = replace_background(data, bg_data, {
