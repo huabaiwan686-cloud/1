@@ -333,7 +333,11 @@ def replace_background(
     o = opts or {}
     provider = mask_provider or get_default_provider()
     img = _open(data)
-    bg = _open(bg_data).resize(img.size, Image.LANCZOS)
+    if bg_data:
+        bg = _open(bg_data).resize(img.size, Image.LANCZOS)
+    else:
+        # bg_data=None → 纯白背景
+        bg = Image.new("RGB", img.size, (255, 255, 255))
 
     # 背景白微变：纯白 #FFFFFF 和 #FEFEFE、#FDFDFD 肉眼看不出区别，但 pHash 会变
     # 每次随机微调背景白，背景每次都不一样

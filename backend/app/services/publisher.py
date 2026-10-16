@@ -432,9 +432,6 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
     except NotImplementedError as e:
         # N17/N18：抠图不可用时记录失败审计，不返回 success + 原图冒充成功
         from app.models.content import TaskLog
-        db.add(ImageJob(mode=mode, status="failed", source="publish", user_id=(user.id if user else None),
-                        result_url="", quota_consumed=False,
-                        detail=f"matting_unavailable:{src_hash}:{str(e)[:200]}"))
         # N17：写入 TaskLog 审计
         try:
             db.add(TaskLog(action="matting", executor=user.username if user else "system",
@@ -448,9 +445,6 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
         # VIP 已删除，额度无限
         ok_q = True
         quota_consumed = ok_q
-    db.add(ImageJob(mode=mode, status="success", source="publish", user_id=(user.id if user else None),
-                    result_url="", quota_consumed=quota_consumed,
-                    detail=f"publish_matting:{src_hash}"))
     db.flush()
     # 自动清理：用完模型立即卸载，释放内存（不用等用户提醒）
     # API 进程常驻，不清理会一直占 ~170MB，越积越多卡爆服务器
