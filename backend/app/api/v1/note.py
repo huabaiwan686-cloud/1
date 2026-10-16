@@ -336,7 +336,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
 
     # 全局抠图模式：开启后所有发往频道的展示图按所选背景自动抠图（内存处理，不落盘）；
     # 服务器只保留原图，每次循环都拿原图重新处理再发送
-    gm = get_matting_global(db, user.id if user else None)
+    gm = get_matting_global(user, db)
     if gm:
         processed = []
         for m in show:
