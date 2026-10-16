@@ -400,6 +400,8 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
             pass
 
 def _matt_for_publish_inner(data, bg_data, db, user, mode, background_id, publish_count, src_hash):
+    from app.services.image_pipeline import replace_background
+    from app.services.matting import is_table_image
     try:
         import random
         # 镜像：强制交替（用户要求：按发布次数，第 1 次不镜像，第 2 次镜像，第 3 次不镜像…）
