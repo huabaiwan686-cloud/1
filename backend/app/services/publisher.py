@@ -357,7 +357,7 @@ def send_listing_set(bot_token: str, chat_id: str, title: str = "", body: str = 
     return result
 
 
-def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "替换背景", background_id: int | None = None) -> bytes:
+def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: str = "替换背景", background_id: int | None = None, publish_count: int = 0) -> bytes:
     """全局抠图（发布时用）：内存中处理，**不落盘**；服务器只保留原图。
 
     mode: replace_bg | original
@@ -373,7 +373,6 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
 
     from PIL import Image as PILImage
 
-    from app.models.media import ImageJob
     from app.services.image_pipeline import replace_background
     from app.services.matting import is_table_image
 
@@ -389,36 +388,13 @@ def matt_for_publish(data: bytes, bg_data: bytes | None, db, user=None, mode: st
             return data
     except Exception:  # noqa: BLE001
         pass
-    # 去重扣额度（与 /api/media/process 共用规则）
-    dup = db.query(ImageJob).filter(
-        ImageJob.mode.in_(["替换背景"]),
-        ImageJob.status == "success",
-        ImageJob.quota_consumed.is_(True),
-        ImageJob.detail.contains(src_hash),
-    ).first()
-    if not dup:
-        # VIP 已删除，额度无限
-        if False:
-            # 额度不足 → 返回原图，不扣费、不中断上架
-            # N18：记为 failed（额度不足），不是 success，避免假成功
-            db.add(ImageJob(mode=mode, status="failed", source="publish", user_id=(user.id if user else None),
-                            result_url="", quota_consumed=False, fallback=True,
-                            detail=f"quota_exhausted:{src_hash}"))
-            db.flush()
-            return data
+    # VIP 已删，额度无限，不查 ImageJob
     try:
         import random
         # 镜像：强制交替（用户要求：按发布次数，第 1 次不镜像，第 2 次镜像，第 3 次不镜像…）
-        # 用该图片的 ImageJob 成功次数判断（按图计数，非全局计数，无竞态）
-        # 奇数次（第 1、3、5…次）：不镜像；偶数次（第 2、4、6…次）：镜像
-        job_count = db.query(ImageJob).filter(
-            ImageJob.mode == "替换背景",
-            ImageJob.status == "success",
-            ImageJob.detail.contains(src_hash),
-        ).count()
-        # job_count 是已成功次数，当前是第 job_count+1 次发布
-        # 第 1 次：job_count=0 → 不镜像；第 2 次：job_count=1 → 镜像；第 3 次：job_count=2 → 不镜像
-        force_mirror = (job_count % 2 == 1)
+        # 用资料发布次数判断镜像交替
+        # 第 1 次：publish_count=0 → 不镜像；第 2 次：publish_count=1 → 镜像；第 3 次：publish_count=2 → 不镜像
+        force_mirror = (publish_count % 2 == 1)
         # 防重方案（清晰度优先，无噪点）：
         # - 镜像那次：镜像 + 微裁剪 + 羽化随机（镜像已防重，保持干净）
         # - 不镜像那次：微旋转 + 微裁剪 + 色温微调 + 羽化随机（结构全变，防特征匹配）

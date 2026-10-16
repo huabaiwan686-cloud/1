@@ -350,7 +350,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 processed.append({"data": data, "name": fname})
                 continue
             # 抠图失败必须报错，不得悄悄发原图（用户明确要求）
-            data = matt_for_publish(data, None, db, user, "替换背景", None)
+            data = matt_for_publish(data, None, db, user, "替换背景", None, publish_count=getattr(n, "publish_count", 0) or 0)
             processed.append({"data": data, "name": fname})
         show = processed
 
