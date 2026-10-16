@@ -40,7 +40,7 @@ class UploadOut(BaseModel):
     url: str
 
 
-@router.post("/upload", response_model=UploadOut)
+@router.post("/upload")
 async def upload_file(file: UploadFile = File(...), user: User = Depends(require_member)):
     """通用文件上传：保存到 /uploads/，返回 URL。用于资料上传、消息模板。"""
     import os
@@ -53,5 +53,4 @@ async def upload_file(file: UploadFile = File(...), user: User = Depends(require
     content = await file.read()
     with open(fpath, "wb") as f:
         f.write(content)
-    from app.api.deps import ok
     return ok({"url": f"/uploads/{fname}"})
