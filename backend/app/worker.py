@@ -111,6 +111,8 @@ def sweep_loops() -> dict:
                 # 修复前 bug：cron worker 已加载任务后，用户下架时只改了 DB 的 enabled，
                 # worker 仍按已加载的任务发送，导致下架后还在发。
                 # 修：发送前重查 LoopTask.enabled，防止下架提交前的竞态窗口
+                # 强制过期会话缓存，否则重查读到旧状态
+                db.expire_all()
                 _lt_check = db.query(LoopTask).filter(LoopTask.id == t.id).first()
                 if not _lt_check or not _lt_check.enabled:
                     log.info("循环任务 %s 已被禁用（下架），跳过发送", t.id)
