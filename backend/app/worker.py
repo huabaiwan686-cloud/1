@@ -106,10 +106,15 @@ def sweep_loops() -> dict:
                 n = db.query(Note).filter(Note.id == t.note_id).first()
                 if not n:
                     raise ValueError(f"笔记#{t.note_id} 不存在")
-                # 双保险：发送前再次确认资料仍是已发布状态
+                # 双保险：发送前再次确认资料仍是已发布状态 + 任务仍启用
                 # 下架后循环必须立即停（用户规则：手动下架后不再循环，除非重新上架）
                 # 修复前 bug：cron worker 已加载任务后，用户下架时只改了 DB 的 enabled，
                 # worker 仍按已加载的任务发送，导致下架后还在发。
+                # 修：发送前重查 LoopTask.enabled，防止下架提交前的竞态窗口
+                _lt_check = db.query(LoopTask).filter(LoopTask.id == t.id).first()
+                if not _lt_check or not _lt_check.enabled:
+                    log.info("循环任务 %s 已被禁用（下架），跳过发送", t.id)
+                    continue
                 if n.status != "published":
                     # 资料已下架/草稿，停掉这个循环任务，永不自动恢复
                     db.query(LoopTask).filter(LoopTask.id == t.id).update(
