@@ -118,6 +118,9 @@ def vary_text(text: str, publish_count: int = 0) -> str:
     """
     if not text:
         return text
+    # 首次发布（publish_count <= 1）发原文，不处理
+    if publish_count <= 1:
+        return text
     import random
     lines = text.split("\n")
     # 只打乱年龄、身高、体重这三行，其他行固定
