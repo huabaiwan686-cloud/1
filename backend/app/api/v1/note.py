@@ -617,6 +617,8 @@ def _apply_batch_op(notes: list[Note], op: str, params: dict, db: Session, user:
                 if sent:
                     n.status = "published"
                     n.published_at = datetime.utcnow()
+                    db.flush()
+                    db.commit()  # 立即提交，避免 _send_to_channels 内的 commit 导致对象过期后状态丢失
                     _auto_create_loop_task(db, n, user)  # 批量发布进循环
                 else:
                     n.status = "publish_failed"
