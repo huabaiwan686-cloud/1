@@ -350,7 +350,10 @@ def _send_to_channels(n: Note, user: User, db: Session,
                 processed.append({"data": data, "name": fname})
                 continue
             # 抠图失败必须报错，不得悄悄发原图（用户明确要求）
-            data = matt_for_publish(data, None, db, user, "替换背景", None, publish_count=getattr(n, "publish_count", 0) or 0)
+            # 抠图镜像按发布次数交替：Note 无 publish_count 列，用 TaskLog 成功发送计数
+            from app.models.content import TaskLog as _TL
+            _pc = db.query(_TL).filter(_TL.note_id == n.id, _TL.action.in_(["push_send", "loop_send"]), _TL.result == "success").count()
+            data = matt_for_publish(data, None, db, user, "替换背景", None, publish_count=_pc)
             processed.append({"data": data, "name": fname})
         show = processed
 

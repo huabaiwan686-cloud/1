@@ -162,7 +162,7 @@ def _video_mirror_alternate(db, note_id: int | None) -> bool:
         from app.models.content import TaskLog
         count = db.query(TaskLog).filter(
             TaskLog.note_id == note_id,
-            TaskLog.action == "push_send",
+            TaskLog.action.in_(["push_send", "loop_send"]),
             TaskLog.result == "success",
         ).count()
         return (count % 2 == 1)
