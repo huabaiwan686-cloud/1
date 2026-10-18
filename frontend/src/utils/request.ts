@@ -3,7 +3,7 @@ import axios from 'axios';
 const _base = import.meta.env.VITE_API_BASE_URL;
 const request = axios.create({
   baseURL: _base === undefined ? 'http://localhost:8000' : _base,
-  timeout: 120000,
+  timeout: 300000,  // 发布要抠图+处理视频，120秒不够，改 300 秒
 });
 
 // token 注入 + 全站防缓存：GET 请求一律不走浏览器缓存
