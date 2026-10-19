@@ -108,58 +108,41 @@ def _vary_number_value(key: str, value: str, publish_count: int = 0) -> str:
 
 
 def vary_text(text: str, publish_count: int = 0) -> str:
-    """文本变体：
-    1. 只打乱年龄、身高、体重这三行（带冒号），其他行固定不动
-    2. 年龄/身高/体重的值按发布次数轮流换写法（168→一六八→一米六八→168...），冒号前面不动
-    3. 不加零宽字符（用户要求）
-    4. 不替换空格（用户要求）
-    5. 三行顺序每次随机打乱
-    不改词句/链接/标识符。
+    """文本处理（2026-10-19 用户改定）：
+    1. 首次发布（publish_count <= 1）发原文，不处理
+    2. 循环重发：只打乱年龄、身高、体重三行顺序，值不变（变体取消）
+    3. 冒号前标签不动，不加零宽字符，不替换空格
     """
     if not text:
         return text
-    # 首次发布（publish_count <= 1）发原文，不处理
     if publish_count <= 1:
         return text
     import random
     lines = text.split("\n")
-    # 只打乱年龄、身高、体重这三行，其他行固定
     shuffle_keys = ["年龄", "身高", "体重"]
     shuffle_lines = []
     result = []
     for line in lines:
-        # 检查是否是年龄/身高/体重行（带冒号）
         is_shuffle = (("：" in line or ":" in line) and
                       any(k in line for k in shuffle_keys))
         if is_shuffle:
-            # 找到是哪个字段，换值写法
-            for key in shuffle_keys:
-                if key in line:
-                    # 分离标签和值：身高：168 → 标签=身高：，值=168
-                    colon = "：" if "：" in line else ":"
-                    parts = line.split(colon, 1)
-                    if len(parts) == 2:
-                        new_value = _vary_number_value(key, parts[1], publish_count)
-                        line = parts[0] + colon + new_value
-                    break
             shuffle_lines.append(line)
-            result.append(None)  # 占位，待填入打乱后的行
         else:
             result.append(line)
-    # 打乱年龄/身高/体重三行
+    # 只打乱三行顺序，值不变
     random.shuffle(shuffle_lines)
-    # 填回占位
-    idx = 0
-    for i, item in enumerate(result):
-        if item is None:
-            result[i] = shuffle_lines[idx]
-            idx += 1
-    text = "\n".join(result)
-    # 零宽字符：只插在标点后或行尾，不插词中间（避免"身​高"搜不到"身高"）
-    # 零宽字符已删除：用户没要求加，不加
-    # 只做用户要求的两样：打乱年龄/身高/体重顺序 + 值换中文写法
-    return text
-
+    # 把打乱后的三行放回原位置
+    out = []
+    si = 0
+    for line in lines:
+        is_shuffle = (("：" in line or ":" in line) and
+                      any(k in line for k in shuffle_keys))
+        if is_shuffle:
+            out.append(shuffle_lines[si])
+            si += 1
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 def vary_image(data: bytes) -> bytes:
     """图片变体：微裁切 + 亮度抖动 + 随机 JPEG 质量 + 随机 comment。"""
