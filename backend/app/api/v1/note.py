@@ -412,6 +412,12 @@ def _send_to_channels(n: Note, user: User, db: Session,
             TaskLog.note_id == n.id, TaskLog.action == "push_send",
             TaskLog.result == "success",
             TaskLog.detail.contains(ch.name)).first() is not None
+        # 简化：发之前再查一次，下架了就不发
+        # 处理（抠图/视频）要时间，处理完、发之前查才准
+        db.expire(n, ["status"])
+        if n.status != "published":
+            failed.append(f"{ch.name}：资料已下架，跳过发送")
+            continue
         try:
             res = send_listing_set(
                 _dec(bot.token_secret), chat,
