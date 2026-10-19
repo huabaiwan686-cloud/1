@@ -17,6 +17,9 @@ from app.core.database import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # 启动循环管理器：从数据库恢复循环任务
+    from app.services.loop_manager import restore_loops
+    await restore_loops()
     yield
 
 
