@@ -412,17 +412,7 @@ def _send_to_channels(n: Note, user: User, db: Session,
             TaskLog.note_id == n.id, TaskLog.action == "push_send",
             TaskLog.result == "success",
             TaskLog.detail.contains(ch.name)).first() is not None
-        # 发之前用新会话查状态，下架了就不发
-        # 参考 Bot 代码：检查必须在发之前一刻，用新会话绕开缓存
-        from app.core.database import SessionLocal as _SL
-        _db2 = _SL()
-        try:
-            _n2 = _db2.query(Note).filter(Note.id == n.id).first()
-            if not _n2 or _n2.status != "published":
-                failed.append(f"{ch.name}：资料已下架，跳过发送")
-                continue
-        finally:
-            _db2.close()
+
         try:
             res = send_listing_set(
                 _dec(bot.token_secret), chat,
