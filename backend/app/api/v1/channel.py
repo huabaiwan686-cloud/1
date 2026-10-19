@@ -37,7 +37,7 @@ def _out(c: Channel) -> dict:
 @router.get("/list")
 def list_channels(is_active: bool | None = None, user: User = Depends(require_member), db: Session = Depends(get_db)):
     """列出当前用户的频道（前端 channelApi.list 调用）。"""
-    q = db.query(Channel)
+    q = db.query(Channel).filter(Channel.created_by == user.id)
     if is_active is not None:
         q = q.filter(Channel.is_active.is_(is_active))
     return ok([_out(c) for c in q.order_by(Channel.id.desc()).all()])
