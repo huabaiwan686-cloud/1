@@ -730,7 +730,6 @@ def batch_op(body: BatchIn, user: User = Depends(get_current_user), db: Session 
         raise HTTPException(status.HTTP_403_FORBIDDEN, "该功能仅会员可用，请先开通会员")
     notes = db.query(Note).filter(Note.id.in_(body.ids), Note.created_by == user.id).all()
     import logging as _lg
-    _lg.getLogger(__name__).warning(f"BATCH {body.op} ids={body.ids} user={user.id} found={len(notes)}")
     result = _apply_batch_op(notes, body.op, body.params, db, user)
     db.add(
         TaskLog(
